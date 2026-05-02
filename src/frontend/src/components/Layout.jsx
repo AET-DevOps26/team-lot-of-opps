@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom'
 import TopBar from './TopBar'
 import SideNav from './SideNav'
 import ChatFab from './ChatFab'
+import SettingsModal from './SettingsModal'
 
 export default function Layout() {
   return (
@@ -14,6 +15,7 @@ export default function Layout() {
         </div>
       </main>
       <ChatFab />
+      <SettingsModal />
     </div>
   )
 }

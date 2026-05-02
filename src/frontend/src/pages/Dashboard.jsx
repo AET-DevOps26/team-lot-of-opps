@@ -1,28 +1,5 @@
+import useT from '../i18n/useT'
 import Icon from '../components/Icon'
-
-const SUMMARY_CARDS = [
-  {
-    label: 'Total Expenses',
-    value: '€4,250.00',
-    hint: '+€350 since last upload',
-    hintIcon: 'trending_up',
-    hintColor: 'text-secondary',
-  },
-  {
-    label: 'Est. Loss Carryforward',
-    value: '€3,800.00',
-    hint: 'AI Verified',
-    hintIcon: 'verified',
-    highlight: true,
-  },
-  {
-    label: 'Estimated Future Refund',
-    value: '~€1,140.00',
-    hint: 'Assuming 30% tax rate later',
-    hintIcon: 'info',
-    hintColor: 'text-on-surface-variant',
-  },
-]
 
 const EXPENSE_BARS = [
   { label: 'Fachliteratur', amount: '€850', width: '65%', bar: 'bg-primary' },
@@ -56,30 +33,53 @@ function SummaryCard({ label, value, hint, hintIcon, hintColor, highlight }) {
         {label}
       </p>
       <p className={`font-h2 text-h2 mb-1 ${highlight ? 'text-secondary' : 'text-primary'}`}>{value}</p>
-      <div
-        className={`flex items-center gap-1 ${
-          highlight ? 'text-on-secondary-fixed-variant' : hintColor || 'text-on-surface-variant'
-        }`}
-      >
-        <Icon name={hintIcon} size={16} />
-        <span className="font-body-sm text-body-sm">{hint}</span>
-      </div>
+      {hint && (
+        <div
+          className={`flex items-center gap-1 ${
+            highlight ? 'text-on-secondary-fixed-variant' : hintColor || 'text-on-surface-variant'
+          }`}
+        >
+          {hintIcon && <Icon name={hintIcon} size={16} />}
+          <span className="font-body-sm text-body-sm">{hint}</span>
+        </div>
+      )}
     </div>
   )
 }
 
 export default function Dashboard() {
+  const t = useT()
+
+  const summaryCards = [
+    {
+      label: t('dashboard.cards.totalExpenses'),
+      value: '€4,250.00',
+      hint: t('dashboard.cards.sinceLastUpload'),
+      hintIcon: 'trending_up',
+      hintColor: 'text-secondary',
+    },
+    {
+      label: t('dashboard.cards.carryforward'),
+      value: '€3,800.00',
+      highlight: true,
+    },
+    {
+      label: t('dashboard.cards.futureRefund'),
+      value: '~€1,140.00',
+      hint: t('dashboard.cards.taxRateNote'),
+      hintIcon: 'info',
+    },
+  ]
+
   return (
     <>
       <div className="mb-10">
-        <h1 className="font-h1 text-h1 text-primary mb-2">Tax Overview 2023</h1>
-        <p className="font-body-lg text-body-lg text-on-surface-variant">
-          Here is the current state of your academic tax loss carryforward.
-        </p>
+        <h1 className="font-h1 text-h1 text-primary mb-2">{t('dashboard.title')}</h1>
+        <p className="font-body-lg text-body-lg text-on-surface-variant">{t('dashboard.subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        {SUMMARY_CARDS.map((card) => (
+        {summaryCards.map((card) => (
           <SummaryCard key={card.label} {...card} />
         ))}
       </div>
@@ -88,9 +88,9 @@ export default function Dashboard() {
         <div className="lg:col-span-2 space-y-8">
           <section className={CARD_BASE}>
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-h3 text-h3 text-primary">Expenses by Category</h3>
+              <h3 className="font-h3 text-h3 text-primary">{t('dashboard.categories.title')}</h3>
               <button className="font-body-sm text-body-sm text-surface-tint flex items-center gap-1 hover:text-primary transition-colors">
-                Filter <Icon name="filter_list" size={18} />
+                {t('dashboard.categories.filter')} <Icon name="filter_list" size={18} />
               </button>
             </div>
             <div className="space-y-4">
@@ -113,30 +113,29 @@ export default function Dashboard() {
           <section className={CARD_BASE}>
             <h3 className="font-h3 text-h3 text-primary mb-4 flex items-center gap-2">
               <Icon name="calculate" className="text-surface-tint" />
-              How Your Savings Work
+              {t('dashboard.savings.title')}
             </h3>
             <div className="bg-surface p-4 rounded-lg border border-surface-container-highest">
               <p className="font-body-sm text-body-sm text-on-surface-variant mb-4">
-                A &quot;Verlustvortrag&quot; records your study costs now, to offset against your future income
-                when you start working.
+                {t('dashboard.savings.intro')}
               </p>
               <div className="space-y-2 border-l-2 border-primary-fixed-dim pl-4">
                 <div className="flex justify-between items-center">
                   <span className="font-body-sm text-body-sm text-on-surface-variant">
-                    Your recorded expenses
+                    {t('dashboard.savings.recordedExpenses')}
                   </span>
                   <span className="font-data-mono text-data-mono text-primary">€3,800</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="font-body-sm text-body-sm text-on-surface-variant">
-                    Future tax rate (Est. 30%)
+                    {t('dashboard.savings.futureTaxRate')}
                   </span>
                   <span className="font-data-mono text-data-mono text-primary">x 0.30</span>
                 </div>
                 <div className="w-full h-px bg-surface-container-highest my-2" />
                 <div className="flex justify-between items-center">
                   <span className="font-body-md text-body-md font-semibold text-primary">
-                    Future Cash Refund
+                    {t('dashboard.savings.futureRefund')}
                   </span>
                   <span className="font-data-mono text-data-mono text-secondary font-semibold">
                     €1,140
@@ -152,24 +151,23 @@ export default function Dashboard() {
             <IntelligenceRail />
             <div className="flex items-center gap-2 mb-4">
               <Icon name="auto_awesome" className="text-[#9333ea]" />
-              <h3 className="font-h3 text-h3 text-primary">AI Suggestions</h3>
+              <h3 className="font-h3 text-h3 text-primary">{t('dashboard.ai.title')}</h3>
             </div>
             <div className="space-y-4">
               <div className="bg-error-container/30 border border-error-container p-4 rounded-lg">
                 <p className="font-body-sm text-body-sm text-on-surface mb-3">
-                  &quot;I see you uploaded a hotel receipt for Barcelona (Nov 12). Do you have the
-                  corresponding flight bill to claim full Reisekosten?&quot;
+                  {t('dashboard.ai.suggestion1')}
                 </p>
                 <button className="bg-white border border-outline-variant text-primary font-body-sm text-body-sm px-3 py-1.5 rounded hover:bg-surface-container transition-colors flex items-center gap-1 w-full justify-center">
-                  <Icon name="upload" size={16} /> Upload Flight Bill
+                  <Icon name="upload" size={16} /> {t('dashboard.ai.uploadFlight')}
                 </button>
               </div>
               <div className="bg-surface p-4 rounded-lg border border-surface-container-highest">
                 <p className="font-body-sm text-body-sm text-on-surface mb-3">
-                  You haven&apos;t claimed the Internet Pauschale (Internet Flatrate) for this year.
+                  {t('dashboard.ai.suggestion2')}
                 </p>
                 <button className="text-surface-tint font-body-sm text-body-sm hover:text-primary transition-colors flex items-center gap-1">
-                  Add Pauschale <Icon name="arrow_forward" size={16} />
+                  {t('dashboard.ai.addPauschale')} <Icon name="arrow_forward" size={16} />
                 </button>
               </div>
             </div>

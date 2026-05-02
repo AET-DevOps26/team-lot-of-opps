@@ -1,3 +1,4 @@
+import useT from '../i18n/useT'
 import Icon from '../components/Icon'
 
 const CATEGORIES = [
@@ -33,13 +34,14 @@ const selectClass =
   'w-full appearance-none pl-4 pr-10 py-2 bg-surface rounded-lg border border-outline-variant text-on-surface font-body-sm text-body-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer'
 
 export default function Documents() {
+  const t = useT()
   return (
     <div className="space-y-lg">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="font-h1 text-h1 text-on-background mb-2">Documents</h1>
+          <h1 className="font-h1 text-h1 text-on-background mb-2">{t('documents.title')}</h1>
           <p className="font-body-lg text-body-lg text-on-surface-variant">
-            Manage and review your uploaded tax documents.
+            {t('documents.subtitle')}
           </p>
         </div>
         <div className="bg-secondary-container text-on-secondary-container px-6 py-4 rounded-xl border border-secondary-fixed-dim/30 shadow-sm flex items-center gap-4 min-w-[250px]">
@@ -48,7 +50,7 @@ export default function Documents() {
           </div>
           <div>
             <p className="font-label-caps text-label-caps text-on-secondary-container/80 uppercase tracking-wider mb-1">
-              Total Filtered Amount
+              {t('documents.totalFiltered')}
             </p>
             <p className="font-h2 text-h2 text-on-secondary-container">€ 4,250.00</p>
           </div>
@@ -62,12 +64,12 @@ export default function Documents() {
               name="search"
               className="absolute left-3 top-1/2 -translate-y-1/2 text-outline pointer-events-none"
             />
-            <input className={inputClass} placeholder="Search vendors or notes..." type="text" />
+            <input className={inputClass} placeholder={t('documents.search')} type="text" />
           </div>
 
           <div className="relative min-w-[120px]">
-            <select className={selectClass} defaultValue="All Years">
-              <option>All Years</option>
+            <select className={selectClass} defaultValue="">
+              <option value="">{t('documents.allYears')}</option>
               <option>2023</option>
               <option>2022</option>
               <option>2021</option>
@@ -79,8 +81,8 @@ export default function Documents() {
           </div>
 
           <div className="relative min-w-[200px] flex-1 md:flex-none">
-            <select className={selectClass} defaultValue="All Categories">
-              <option>All Categories</option>
+            <select className={selectClass} defaultValue="">
+              <option value="">{t('documents.allCategories')}</option>
               {CATEGORIES.map((c) => (
                 <option key={c}>{c}</option>
               ))}
@@ -93,7 +95,7 @@ export default function Documents() {
         </div>
         <button className="font-label-caps text-label-caps uppercase text-primary hover:bg-surface p-2 rounded transition-colors flex items-center gap-2">
           <Icon name="filter_list" size={18} />
-          More Filters
+          {t('documents.moreFilters')}
         </button>
       </div>
 
@@ -102,19 +104,19 @@ export default function Documents() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-surface-container-high bg-surface-bright">
-                {['Date', 'Vendor', 'Category'].map((h) => (
+                {['date', 'vendor', 'category'].map((key) => (
                   <th
-                    key={h}
+                    key={key}
                     className="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider font-semibold"
                   >
-                    {h}
+                    {t(`documents.table.${key}`)}
                   </th>
                 ))}
                 <th className="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider font-semibold text-right">
-                  Amount
+                  {t('documents.table.amount')}
                 </th>
                 <th className="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider font-semibold text-center">
-                  Action
+                  {t('documents.table.action')}
                 </th>
               </tr>
             </thead>
@@ -136,7 +138,7 @@ export default function Documents() {
                   <td className="py-4 px-6 text-center">
                     <button
                       className="text-primary hover:bg-primary/10 p-2 rounded-full transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                      title="View Receipt"
+                      title={t('documents.table.viewReceipt')}
                     >
                       <Icon name="visibility" />
                     </button>
@@ -149,7 +151,7 @@ export default function Documents() {
 
         <div className="px-6 py-4 border-t border-surface-container-high bg-surface-bright flex items-center justify-between">
           <span className="font-body-sm text-body-sm text-on-surface-variant">
-            Showing 1-5 of 24 documents
+            {t('documents.pagination')}
           </span>
           <div className="flex items-center gap-2">
             <button

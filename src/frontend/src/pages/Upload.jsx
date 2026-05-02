@@ -1,44 +1,9 @@
+import useT from '../i18n/useT'
 import Icon from '../components/Icon'
-
-const QUEUE_ITEMS = [
-  {
-    type: 'processing',
-    name: 'Q3_Office_Supplies_Invoice.pdf',
-    meta: 'Uploaded Today, 10:42 AM',
-    status: 'AI Extracting',
-    statusClass: 'bg-primary-fixed text-on-primary-fixed',
-    icon: 'receipt_long',
-    iconWrap: 'bg-surface-container text-outline',
-  },
-  {
-    type: 'verified',
-    name: 'AWS_Server_Hosting_Aug2023.pdf',
-    meta: 'Uploaded Yesterday',
-    status: 'Verified',
-    statusClass: 'bg-secondary-container text-on-secondary-container',
-    icon: 'check_circle',
-    iconWrap: 'bg-[#ECFDF5] text-secondary',
-    extracted: [
-      { label: 'Vendor', value: 'Amazon Web Services' },
-      { label: 'Amount', value: '€ 1,245.00', mono: true },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'Unknown_Receipt_Scan_001.jpg',
-    meta: 'Missing vendor information',
-    metaClass: 'text-error',
-    status: 'Action Needed',
-    statusClass: 'bg-tertiary-container text-on-tertiary-container',
-    icon: 'error',
-    iconWrap: 'bg-error-container text-error',
-    borderClass: 'border-error-container',
-  },
-]
 
 const CARD_SHADOW = 'shadow-[0_4px_20px_rgba(26,43,60,0.05)]'
 
-function QueueItem({ item }) {
+function QueueItem({ item, t }) {
   return (
     <article
       className={`bg-surface-container-lowest rounded-lg border ${CARD_SHADOW} overflow-hidden flex flex-col sm:flex-row items-start sm:items-center p-sm gap-md relative ${
@@ -101,7 +66,7 @@ function QueueItem({ item }) {
       {item.type === 'error' && (
         <div className="hidden md:flex items-center pr-md">
           <button className="font-body-sm text-body-sm text-primary font-medium hover:underline flex items-center gap-1">
-            Review Document <Icon name="arrow_forward" size={16} />
+            {t('upload.review')} <Icon name="arrow_forward" size={16} />
           </button>
         </div>
       )}
@@ -110,13 +75,50 @@ function QueueItem({ item }) {
 }
 
 export default function Upload() {
+  const t = useT()
+
+  const queueItems = [
+    {
+      type: 'processing',
+      name: 'Q3_Office_Supplies_Invoice.pdf',
+      meta: t('upload.meta.uploadedToday'),
+      status: t('upload.status.extracting'),
+      statusClass: 'bg-primary-fixed text-on-primary-fixed',
+      icon: 'receipt_long',
+      iconWrap: 'bg-surface-container text-outline',
+    },
+    {
+      type: 'verified',
+      name: 'AWS_Server_Hosting_Aug2023.pdf',
+      meta: t('upload.meta.uploadedYesterday'),
+      status: t('upload.status.verified'),
+      statusClass: 'bg-secondary-container text-on-secondary-container',
+      icon: 'check_circle',
+      iconWrap: 'bg-[#ECFDF5] text-secondary',
+      extracted: [
+        { label: t('upload.fields.vendor'), value: 'Amazon Web Services' },
+        { label: t('upload.fields.amount'), value: '€ 1,245.00', mono: true },
+      ],
+    },
+    {
+      type: 'error',
+      name: 'Unknown_Receipt_Scan_001.jpg',
+      meta: t('upload.meta.missingVendor'),
+      metaClass: 'text-error',
+      status: t('upload.status.actionNeeded'),
+      statusClass: 'bg-tertiary-container text-on-tertiary-container',
+      icon: 'error',
+      iconWrap: 'bg-error-container text-error',
+      borderClass: 'border-error-container',
+    },
+  ]
+
   return (
     <div className="flex flex-col gap-lg">
       <header className="flex flex-col gap-base">
-        <h1 className="font-h1 text-h1 text-on-surface">Intelligent Upload</h1>
+        <h1 className="font-h1 text-h1 text-on-surface">{t('upload.title')}</h1>
         <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">
-          Securely deposit your financial documents. Our AI will automatically extract key data,
-          classify expenses, and identify potential tax-loss carryforwards.
+          {t('upload.subtitle')}
         </p>
       </header>
 
@@ -125,9 +127,9 @@ export default function Upload() {
         <div className="w-16 h-16 mb-6 rounded-full bg-surface-container flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
           <Icon name="cloud_upload" size={32} />
         </div>
-        <h2 className="font-h2 text-h2 text-on-surface mb-2">Drag &amp; drop your invoices here</h2>
+        <h2 className="font-h2 text-h2 text-on-surface mb-2">{t('upload.dropzone.title')}</h2>
         <p className="font-body-md text-body-md text-on-surface-variant mb-6">
-          or click to browse from your device
+          {t('upload.dropzone.subtitle')}
         </p>
         <div className="flex items-center gap-4 text-outline font-label-caps text-label-caps uppercase">
           <span>PDF</span>
@@ -136,10 +138,10 @@ export default function Upload() {
           <div className="w-1 h-1 rounded-full bg-outline-variant" />
           <span>PNG</span>
           <div className="w-1 h-1 rounded-full bg-outline-variant" />
-          <span>Max 25MB</span>
+          <span>{t('upload.dropzone.maxSize')}</span>
         </div>
         <input
-          aria-label="File upload input"
+          aria-label={t('upload.dropzone.title')}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           multiple
           type="file"
@@ -148,14 +150,14 @@ export default function Upload() {
 
       <section className="flex flex-col gap-md">
         <div className="flex items-center justify-between border-b border-surface-variant pb-2">
-          <h3 className="font-h3 text-h3 text-on-surface">Processing Queue</h3>
+          <h3 className="font-h3 text-h3 text-on-surface">{t('upload.queue.title')}</h3>
           <button className="font-body-sm text-body-sm text-primary font-medium hover:underline">
-            View All Documents
+            {t('upload.queue.viewAll')}
           </button>
         </div>
         <div className="grid grid-cols-1 gap-sm">
-          {QUEUE_ITEMS.map((item) => (
-            <QueueItem key={item.name} item={item} />
+          {queueItems.map((item) => (
+            <QueueItem key={item.name} item={item} t={t} />
           ))}
         </div>
       </section>
