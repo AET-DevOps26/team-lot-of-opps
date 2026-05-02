@@ -1,0 +1,63 @@
+import { NavLink } from 'react-router-dom'
+import Icon from './Icon'
+
+const NAV_ITEMS = [
+  { to: '/', icon: 'dashboard', label: 'Dashboard', end: true },
+  { to: '/documents', icon: 'description', label: 'Documents' },
+  { to: '/upload', icon: 'upload_file', label: 'Upload' },
+]
+
+const FOOTER_ITEMS = [
+  { icon: 'settings', label: 'Settings' },
+]
+
+function navClass({ isActive }) {
+  return [
+    'flex items-center gap-3 p-3 rounded-lg transition-colors text-sm font-semibold tracking-wide',
+    isActive
+      ? 'bg-white text-blue-700 shadow-sm'
+      : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700',
+  ].join(' ')
+}
+
+export default function SideNav() {
+  return (
+    <aside className="hidden md:flex fixed left-0 top-16 h-[calc(100vh-64px)] w-64 p-4 flex-col justify-between bg-slate-50 border-r border-slate-200 z-40">
+      <div>
+        <div className="mb-8 px-3">
+          <h2 className="text-lg font-extrabold text-slate-900 uppercase tracking-wide">
+            Verlustvortrag
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">Tax Optimizer</p>
+        </div>
+        <ul className="space-y-2">
+          {NAV_ITEMS.map((item) => (
+            <li key={item.to}>
+              <NavLink to={item.to} end={item.end} className={navClass}>
+                {({ isActive }) => (
+                  <>
+                    <Icon name={item.icon} filled={isActive} />
+                    {item.label}
+                  </>
+                )}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <ul className="space-y-2 border-t border-slate-200 pt-4">
+        {FOOTER_ITEMS.map((item) => (
+          <li key={item.label}>
+            <a
+              href="#"
+              className="flex items-center gap-3 text-slate-600 p-3 hover:bg-blue-50 hover:text-blue-700 rounded-lg transition-colors text-sm font-semibold tracking-wide"
+            >
+              <Icon name={item.icon} />
+              {item.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  )
+}
