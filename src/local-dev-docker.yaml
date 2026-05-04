@@ -1,4 +1,6 @@
 services:
+  # ai:
+
   backend:
     platform: linux/amd64
     build:
@@ -11,6 +13,7 @@ services:
       - SPRING_PROFILES_ACTIVE=dev
       - SPRING_APPLICATION_NAME=backend
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/app_db
+      - AI_BACKEND_URL=http://ai:8081/extract
     networks:
       - network
     healthcheck:

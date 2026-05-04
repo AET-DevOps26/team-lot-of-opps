@@ -1,0 +1,13 @@
+package com.lotofopps.backend.repository;
+
+import com.lotofopps.backend.model.Document;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface DocumentRepository extends JpaRepository<Document, Long> {
+
+    List<Document> findByContentType(String contentType);
+
+    List<Document> findByFilenameContainingIgnoreCase(String filename);
+}
