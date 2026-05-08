@@ -6,6 +6,7 @@ export interface TranslationDict {
   sidebar: { title: string; subtitle: string }
   nav: { dashboard: string; documents: string; upload: string; settings: string }
   topbar: { logIn: string }
+  auth: { signOut: string; accountMenu: string }
   settings: {
     title: string
     language: string
@@ -83,6 +84,7 @@ const translations: Record<Language, TranslationDict> = {
       settings: 'Settings',
     },
     topbar: { logIn: 'Log In' },
+    auth: { signOut: 'Sign out', accountMenu: 'Account menu' },
     settings: {
       title: 'Settings',
       language: 'Language',
@@ -173,6 +175,7 @@ const translations: Record<Language, TranslationDict> = {
       settings: 'Einstellungen',
     },
     topbar: { logIn: 'Anmelden' },
+    auth: { signOut: 'Abmelden', accountMenu: 'Kontomenü' },
     settings: {
       title: 'Einstellungen',
       language: 'Sprache',
