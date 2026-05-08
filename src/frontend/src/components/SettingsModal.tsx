@@ -1,22 +1,24 @@
-import { useDispatch, useSelector } from 'react-redux'
 import { closeSettings } from '../features/uiSlice'
 import { setLanguage } from '../features/i18nSlice'
 import { SUPPORTED_LANGUAGES } from '../i18n/translations'
+import { useAppDispatch, useAppSelector } from '../store/hooks'
 import useT from '../i18n/useT'
 import Icon from './Icon'
 
 export default function SettingsModal() {
   const t = useT()
-  const dispatch = useDispatch()
-  const open = useSelector((state) => state.ui.settingsOpen)
-  const language = useSelector((state) => state.i18n.language)
+  const dispatch = useAppDispatch()
+  const open = useAppSelector((state) => state.ui.settingsOpen)
+  const language = useAppSelector((state) => state.i18n.language)
 
   if (!open) return null
+
+  const close = () => dispatch(closeSettings())
 
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40"
-      onClick={() => dispatch(closeSettings())}
+      onClick={close}
     >
       <div
         role="dialog"
@@ -28,7 +30,7 @@ export default function SettingsModal() {
           <h2 className="font-h2 text-h2 text-primary">{t('settings.title')}</h2>
           <button
             aria-label={t('settings.close')}
-            onClick={() => dispatch(closeSettings())}
+            onClick={close}
             className="p-2 text-outline hover:text-on-surface hover:bg-surface rounded-full transition-colors"
           >
             <Icon name="close" />

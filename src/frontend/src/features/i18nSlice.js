@@ -1,31 +1,30 @@
-import { createSlice } from '@reduxjs/toolkit'
-import { SUPPORTED_LANGUAGES } from '../i18n/translations'
-
-const STORAGE_KEY = 'app.language'
-
+import { createSlice } from '@reduxjs/toolkit';
+import { isLanguage } from '../i18n/translations';
+const STORAGE_KEY = 'app.language';
+const DEFAULT_LANGUAGE = 'en';
 function detectInitialLanguage() {
-  if (typeof window === 'undefined') return 'en'
-  const stored = window.localStorage?.getItem(STORAGE_KEY)
-  if (stored && SUPPORTED_LANGUAGES.includes(stored)) return stored
-  const browser = window.navigator?.language?.slice(0, 2)
-  return SUPPORTED_LANGUAGES.includes(browser) ? browser : 'en'
+    if (typeof window === 'undefined')
+        return DEFAULT_LANGUAGE;
+    const stored = window.localStorage?.getItem(STORAGE_KEY);
+    if (isLanguage(stored))
+        return stored;
+    const browser = window.navigator?.language?.slice(0, 2);
+    return isLanguage(browser) ? browser : DEFAULT_LANGUAGE;
 }
-
-const i18nSlice = createSlice({
-  name: 'i18n',
-  initialState: {
+const initialState = {
     language: detectInitialLanguage(),
-  },
-  reducers: {
-    setLanguage: (state, action) => {
-      if (!SUPPORTED_LANGUAGES.includes(action.payload)) return
-      state.language = action.payload
-      if (typeof window !== 'undefined') {
-        window.localStorage?.setItem(STORAGE_KEY, action.payload)
-      }
+};
+const i18nSlice = createSlice({
+    name: 'i18n',
+    initialState,
+    reducers: {
+        setLanguage(state, action) {
+            state.language = action.payload;
+            if (typeof window !== 'undefined') {
+                window.localStorage?.setItem(STORAGE_KEY, action.payload);
+            }
+        },
     },
-  },
-})
-
-export const { setLanguage } = i18nSlice.actions
-export default i18nSlice.reducer
+});
+export const { setLanguage } = i18nSlice.actions;
+export default i18nSlice.reducer;

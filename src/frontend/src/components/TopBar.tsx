@@ -1,11 +1,12 @@
-import { useDispatch } from 'react-redux'
 import { openSettings } from '../features/uiSlice'
+import { useAppDispatch } from '../store/hooks'
 import useT from '../i18n/useT'
 import Icon from './Icon'
 
 export default function TopBar() {
   const t = useT()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
+
   return (
     <header className="flex justify-between items-center h-16 px-6 w-full fixed top-0 left-0 z-50 bg-white border-b border-slate-200 shadow-sm">
       <div className="flex items-center gap-4">
