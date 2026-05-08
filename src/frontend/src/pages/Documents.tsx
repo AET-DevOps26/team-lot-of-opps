@@ -1,7 +1,14 @@
 import useT from '../i18n/useT'
 import Icon from '../components/Icon'
 
-const CATEGORIES = [
+interface DocumentRow {
+  date: string
+  vendor: string
+  category: string
+  amount: string
+}
+
+const CATEGORIES: readonly string[] = [
   'Arbeitsmittel',
   'Fahrtkosten',
   'Fachliteratur',
@@ -19,13 +26,15 @@ const CATEGORIES = [
   'Steuerberatungskosten',
 ]
 
-const ROWS = [
+const ROWS: readonly DocumentRow[] = [
   { date: '12.10.2023', vendor: 'Apple Store', category: 'Arbeitsmittel', amount: '€ 1,299.00' },
   { date: '05.09.2023', vendor: 'Deutsche Bahn', category: 'Fahrtkosten', amount: '€ 145.50' },
   { date: '22.08.2023', vendor: 'Thalia Buchhandlung', category: 'Fachliteratur', amount: '€ 68.00' },
   { date: '15.01.2023', vendor: 'Coursera', category: 'Fortbildungskosten', amount: '€ 399.00' },
   { date: '10.11.2022', vendor: 'IKEA', category: 'Arbeitszimmer', amount: '€ 450.00' },
 ]
+
+const TABLE_COLUMNS = ['date', 'vendor', 'category'] as const
 
 const inputClass =
   'w-full pl-10 pr-4 py-2 bg-surface rounded-lg border border-outline-variant text-on-surface font-body-sm text-body-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all'
@@ -35,6 +44,7 @@ const selectClass =
 
 export default function Documents() {
   const t = useT()
+
   return (
     <div className="space-y-lg">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -83,8 +93,8 @@ export default function Documents() {
           <div className="relative min-w-[200px] flex-1 md:flex-none">
             <select className={selectClass} defaultValue="">
               <option value="">{t('documents.allCategories')}</option>
-              {CATEGORIES.map((c) => (
-                <option key={c}>{c}</option>
+              {CATEGORIES.map((category) => (
+                <option key={category}>{category}</option>
               ))}
             </select>
             <Icon
@@ -104,7 +114,7 @@ export default function Documents() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-surface-container-high bg-surface-bright">
-                {['date', 'vendor', 'category'].map((key) => (
+                {TABLE_COLUMNS.map((key) => (
                   <th
                     key={key}
                     className="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider font-semibold"
@@ -122,8 +132,13 @@ export default function Documents() {
             </thead>
             <tbody className="divide-y divide-surface-container-high">
               {ROWS.map((row) => (
-                <tr key={`${row.date}-${row.vendor}`} className="hover:bg-surface transition-colors group">
-                  <td className="py-4 px-6 font-data-mono text-data-mono text-on-surface">{row.date}</td>
+                <tr
+                  key={`${row.date}-${row.vendor}`}
+                  className="hover:bg-surface transition-colors group"
+                >
+                  <td className="py-4 px-6 font-data-mono text-data-mono text-on-surface">
+                    {row.date}
+                  </td>
                   <td className="py-4 px-6 font-body-md text-body-md text-on-surface font-medium">
                     {row.vendor}
                   </td>

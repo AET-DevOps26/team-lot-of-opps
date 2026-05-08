@@ -1,9 +1,30 @@
-import useT from '../i18n/useT'
+import useT, { type Translator } from '../i18n/useT'
 import Icon from '../components/Icon'
+
+type QueueItemType = 'processing' | 'verified' | 'error'
+
+interface ExtractedField {
+  label: string
+  value: string
+  mono?: boolean
+}
+
+interface QueueItem {
+  type: QueueItemType
+  name: string
+  meta: string
+  metaClass?: string
+  status: string
+  statusClass: string
+  icon: string
+  iconWrap: string
+  borderClass?: string
+  extracted?: readonly ExtractedField[]
+}
 
 const CARD_SHADOW = 'shadow-[0_4px_20px_rgba(26,43,60,0.05)]'
 
-function QueueItem({ item, t }) {
+function QueueItemCard({ item, t }: { item: QueueItem; t: Translator }) {
   return (
     <article
       className={`bg-surface-container-lowest rounded-lg border ${CARD_SHADOW} overflow-hidden flex flex-col sm:flex-row items-start sm:items-center p-sm gap-md relative ${
@@ -77,7 +98,7 @@ function QueueItem({ item, t }) {
 export default function Upload() {
   const t = useT()
 
-  const queueItems = [
+  const queueItems: readonly QueueItem[] = [
     {
       type: 'processing',
       name: 'Q3_Office_Supplies_Invoice.pdf',
@@ -157,7 +178,7 @@ export default function Upload() {
         </div>
         <div className="grid grid-cols-1 gap-sm">
           {queueItems.map((item) => (
-            <QueueItem key={item.name} item={item} t={t} />
+            <QueueItemCard key={item.name} item={item} t={t} />
           ))}
         </div>
       </section>

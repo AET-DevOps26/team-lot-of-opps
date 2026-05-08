@@ -1,7 +1,23 @@
 import useT from '../i18n/useT'
 import Icon from '../components/Icon'
 
-const EXPENSE_BARS = [
+interface ExpenseBar {
+  label: string
+  amount: string
+  width: string
+  bar: string
+}
+
+interface SummaryCardProps {
+  label: string
+  value: string
+  hint?: string
+  hintIcon?: string
+  hintColor?: string
+  highlight?: boolean
+}
+
+const EXPENSE_BARS: readonly ExpenseBar[] = [
   { label: 'Fachliteratur', amount: '€850', width: '65%', bar: 'bg-primary' },
   { label: 'Fahrtkosten', amount: '€420', width: '45%', bar: 'bg-surface-tint' },
   { label: 'Arbeitsmittel', amount: '€310', width: '30%', bar: 'bg-primary-fixed-dim' },
@@ -15,30 +31,24 @@ function IntelligenceRail() {
   return <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#9333ea] to-[#2563eb]" />
 }
 
-function SummaryCard({ label, value, hint, hintIcon, hintColor, highlight }) {
+function SummaryCard({ label, value, hint, hintIcon, hintColor, highlight = false }: SummaryCardProps) {
+  const containerClass = highlight
+    ? `relative overflow-hidden bg-[#ECFDF5] border border-secondary-fixed-dim rounded-xl p-6 ${CARD_SHADOW}`
+    : CARD_BASE
+
+  const labelClass = highlight ? 'text-on-secondary-container' : 'text-on-surface-variant'
+  const valueClass = highlight ? 'text-secondary' : 'text-primary'
+  const hintTextClass = highlight ? 'text-on-secondary-fixed-variant' : hintColor || 'text-on-surface-variant'
+
   return (
-    <div
-      className={
-        highlight
-          ? `relative overflow-hidden bg-[#ECFDF5] border border-secondary-fixed-dim rounded-xl p-6 ${CARD_SHADOW}`
-          : CARD_BASE
-      }
-    >
+    <div className={containerClass}>
       {highlight && <IntelligenceRail />}
-      <p
-        className={`font-label-caps text-label-caps mb-2 uppercase tracking-widest ${
-          highlight ? 'text-on-secondary-container' : 'text-on-surface-variant'
-        }`}
-      >
+      <p className={`font-label-caps text-label-caps mb-2 uppercase tracking-widest ${labelClass}`}>
         {label}
       </p>
-      <p className={`font-h2 text-h2 mb-1 ${highlight ? 'text-secondary' : 'text-primary'}`}>{value}</p>
+      <p className={`font-h2 text-h2 mb-1 ${valueClass}`}>{value}</p>
       {hint && (
-        <div
-          className={`flex items-center gap-1 ${
-            highlight ? 'text-on-secondary-fixed-variant' : hintColor || 'text-on-surface-variant'
-          }`}
-        >
+        <div className={`flex items-center gap-1 ${hintTextClass}`}>
           {hintIcon && <Icon name={hintIcon} size={16} />}
           <span className="font-body-sm text-body-sm">{hint}</span>
         </div>
@@ -50,7 +60,7 @@ function SummaryCard({ label, value, hint, hintIcon, hintColor, highlight }) {
 export default function Dashboard() {
   const t = useT()
 
-  const summaryCards = [
+  const summaryCards: readonly SummaryCardProps[] = [
     {
       label: t('dashboard.cards.totalExpenses'),
       value: '€4,250.00',
