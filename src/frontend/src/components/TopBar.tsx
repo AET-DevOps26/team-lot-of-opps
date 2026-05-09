@@ -1,6 +1,7 @@
 import { openSettings } from '../features/uiSlice'
 import { useAppDispatch } from '../store/hooks'
 import useT from '../i18n/useT'
+import AuthMenu from './AuthMenu'
 import Icon from './Icon'
 
 export default function TopBar() {
@@ -20,9 +21,7 @@ export default function TopBar() {
         >
           <Icon name="settings" />
         </button>
-        <button className="ml-2 font-medium text-blue-700 hover:bg-slate-50 px-4 py-2 rounded-lg transition-colors">
-          {t('topbar.logIn')}
-        </button>
+        <AuthMenu />
       </div>
     </header>
   )
