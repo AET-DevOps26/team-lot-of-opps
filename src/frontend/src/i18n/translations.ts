@@ -4,7 +4,24 @@ export type Language = (typeof SUPPORTED_LANGUAGES)[number]
 export interface TranslationDict {
   brand: string
   sidebar: { title: string; subtitle: string }
-  nav: { dashboard: string; documents: string; upload: string; settings: string }
+  nav: {
+    dashboard: string
+    documents: string
+    upload: string
+    settings: string
+    signInRequired: string
+  }
+  onboarding: {
+    eyebrow: string
+    title: string
+    subtitle: string
+    signInHint: string
+    features: {
+      upload: { title: string; body: string }
+      ai: { title: string; body: string }
+      savings: { title: string; body: string }
+    }
+  }
   topbar: { logIn: string }
   auth: { signIn: string; signOut: string; accountMenu: string }
   settings: {
@@ -82,6 +99,28 @@ const translations: Record<Language, TranslationDict> = {
       documents: 'Documents',
       upload: 'Upload',
       settings: 'Settings',
+      signInRequired: 'Sign in to access this section',
+    },
+    onboarding: {
+      eyebrow: 'Welcome to TaxForward',
+      title: 'Turn your study costs into a future tax refund',
+      subtitle:
+        'TaxForward records the expenses you have today as students or trainees, so you can offset them against your future income — automatically, with AI-assisted document processing.',
+      signInHint: 'We use Google sign-in. We only read your name, email, and profile picture.',
+      features: {
+        upload: {
+          title: 'Drop in your receipts',
+          body: 'Upload PDFs or photos of any tuition fee, semester ticket, laptop, books — anything study-related.',
+        },
+        ai: {
+          title: 'AI does the paperwork',
+          body: 'Vendor, amount, category, and tax classification are extracted automatically and reviewed before you confirm.',
+        },
+        savings: {
+          title: 'See what it is worth',
+          body: 'Get a live estimate of your "Verlustvortrag" — the refund waiting for you when you start earning.',
+        },
+      },
     },
     topbar: { logIn: 'Log In' },
     auth: { signIn: 'Sign in with Google', signOut: 'Sign out', accountMenu: 'Account menu' },
@@ -173,6 +212,29 @@ const translations: Record<Language, TranslationDict> = {
       documents: 'Dokumente',
       upload: 'Hochladen',
       settings: 'Einstellungen',
+      signInRequired: 'Anmelden, um diesen Bereich zu nutzen',
+    },
+    onboarding: {
+      eyebrow: 'Willkommen bei TaxForward',
+      title: 'Aus heutigen Studienkosten wird morgen Steuerrückerstattung',
+      subtitle:
+        'TaxForward erfasst deine aktuellen Ausgaben als Studierende:r oder Auszubildende:r, damit du sie später mit deinem Einkommen verrechnen kannst — automatisch, mit KI-gestützter Belegerkennung.',
+      signInHint:
+        'Wir nutzen Google-Anmeldung und lesen nur Name, E-Mail und Profilbild.',
+      features: {
+        upload: {
+          title: 'Belege einfach hochladen',
+          body: 'Lade PDFs oder Fotos von Studiengebühren, Semestertickets, Laptops, Büchern hoch — alles, was zum Studium gehört.',
+        },
+        ai: {
+          title: 'KI übernimmt die Bürokratie',
+          body: 'Lieferant, Betrag, Kategorie und steuerliche Einordnung werden automatisch extrahiert und vor der Bestätigung geprüft.',
+        },
+        savings: {
+          title: 'Sieh, was es wert ist',
+          body: 'Erhalte eine Live-Schätzung deines Verlustvortrags — die Rückerstattung, die auf dich wartet, sobald du verdienst.',
+        },
+      },
     },
     topbar: { logIn: 'Anmelden' },
     auth: { signIn: 'Mit Google anmelden', signOut: 'Abmelden', accountMenu: 'Kontomenü' },

@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { openSettings } from '../features/uiSlice'
-import { useAppDispatch } from '../store/hooks'
+import { useAppDispatch, useAppSelector } from '../store/hooks'
 import useT from '../i18n/useT'
 import Icon from './Icon'
 
@@ -17,9 +17,12 @@ const NAV_ITEMS: readonly NavItem[] = [
   { to: '/upload', icon: 'upload_file', labelKey: 'nav.upload' },
 ]
 
-function navClass({ isActive }: { isActive: boolean }): string {
+const NAV_BASE =
+  'flex items-center gap-3 p-3 rounded-lg transition-colors text-sm font-semibold tracking-wide'
+
+function activeClass({ isActive }: { isActive: boolean }): string {
   return [
-    'flex items-center gap-3 p-3 rounded-lg transition-colors text-sm font-semibold tracking-wide',
+    NAV_BASE,
     isActive
       ? 'bg-white text-blue-700 shadow-sm'
       : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700',
@@ -29,6 +32,7 @@ function navClass({ isActive }: { isActive: boolean }): string {
 export default function SideNav() {
   const t = useT()
   const dispatch = useAppDispatch()
+  const isAuthenticated = useAppSelector((state) => state.auth.user !== null)
 
   return (
     <aside className="hidden md:flex fixed left-0 top-16 h-[calc(100vh-64px)] w-64 p-4 flex-col justify-between bg-slate-50 border-r border-slate-200 z-40">
@@ -42,17 +46,39 @@ export default function SideNav() {
         <ul className="space-y-2">
           {NAV_ITEMS.map((item) => (
             <li key={item.to}>
-              <NavLink to={item.to} end={item.end} className={navClass}>
-                {({ isActive }) => (
-                  <>
-                    <Icon name={item.icon} filled={isActive} />
-                    {t(item.labelKey)}
-                  </>
-                )}
-              </NavLink>
+              {isAuthenticated ? (
+                <NavLink to={item.to} end={item.end} className={activeClass}>
+                  {({ isActive }) => (
+                    <>
+                      <Icon name={item.icon} filled={isActive} />
+                      {t(item.labelKey)}
+                    </>
+                  )}
+                </NavLink>
+              ) : (
+                <span
+                  aria-disabled="true"
+                  className={`${NAV_BASE} text-slate-400 cursor-not-allowed select-none`}
+                >
+                  <Icon name={item.icon} />
+                  <span className="flex-1">{t(item.labelKey)}</span>
+                  <Icon name="lock" />
+                </span>
+              )}
             </li>
           ))}
         </ul>
+        {!isAuthenticated ? (
+          <div
+            role="note"
+            className="mt-4 flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600"
+          >
+            <span className="text-slate-400 mt-0.5">
+              <Icon name="lock" />
+            </span>
+            <span className="leading-snug">{t('nav.signInRequired')}</span>
+          </div>
+        ) : null}
       </div>
       <ul className="space-y-2 border-t border-slate-200 pt-4">
         <li>
