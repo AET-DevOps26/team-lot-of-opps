@@ -20,7 +20,7 @@ ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <Provider store={store}>
       <GoogleOAuthProvider clientId={googleClientId ?? ''}>
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <App />
         </BrowserRouter>
       </GoogleOAuthProvider>
