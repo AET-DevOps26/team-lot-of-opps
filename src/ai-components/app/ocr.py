@@ -17,4 +17,7 @@ async def extract_text(file) -> str:
         raw_text = text
     else:
         raise ValueError(f"Unsupported file type: {file.content_type}")
+    extracted = raw_text.strip()
+    if not extracted or len(extracted) < 10:
+        raise ValueError("Could not extract text - document may be low quality or blank")
     return raw_text
