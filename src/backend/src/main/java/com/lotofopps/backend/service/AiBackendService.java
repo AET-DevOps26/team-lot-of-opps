@@ -2,7 +2,6 @@ package com.lotofopps.backend.service;
 
 import com.lotofopps.backend.model.Document;
 import com.lotofopps.backend.model.Invoice;
-import com.lotofopps.backend.repository.DocumentRepository;
 import com.lotofopps.backend.repository.InvoiceRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -23,32 +22,24 @@ public class AiBackendService {
 
     private final String aiBackendUrl;
     private final InvoiceRepository invoiceRepository;
-    private final DocumentRepository documentRepository;
     private final RestTemplate restTemplate = new RestTemplate();
 
     public AiBackendService(
             @Value("${ai.backend.url}") String aiBackendUrl,
-            InvoiceRepository invoiceRepository,
-            DocumentRepository documentRepository) {
+            InvoiceRepository invoiceRepository) {
         this.aiBackendUrl = aiBackendUrl;
         this.invoiceRepository = invoiceRepository;
-        this.documentRepository = documentRepository;
     }
 
     public Invoice extractAndStore(Document document) {
         Map<String, Object> aiResponse = sendToAiBackend(document);
-
-        String userId = (String) aiResponse.get("user_id");
-
-        document.setUserId(userId);
-        documentRepository.save(document);
 
         Invoice invoice = new Invoice(
                 (String) aiResponse.get("product_name"),
                 (String) aiResponse.get("company"),
                 new BigDecimal(aiResponse.get("value").toString())
         );
-        invoice.setUserId(userId);
+        invoice.setUserId(document.getUserId());
         String rawDate = (String) aiResponse.get("invoice_date");
         if (rawDate != null) {
             invoice.setInvoiceDate(LocalDate.parse(rawDate));

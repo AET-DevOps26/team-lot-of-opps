@@ -2,30 +2,15 @@ import { useState } from 'react'
 import { useGoogleLogin } from '@react-oauth/google'
 import { signedIn, type AuthUser } from '../features/authSlice'
 import { useAppDispatch } from '../store/hooks'
+import { apiPost } from '../api/client'
 import useT from '../i18n/useT'
 
-const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
-
-interface GoogleUserInfo {
+interface BackendAuthResponse {
+  token: string
   sub: string
   email: string
-  name?: string
+  name: string
   picture?: string
-}
-
-async function fetchUserInfo(accessToken: string): Promise<AuthUser> {
-  const res = await fetch(USERINFO_URL, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  })
-  if (!res.ok) throw new Error(`userinfo request failed: ${res.status}`)
-  const data = (await res.json()) as GoogleUserInfo
-  if (!data.sub || !data.email) throw new Error('userinfo response missing required fields')
-  return {
-    sub: data.sub,
-    email: data.email,
-    name: data.name ?? data.email,
-    picture: data.picture,
-  }
 }
 
 interface Props {
@@ -43,10 +28,19 @@ export default function GoogleSignInButton({ size = 'sm', className = '' }: Prop
     scope: 'openid email profile',
     onSuccess: async (tokenResponse) => {
       try {
-        const profile = await fetchUserInfo(tokenResponse.access_token)
-        dispatch(signedIn(profile))
+        const response = await apiPost<BackendAuthResponse>(
+          '/api/auth/google',
+          { accessToken: tokenResponse.access_token },
+        )
+        const profile: AuthUser = {
+          sub: response.sub,
+          email: response.email,
+          name: response.name,
+          picture: response.picture,
+        }
+        dispatch(signedIn({ user: profile, token: response.token }))
       } catch (err) {
-        console.error('Failed to load Google user profile', err)
+        console.error('Failed to sign in', err)
       } finally {
         setBusy(false)
       }
