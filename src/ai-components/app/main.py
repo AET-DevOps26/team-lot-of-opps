@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from typing import Optional
+from app.ocr import extract_text
 import httpx
 import os
 
@@ -14,13 +15,8 @@ async def extract(
     file: UploadFile = File(...),
     user_id: Optional[str] = Form(None)
 ):
-    return {
-        "user_id": user_id or "unknown",
-        "product_name": "Test Product",
-        "company": "Test Company",
-        "value": "99.99",
-        "invoice_date": "2024-01-15"
-    }
+    raw_text = await extract_text(file)
+    return {"raw_text": raw_text}
 
 @app.get("/test-llm")
 async def test_llm():

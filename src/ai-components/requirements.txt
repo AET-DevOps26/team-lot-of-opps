@@ -2,3 +2,7 @@ fastapi
 uvicorn[standard]
 python-multipart
 httpx
+pdfplumber
+pytesseract
+Pillow
+langextract
