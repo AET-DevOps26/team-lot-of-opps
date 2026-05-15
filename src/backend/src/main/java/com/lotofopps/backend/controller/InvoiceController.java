@@ -10,7 +10,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/invoices")
@@ -21,14 +20,6 @@ public class InvoiceController {
 
     public InvoiceController(InvoiceRepository invoiceRepository) {
         this.invoiceRepository = invoiceRepository;
-    }
-
-    @GetMapping("/health")
-    @Operation(summary = "Health check", responses = {
-        @ApiResponse(responseCode = "200", description = "Service is up")
-    })
-    public ResponseEntity<Map<String, String>> health() {
-        return ResponseEntity.ok(Map.of("status", "UP"));
     }
 
     @GetMapping

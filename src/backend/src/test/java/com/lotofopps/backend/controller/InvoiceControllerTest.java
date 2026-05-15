@@ -27,13 +27,6 @@ class InvoiceControllerTest {
     private InvoiceRepository invoiceRepository;
 
     @Test
-    void healthReturnsUp() throws Exception {
-        mockMvc.perform(get("/api/invoices/health"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"));
-    }
-
-    @Test
     void listInvoicesReturnsInvoiceResponseFields() throws Exception {
         Invoice invoice = new Invoice("Laptop", "Apple", new BigDecimal("1299.99"));
         when(invoiceRepository.findByInvoiceDateYear(anyInt())).thenReturn(List.of(invoice));
