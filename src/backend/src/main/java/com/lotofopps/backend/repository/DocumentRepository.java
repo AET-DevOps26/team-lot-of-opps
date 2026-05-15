@@ -10,4 +10,6 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
     List<Document> findByContentType(String contentType);
 
     List<Document> findByFilenameContainingIgnoreCase(String filename);
+
+    List<Document> findByUserId(String userId);
 }

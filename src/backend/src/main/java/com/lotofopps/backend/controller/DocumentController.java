@@ -12,8 +12,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -39,6 +41,10 @@ public class DocumentController {
         this.aiBackendService = aiBackendService;
     }
 
+    private String currentUserId() {
+        return SecurityContextHolder.getContext().getAuthentication().getName();
+    }
+
     @PostMapping("/upload")
     @Operation(summary = "Upload a document", responses = {
         @ApiResponse(responseCode = "200", description = "Document received and processed"),
@@ -51,7 +57,7 @@ public class DocumentController {
             return ResponseEntity.badRequest().body(Map.of("error", "No file provided"));
         }
         try {
-            Document document = documentStorageService.store(file);
+            Document document = documentStorageService.store(file, currentUserId());
             Invoice invoice = aiBackendService.extractAndStore(document);
             return ResponseEntity.ok(new UploadResponse(
                     "Document received", file.getOriginalFilename(),
@@ -66,12 +72,16 @@ public class DocumentController {
     @GetMapping("/{id}/content")
     @Operation(summary = "Download document content", responses = {
         @ApiResponse(responseCode = "200", description = "File content"),
+        @ApiResponse(responseCode = "403", description = "Document belongs to another user"),
         @ApiResponse(responseCode = "404", description = "Document not found")
     })
     public ResponseEntity<Resource> downloadDocument(@PathVariable Long id) {
         Document document = documentRepository.findById(id).orElse(null);
         if (document == null) {
             return ResponseEntity.notFound().build();
+        }
+        if (!currentUserId().equals(document.getUserId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         try {
             Resource resource = documentStorageService.load(document.getStoragePath());
@@ -86,11 +96,11 @@ public class DocumentController {
     }
 
     @GetMapping
-    @Operation(summary = "List all documents", responses = {
+    @Operation(summary = "List documents for the authenticated user", responses = {
         @ApiResponse(responseCode = "200", description = "List of documents")
     })
     public ResponseEntity<List<DocumentResponse>> listDocuments() {
-        return ResponseEntity.ok(documentRepository.findAll().stream()
+        return ResponseEntity.ok(documentRepository.findByUserId(currentUserId()).stream()
                 .map(DocumentResponse::from)
                 .toList());
     }

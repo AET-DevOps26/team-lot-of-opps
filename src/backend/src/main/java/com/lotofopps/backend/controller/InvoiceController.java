@@ -6,9 +6,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -32,15 +32,16 @@ public class InvoiceController {
     }
 
     @GetMapping
-    @Operation(summary = "List invoices filtered by year", responses = {
+    @Operation(summary = "List invoices for the authenticated user, optionally filtered by year", responses = {
         @ApiResponse(responseCode = "200", description = "List of invoices")
     })
     public ResponseEntity<List<InvoiceResponse>> listInvoices(
             @RequestParam(required = false) Integer invoiceYear) {
-        int effectiveYear = (invoiceYear != null) ? invoiceYear : LocalDateTime.now().getYear();
-        return ResponseEntity.ok(invoiceRepository.findByInvoiceDateYear(effectiveYear).stream()
-                .map(InvoiceResponse::from)
-                .toList());
+        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+        List<InvoiceResponse> results = (invoiceYear != null)
+                ? invoiceRepository.findByUserIdAndInvoiceDateYear(userId, invoiceYear).stream().map(InvoiceResponse::from).toList()
+                : invoiceRepository.findByUserId(userId).stream().map(InvoiceResponse::from).toList();
+        return ResponseEntity.ok(results);
     }
     // TODO: Custom Post method
 
