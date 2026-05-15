@@ -1,13 +1,12 @@
 package com.lotofopps.backend.controller;
 
-import com.lotofopps.backend.config.JwtAuthFilter;
 import com.lotofopps.backend.model.User;
 import com.lotofopps.backend.service.GoogleAuthService;
 import com.lotofopps.backend.service.JwtService;
 import com.lotofopps.backend.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -35,10 +34,6 @@ class AuthControllerTest {
 
     @MockitoBean
     private JwtService jwtService;
-
-    // Mocked so the web slice can load JwtAuthFilter without its real JwtService dependency
-    @MockitoBean
-    private JwtAuthFilter jwtAuthFilter;
 
     @Test
     void googleLogin_returnsAuthResponseOnSuccess() throws Exception {
