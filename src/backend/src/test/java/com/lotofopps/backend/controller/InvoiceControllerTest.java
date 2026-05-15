@@ -6,6 +6,8 @@ import com.lotofopps.backend.service.JwtService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -13,6 +15,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -35,7 +39,8 @@ class InvoiceControllerTest {
     @Test
     void listInvoicesReturnsInvoiceResponseFields() throws Exception {
         Invoice invoice = new Invoice("Laptop", "Apple", new BigDecimal("1299.99"));
-        when(invoiceRepository.findByUserId(anyString())).thenReturn(List.of(invoice));
+        when(invoiceRepository.findByUserId(anyString(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(invoice)));
 
         mockMvc.perform(get("/api/invoices"))
                 .andExpect(status().isOk())
@@ -47,9 +52,20 @@ class InvoiceControllerTest {
 
     @Test
     void listInvoicesAcceptsYearQueryParam() throws Exception {
-        when(invoiceRepository.findByInvoiceDateYear(2023)).thenReturn(List.of());
+        when(invoiceRepository.findByUserIdAndInvoiceDateYear(anyString(), anyInt(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
 
         mockMvc.perform(get("/api/invoices").param("invoiceYear", "2023"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    void listInvoicesRespectsLimitParam() throws Exception {
+        when(invoiceRepository.findByUserId(anyString(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/invoices").param("limit", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
     }
