@@ -14,7 +14,11 @@ public class GoogleAuthService {
     public record GoogleUserInfo(String sub, String email, String name, String picture) {}
 
     private static final String USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public GoogleAuthService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     public GoogleUserInfo verify(String accessToken) {
         try {
