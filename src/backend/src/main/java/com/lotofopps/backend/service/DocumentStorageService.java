@@ -30,7 +30,7 @@ public class DocumentStorageService {
         Files.createDirectories(this.storageRoot);
     }
 
-    public Document store(MultipartFile file) throws IOException {
+    public Document store(MultipartFile file, String userId) throws IOException {
         String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
         String extension = originalFilename.contains(".")
                 ? originalFilename.substring(originalFilename.lastIndexOf('.'))
@@ -46,6 +46,7 @@ public class DocumentStorageService {
                 file.getSize(),
                 destination.toString()
         );
+        document.setUserId(userId);
         return documentRepository.save(document);
     }
 
