@@ -23,10 +23,15 @@ public class AuthController {
     }
 
     @PostMapping("/google")
-    public AuthResponse googleLogin(@RequestBody AuthRequest request) {
+    public org.springframework.http.ResponseEntity<?> googleLogin(@RequestBody AuthRequest request) {
+        if (request.accessToken() == null || request.accessToken().isBlank()) {
+            return org.springframework.http.ResponseEntity.badRequest()
+                    .body(java.util.Map.of("error", "accessToken is required"));
+        }
         GoogleAuthService.GoogleUserInfo info = googleAuthService.verify(request.accessToken());
         User user = userService.findOrCreate(info);
         String token = jwtService.generateToken(user);
-        return new AuthResponse(token, user.getGoogleSub(), user.getEmail(), user.getName(), user.getPicture());
+        return org.springframework.http.ResponseEntity.ok(
+                new AuthResponse(token, user.getGoogleSub(), user.getEmail(), user.getName(), user.getPicture()));
     }
 }

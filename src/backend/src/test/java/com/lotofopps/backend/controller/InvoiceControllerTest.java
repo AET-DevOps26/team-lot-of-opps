@@ -2,22 +2,25 @@ package com.lotofopps.backend.controller;
 
 import com.lotofopps.backend.model.Invoice;
 import com.lotofopps.backend.repository.InvoiceRepository;
+import com.lotofopps.backend.service.JwtService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(InvoiceController.class)
+@WithMockUser
 class InvoiceControllerTest {
 
     @Autowired
@@ -26,10 +29,13 @@ class InvoiceControllerTest {
     @MockitoBean
     private InvoiceRepository invoiceRepository;
 
+    @MockitoBean
+    private JwtService jwtService;
+
     @Test
     void listInvoicesReturnsInvoiceResponseFields() throws Exception {
         Invoice invoice = new Invoice("Laptop", "Apple", new BigDecimal("1299.99"));
-        when(invoiceRepository.findByInvoiceDateYear(anyInt())).thenReturn(List.of(invoice));
+        when(invoiceRepository.findByUserId(anyString())).thenReturn(List.of(invoice));
 
         mockMvc.perform(get("/api/invoices"))
                 .andExpect(status().isOk())

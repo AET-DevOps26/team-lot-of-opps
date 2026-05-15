@@ -2,7 +2,6 @@ package com.lotofopps.backend.config;
 
 import com.lotofopps.backend.service.JwtService;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.impl.DefaultClaims;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,8 +12,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
-
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -43,7 +40,8 @@ class JwtAuthFilterTest {
 
     @Test
     void validBearerToken_setsSecurityContext() throws Exception {
-        Claims claims = new DefaultClaims(Map.of("sub", "sub-123"));
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("sub-123");
         when(jwtService.validateToken("valid.token.here")).thenReturn(claims);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -53,7 +51,7 @@ class JwtAuthFilterTest {
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
         assertThat(SecurityContextHolder.getContext().getAuthentication().getName()).isEqualTo("sub-123");
-        verify(filterChain, times(1)).doFilter(request, any());
+        verify(filterChain, times(1)).doFilter(eq(request), any());
     }
 
     @Test
