@@ -77,8 +77,6 @@ export default function Onboarding() {
         <p className="text-xs text-slate-500 mt-3">{t('onboarding.signInHint')}</p>
       </section>
 
-      {/* removed overlay popover: spinner is rendered inline in place of the Google button */}
-
       <section className="mt-xl grid gap-md md:grid-cols-3">
         <FeatureCard
           icon="upload_file"
