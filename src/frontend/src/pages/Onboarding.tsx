@@ -4,6 +4,8 @@ import useT from '../i18n/useT'
 import { useAppDispatch } from '../store/hooks'
 import { signedIn } from '../features/authSlice'
 import type { AuthUser } from '../features/authSlice'
+import { useAppSelector } from '../store/hooks'
+import { selectAuthLoading } from '../features/authSlice'
 
 interface FeatureCardProps {
   icon: string
@@ -49,6 +51,7 @@ function DevLoginButton() {
 
 export default function Onboarding() {
   const t = useT()
+  const loading = useAppSelector(selectAuthLoading)
 
   return (
     <div className="max-w-3xl mx-auto py-xl">
@@ -58,12 +61,23 @@ export default function Onboarding() {
         </p>
         <h1 className="text-h1 font-extrabold text-slate-900">{t('onboarding.title')}</h1>
         <p className="text-body-lg text-slate-600 mt-4">{t('onboarding.subtitle')}</p>
-        <div className="mt-8 flex flex-col items-center">
-          <GoogleSignInButton size="lg" />
-          {IS_DEV && <DevLoginButton />}
+        <div className="mt-8 flex justify-center">
+          {loading ? (
+            <div className="text-center">
+              <svg className="animate-spin h-12 w-12 text-blue-600 mx-auto" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+              <p className="mt-4 text-lg font-medium text-slate-900">{t('auth.signingIn')}</p>
+            </div>
+          ) : (
+            <GoogleSignInButton size="lg" />
+          )}
         </div>
         <p className="text-xs text-slate-500 mt-3">{t('onboarding.signInHint')}</p>
       </section>
+
+      {/* removed overlay popover: spinner is rendered inline in place of the Google button */}
 
       <section className="mt-xl grid gap-md md:grid-cols-3">
         <FeatureCard

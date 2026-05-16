@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useGoogleLogin } from '@react-oauth/google'
-import { signedIn, type AuthUser } from '../features/authSlice'
+import { signingIn, signedIn, signedOut, type AuthUser } from '../features/authSlice'
 import { useAppDispatch } from '../store/hooks'
 import { apiPost } from '../api/client'
 import useT from '../i18n/useT'
@@ -45,8 +45,14 @@ export default function GoogleSignInButton({ size = 'sm', className = '' }: Prop
         setBusy(false)
       }
     },
-    onError: () => setBusy(false),
-    onNonOAuthError: () => setBusy(false),
+    onError: () => {
+      setBusy(false)
+      dispatch(signedOut())
+    },
+    onNonOAuthError: () => {
+      setBusy(false)
+      dispatch(signedOut())
+    },
   })
 
   const sizeClasses =
@@ -58,10 +64,12 @@ export default function GoogleSignInButton({ size = 'sm', className = '' }: Prop
     <button
       type="button"
       onClick={() => {
+        dispatch(signingIn())
         setBusy(true)
         login()
       }}
       disabled={busy}
+      aria-busy={busy}
       className={`inline-flex items-center justify-center rounded-full border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors font-medium text-slate-700 shadow-sm ${sizeClasses} ${className}`}
     >
       <svg aria-hidden="true" width={iconSize} height={iconSize} viewBox="0 0 18 18">
@@ -82,7 +90,7 @@ export default function GoogleSignInButton({ size = 'sm', className = '' }: Prop
           d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
         />
       </svg>
-      {t('auth.signIn')}
+      <span className="ml-2">{t('auth.signIn')}</span>
     </button>
   )
 }
