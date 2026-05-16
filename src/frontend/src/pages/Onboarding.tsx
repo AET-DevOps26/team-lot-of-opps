@@ -1,6 +1,9 @@
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import Icon from '../components/Icon'
 import useT from '../i18n/useT'
+import { useAppDispatch } from '../store/hooks'
+import { signedIn } from '../features/authSlice'
+import type { AuthUser } from '../features/authSlice'
 
 interface FeatureCardProps {
   icon: string
@@ -20,6 +23,30 @@ function FeatureCard({ icon, title, body }: FeatureCardProps) {
   )
 }
 
+const IS_DEV = import.meta.env.VITE_DEV_AUTO_LOGIN === 'true'
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+
+function DevLoginButton() {
+  const dispatch = useAppDispatch()
+
+  async function handleDevLogin() {
+    const res = await fetch(`${API_BASE}/api/auth/dev-login`)
+    if (!res.ok) return
+    const data = await res.json() as { token: string; sub: string; email: string; name: string; picture?: string }
+    const user: AuthUser = { sub: data.sub, email: data.email, name: data.name, picture: data.picture }
+    dispatch(signedIn({ user, token: data.token }))
+  }
+
+  return (
+    <button
+      onClick={handleDevLogin}
+      className="mt-2 text-xs text-slate-400 underline hover:text-slate-600"
+    >
+      Dev login (Alice)
+    </button>
+  )
+}
+
 export default function Onboarding() {
   const t = useT()
 
@@ -31,8 +58,9 @@ export default function Onboarding() {
         </p>
         <h1 className="text-h1 font-extrabold text-slate-900">{t('onboarding.title')}</h1>
         <p className="text-body-lg text-slate-600 mt-4">{t('onboarding.subtitle')}</p>
-        <div className="mt-8 flex justify-center">
+        <div className="mt-8 flex flex-col items-center">
           <GoogleSignInButton size="lg" />
+          {IS_DEV && <DevLoginButton />}
         </div>
         <p className="text-xs text-slate-500 mt-3">{t('onboarding.signInHint')}</p>
       </section>
