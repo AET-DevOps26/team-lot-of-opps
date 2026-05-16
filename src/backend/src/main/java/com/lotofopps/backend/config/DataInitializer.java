@@ -31,7 +31,7 @@ public class DataInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (userRepository.count() > 0) {
+        if (userRepository.findByGoogleSub("mock-sub-001").isPresent()) {
             return;
         }
 
@@ -66,19 +66,19 @@ public class DataInitializer implements ApplicationRunner {
             doc(prefix + "_kontoauszug_2025_01.png",      "image/png",        358_400L, userId),
             doc(prefix + "_bewerbungskosten_2024_10.png", "image/png",        276_480L, userId)
         );
-        documentRepository.saveAll(docs);
+        List<Document> savedDocs = documentRepository.saveAll(docs);
 
         List<Invoice> invoices = List.of(
-            invoice("USB-C Hub",               "Amazon",             "34.99",  InvoiceCategory.ARBEITSMITTEL,                       userId, LocalDate.of(2025, 1, 8),  docs.get(0)),
-            invoice("Mobilfunk Flatrate",       "Telekom",            "29.99",  InvoiceCategory.INTERNET_UND_TELEFON,                userId, LocalDate.of(2025, 2, 1),  docs.get(1)),
-            invoice("Coworking Space März",    "WeWork",             "250.00", InvoiceCategory.HOMEOFFICE_UND_ARBEITSZIMMER,        userId, LocalDate.of(2025, 3, 1),  docs.get(2)),
-            invoice("BahnCard 50",             "Deutsche Bahn",      "244.00", InvoiceCategory.WEGE_ZUR_ARBEIT,                    userId, LocalDate.of(2024, 12, 5), docs.get(3)),
-            invoice("Python Bootcamp",         "Udemy",              "14.99",  InvoiceCategory.FORTBILDUNGEN,                      userId, LocalDate.of(2025, 1, 15), docs.get(4)),
-            invoice("Schreibtischstuhl",       "IKEA",               "199.00", InvoiceCategory.ARBEITSMITTEL,                       userId, LocalDate.of(2025, 2, 20), docs.get(5)),
-            invoice("Steuerberatung 2024",     "DATEV Partner GmbH", "320.00", InvoiceCategory.STEUERBERATUNGSKOSTEN,              userId, LocalDate.of(2024, 11, 3), docs.get(6)),
-            invoice("Tankfüllung Dienstreise", "Shell",              "68.40",  InvoiceCategory.REISEKOSTEN,                        userId, LocalDate.of(2025, 3, 12), docs.get(7)),
-            invoice("Kontoführungsgebühr",     "Sparkasse",          "8.50",   InvoiceCategory.KONTOFUEHRUNGSGEBUEHREN,             userId, LocalDate.of(2025, 1, 31), docs.get(8)),
-            invoice("Bewerbungsmappe",         "Staples",            "12.99",  InvoiceCategory.BEWERBUNGEN,                        userId, LocalDate.of(2024, 10, 4), docs.get(9)),
+            invoice("USB-C Hub",               "Amazon",             "34.99",  InvoiceCategory.ARBEITSMITTEL,                       userId, LocalDate.of(2025, 1, 8),  savedDocs.get(0)),
+            invoice("Mobilfunk Flatrate",       "Telekom",            "29.99",  InvoiceCategory.INTERNET_UND_TELEFON,                userId, LocalDate.of(2025, 2, 1),  savedDocs.get(1)),
+            invoice("Coworking Space März",    "WeWork",             "250.00", InvoiceCategory.HOMEOFFICE_UND_ARBEITSZIMMER,        userId, LocalDate.of(2025, 3, 1),  savedDocs.get(2)),
+            invoice("BahnCard 50",             "Deutsche Bahn",      "244.00", InvoiceCategory.WEGE_ZUR_ARBEIT,                    userId, LocalDate.of(2024, 12, 5), savedDocs.get(3)),
+            invoice("Python Bootcamp",         "Udemy",              "14.99",  InvoiceCategory.FORTBILDUNGEN,                      userId, LocalDate.of(2025, 1, 15), savedDocs.get(4)),
+            invoice("Schreibtischstuhl",       "IKEA",               "199.00", InvoiceCategory.ARBEITSMITTEL,                       userId, LocalDate.of(2025, 2, 20), savedDocs.get(5)),
+            invoice("Steuerberatung 2024",     "DATEV Partner GmbH", "320.00", InvoiceCategory.STEUERBERATUNGSKOSTEN,              userId, LocalDate.of(2024, 11, 3), savedDocs.get(6)),
+            invoice("Tankfüllung Dienstreise", "Shell",              "68.40",  InvoiceCategory.REISEKOSTEN,                        userId, LocalDate.of(2025, 3, 12), savedDocs.get(7)),
+            invoice("Kontoführungsgebühr",     "Sparkasse",          "8.50",   InvoiceCategory.KONTOFUEHRUNGSGEBUEHREN,             userId, LocalDate.of(2025, 1, 31), savedDocs.get(8)),
+            invoice("Bewerbungsmappe",         "Staples",            "12.99",  InvoiceCategory.BEWERBUNGEN,                        userId, LocalDate.of(2024, 10, 4), savedDocs.get(9)),
             invoice("Monitor 27\"",            "MediaMarkt",         "349.00", InvoiceCategory.ARBEITSMITTEL,                       userId, LocalDate.of(2025, 1, 22), null),
             invoice("Gewerkschaftsbeitrag",    "ver.di",             "22.50",  InvoiceCategory.BERUFSVERBÄNDE_UND_GEWERKSCHAFTEN,  userId, LocalDate.of(2025, 2, 1),  null),
             invoice("Fachliteratur Java",      "O'Reilly",           "49.90",  InvoiceCategory.FORTBILDUNGEN,                      userId, LocalDate.of(2024, 12, 18), null),
