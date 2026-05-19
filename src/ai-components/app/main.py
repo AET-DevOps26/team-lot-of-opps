@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from typing import Optional
+from app.extractor import extract_invoice_fields
 from app.ocr import extract_text
 import httpx
 import os
@@ -33,10 +34,16 @@ def health():
 async def extract(
     file: UploadFile = File(...),
     user_id: Optional[str] = Form(None)
-):
+):  
     raw_text = await extract_text(file)
-    result = await call_llm(raw_text)
-    return {"user_id": user_id, "result": result}
+    fields = extract_invoice_fields(raw_text)
+    return {
+        "user_id": user_id or "unknown",
+        "product_name": fields.get("product_name", ""),
+        "company": fields.get("company", ""),
+        "value": fields.get("value", "0"),
+        "invoice_date": fields.get("invoice_date", "")
+    }
 
 @app.get("/test-llm")
 async def test_llm():
