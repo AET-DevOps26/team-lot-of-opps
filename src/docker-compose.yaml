@@ -1,4 +1,23 @@
 services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - network
+    restart: unless-stopped
+    environment:
+      - OLLAMA_MODEL=llama3.2
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "ollama serve &
+      until ollama list >/dev/null 2>&1; do sleep 1; done &&
+      ollama pull $${OLLAMA_MODEL} &&
+      wait"
+
   ai:
     build:
       context: ./ai-components
@@ -7,9 +26,12 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - OLLAMA_URL=http://host.docker.internal:11434
-    networks: 
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=llama3.2
+    networks:
       - network
+    depends_on:
+      - ollama
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 30s
@@ -88,6 +110,7 @@ services:
 
 volumes:
   postgres_data:
+  ollama_data:
 
 networks:
   network:

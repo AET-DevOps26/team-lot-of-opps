@@ -1,5 +1,9 @@
+import { useState, useEffect, useCallback } from 'react'
 import useT, { type Translator } from '../i18n/useT'
 import Icon from '../components/Icon'
+import { useAppSelector } from '../store/hooks'
+import { selectToken } from '../features/authSlice'
+import { apiGet, apiPostFormData } from '../api/client'
 
 type QueueItemType = 'processing' | 'verified' | 'error'
 
@@ -10,6 +14,7 @@ interface ExtractedField {
 }
 
 interface QueueItem {
+  id: string
   type: QueueItemType
   name: string
   meta: string
@@ -22,7 +27,39 @@ interface QueueItem {
   extracted?: readonly ExtractedField[]
 }
 
+interface UploadResponse {
+  message: string
+  filename: string
+  documentId: number
+  invoiceId: number
+}
+
+interface InvoiceResponse {
+  id: number
+  itemName: string
+  company: string
+  price: number
+  invoiceDate: string | null
+}
+
 const CARD_SHADOW = 'shadow-[0_4px_20px_rgba(26,43,60,0.05)]'
+
+function invoiceToQueueItem(inv: InvoiceResponse, t: Translator): QueueItem {
+  return {
+    id: `invoice-${inv.id}`,
+    type: 'verified',
+    name: inv.itemName || inv.company || String(inv.id),
+    meta: inv.invoiceDate ?? '',
+    status: t('upload.status.verified'),
+    statusClass: 'bg-secondary-container text-on-secondary-container',
+    icon: 'check_circle',
+    iconWrap: 'bg-[#ECFDF5] text-secondary',
+    extracted: [
+      { label: t('upload.fields.vendor'), value: inv.company || '—' },
+      { label: t('upload.fields.amount'), value: `€ ${Number(inv.price).toFixed(2)}`, mono: true },
+    ],
+  }
+}
 
 function QueueItemCard({ item, t }: { item: QueueItem; t: Translator }) {
   return (
@@ -97,42 +134,77 @@ function QueueItemCard({ item, t }: { item: QueueItem; t: Translator }) {
 
 export default function Upload() {
   const t = useT()
+  const token = useAppSelector(selectToken)
+  const [queue, setQueue] = useState<QueueItem[]>([])
 
-  const queueItems: readonly QueueItem[] = [
-    {
-      type: 'processing',
-      name: 'Q3_Office_Supplies_Invoice.pdf',
-      meta: t('upload.meta.uploadedToday'),
-      status: t('upload.status.extracting'),
-      statusClass: 'bg-primary-fixed text-on-primary-fixed',
-      icon: 'receipt_long',
-      iconWrap: 'bg-surface-container text-outline',
+  useEffect(() => {
+    apiGet<InvoiceResponse[]>('/api/invoices?limit=5', token)
+      .then((invoices) => setQueue(invoices.map((inv) => invoiceToQueueItem(inv, t))))
+      .catch(() => {})
+  }, [token])
+
+  const handleFiles = useCallback(
+    (files: FileList | null) => {
+      if (!files) return
+      Array.from(files).forEach((file) => {
+        const tempId = `upload-${Date.now()}-${file.name}`
+        const processingItem: QueueItem = {
+          id: tempId,
+          type: 'processing',
+          name: file.name,
+          meta: t('upload.meta.uploadedToday'),
+          status: t('upload.status.extracting'),
+          statusClass: 'bg-primary-fixed text-on-primary-fixed',
+          icon: 'receipt_long',
+          iconWrap: 'bg-surface-container text-outline',
+        }
+        setQueue((prev) => [processingItem, ...prev])
+
+        const form = new FormData()
+        form.append('file', file)
+
+        apiPostFormData<UploadResponse>('/api/documents/upload', form, token)
+          .then((res) => {
+            setQueue((prev) =>
+              prev.map((item) =>
+                item.id === tempId
+                  ? {
+                      id: `invoice-${res.invoiceId}`,
+                      type: 'verified',
+                      name: res.filename,
+                      meta: t('upload.meta.uploadedToday'),
+                      status: t('upload.status.verified'),
+                      statusClass: 'bg-secondary-container text-on-secondary-container',
+                      icon: 'check_circle',
+                      iconWrap: 'bg-[#ECFDF5] text-secondary',
+                    }
+                  : item,
+              ),
+            )
+          })
+          .catch(() => {
+            setQueue((prev) =>
+              prev.map((item) =>
+                item.id === tempId
+                  ? {
+                      ...item,
+                      type: 'error',
+                      meta: t('upload.meta.missingVendor'),
+                      metaClass: 'text-error',
+                      status: t('upload.status.actionNeeded'),
+                      statusClass: 'bg-tertiary-container text-on-tertiary-container',
+                      icon: 'error',
+                      iconWrap: 'bg-error-container text-error',
+                      borderClass: 'border-error-container',
+                    }
+                  : item,
+              ),
+            )
+          })
+      })
     },
-    {
-      type: 'verified',
-      name: 'AWS_Server_Hosting_Aug2023.pdf',
-      meta: t('upload.meta.uploadedYesterday'),
-      status: t('upload.status.verified'),
-      statusClass: 'bg-secondary-container text-on-secondary-container',
-      icon: 'check_circle',
-      iconWrap: 'bg-[#ECFDF5] text-secondary',
-      extracted: [
-        { label: t('upload.fields.vendor'), value: 'Amazon Web Services' },
-        { label: t('upload.fields.amount'), value: '€ 1,245.00', mono: true },
-      ],
-    },
-    {
-      type: 'error',
-      name: 'Unknown_Receipt_Scan_001.jpg',
-      meta: t('upload.meta.missingVendor'),
-      metaClass: 'text-error',
-      status: t('upload.status.actionNeeded'),
-      statusClass: 'bg-tertiary-container text-on-tertiary-container',
-      icon: 'error',
-      iconWrap: 'bg-error-container text-error',
-      borderClass: 'border-error-container',
-    },
-  ]
+    [token, t],
+  )
 
   return (
     <div className="flex flex-col gap-lg">
@@ -166,6 +238,7 @@ export default function Upload() {
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           multiple
           type="file"
+          onChange={(e) => handleFiles(e.target.files)}
         />
       </section>
 
@@ -177,8 +250,8 @@ export default function Upload() {
           </button>
         </div>
         <div className="grid grid-cols-1 gap-sm">
-          {queueItems.map((item) => (
-            <QueueItemCard key={item.name} item={item} t={t} />
+          {queue.map((item) => (
+            <QueueItemCard key={item.id} item={item} t={t} />
           ))}
         </div>
       </section>

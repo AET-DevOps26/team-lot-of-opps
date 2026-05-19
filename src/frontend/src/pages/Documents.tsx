@@ -1,11 +1,17 @@
+import { useState, useEffect } from 'react'
 import useT from '../i18n/useT'
 import Icon from '../components/Icon'
+import { useAppSelector } from '../store/hooks'
+import { selectToken } from '../features/authSlice'
+import { apiGet } from '../api/client'
 
-interface DocumentRow {
-  date: string
-  vendor: string
-  category: string
-  amount: string
+interface InvoiceResponse {
+  id: number
+  itemName: string
+  company: string
+  price: number
+  category: string | null
+  invoiceDate: string | null
 }
 
 const CATEGORIES: readonly string[] = [
@@ -26,14 +32,6 @@ const CATEGORIES: readonly string[] = [
   'Steuerberatungskosten',
 ]
 
-const ROWS: readonly DocumentRow[] = [
-  { date: '12.10.2023', vendor: 'Apple Store', category: 'Arbeitsmittel', amount: '€ 1,299.00' },
-  { date: '05.09.2023', vendor: 'Deutsche Bahn', category: 'Fahrtkosten', amount: '€ 145.50' },
-  { date: '22.08.2023', vendor: 'Thalia Buchhandlung', category: 'Fachliteratur', amount: '€ 68.00' },
-  { date: '15.01.2023', vendor: 'Coursera', category: 'Fortbildungskosten', amount: '€ 399.00' },
-  { date: '10.11.2022', vendor: 'IKEA', category: 'Arbeitszimmer', amount: '€ 450.00' },
-]
-
 const TABLE_COLUMNS = ['date', 'vendor', 'category'] as const
 
 const inputClass =
@@ -42,8 +40,28 @@ const inputClass =
 const selectClass =
   'w-full appearance-none pl-4 pr-10 py-2 bg-surface rounded-lg border border-outline-variant text-on-surface font-body-sm text-body-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer'
 
+function fmtDate(iso: string | null): string {
+  if (!iso) return '—'
+  const [y, m, d] = iso.split('-')
+  return `${d}.${m}.${y}`
+}
+
+function fmtEur(n: number): string {
+  return `€ ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 export default function Documents() {
   const t = useT()
+  const token = useAppSelector(selectToken)
+  const [invoices, setInvoices] = useState<InvoiceResponse[]>([])
+
+  useEffect(() => {
+    apiGet<InvoiceResponse[]>('/api/invoices', token)
+      .then(setInvoices)
+      .catch(() => {})
+  }, [token])
+
+  const total = invoices.reduce((sum, inv) => sum + Number(inv.price), 0)
 
   return (
     <div className="space-y-lg">
@@ -62,7 +80,7 @@ export default function Documents() {
             <p className="font-label-caps text-label-caps text-on-secondary-container/80 uppercase tracking-wider mb-1">
               {t('documents.totalFiltered')}
             </p>
-            <p className="font-h2 text-h2 text-on-secondary-container">€ 4,250.00</p>
+            <p className="font-h2 text-h2 text-on-secondary-container">{fmtEur(total)}</p>
           </div>
         </div>
       </div>
@@ -131,24 +149,24 @@ export default function Documents() {
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-container-high">
-              {ROWS.map((row) => (
+              {invoices.map((inv) => (
                 <tr
-                  key={`${row.date}-${row.vendor}`}
+                  key={inv.id}
                   className="hover:bg-surface transition-colors group"
                 >
                   <td className="py-4 px-6 font-data-mono text-data-mono text-on-surface">
-                    {row.date}
+                    {fmtDate(inv.invoiceDate)}
                   </td>
                   <td className="py-4 px-6 font-body-md text-body-md text-on-surface font-medium">
-                    {row.vendor}
+                    {inv.company || '—'}
                   </td>
                   <td className="py-4 px-6">
                     <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-surface-container text-on-surface font-body-sm text-body-sm border border-outline-variant/50">
-                      {row.category}
+                      {inv.category ?? '—'}
                     </span>
                   </td>
                   <td className="py-4 px-6 font-data-mono text-data-mono text-on-surface text-right font-medium">
-                    {row.amount}
+                    {fmtEur(inv.price)}
                   </td>
                   <td className="py-4 px-6 text-center">
                     <button
