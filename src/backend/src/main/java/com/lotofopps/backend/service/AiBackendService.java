@@ -2,6 +2,7 @@ package com.lotofopps.backend.service;
 
 import com.lotofopps.backend.model.Document;
 import com.lotofopps.backend.model.Invoice;
+import com.lotofopps.backend.model.InvoiceCategory;
 import com.lotofopps.backend.repository.InvoiceRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -43,6 +44,12 @@ public class AiBackendService {
         String rawDate = (String) aiResponse.get("invoice_date");
         if (rawDate != null) {
             invoice.setInvoiceDate(LocalDate.parse(rawDate));
+        }
+        String rawCategory = (String) aiResponse.get("category");
+        if (rawCategory != null) {
+            try {
+                invoice.setCategory(InvoiceCategory.valueOf(rawCategory));
+            } catch (IllegalArgumentException ignored) {}
         }
         invoice.setDocument(document);
         return invoiceRepository.save(invoice);

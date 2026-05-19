@@ -1,4 +1,9 @@
 fastapi
+pydantic
 uvicorn[standard]
 python-multipart
-httpx
+litellm
+pdfplumber
+pytesseract
+Pillow
+langextract

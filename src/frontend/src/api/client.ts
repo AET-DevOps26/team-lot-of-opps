@@ -29,3 +29,7 @@ export function apiPost<T>(path: string, body: unknown, token?: string | null): 
     token,
   )
 }
+
+export function apiPostFormData<T>(path: string, body: FormData, token?: string | null): Promise<T> {
+  return request<T>(path, { method: 'POST', body }, token)
+}
