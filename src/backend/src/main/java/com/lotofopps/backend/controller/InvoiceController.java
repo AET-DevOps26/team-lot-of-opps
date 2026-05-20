@@ -1,17 +1,21 @@
 package com.lotofopps.backend.controller;
 
 import com.lotofopps.backend.dto.InvoiceResponse;
+import com.lotofopps.backend.model.Invoice;
 import com.lotofopps.backend.repository.InvoiceRepository;
+import com.lotofopps.backend.service.DocumentStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -20,9 +24,11 @@ import java.util.List;
 public class InvoiceController {
 
     private final InvoiceRepository invoiceRepository;
+    private final DocumentStorageService documentStorageService;
 
-    public InvoiceController(InvoiceRepository invoiceRepository) {
+    public InvoiceController(InvoiceRepository invoiceRepository, DocumentStorageService documentStorageService) {
         this.invoiceRepository = invoiceRepository;
+        this.documentStorageService = documentStorageService;
     }
 
     @GetMapping
@@ -42,6 +48,21 @@ public class InvoiceController {
                 : invoiceRepository.findByUserId(userId, pageable).stream().map(InvoiceResponse::from).toList();
         return ResponseEntity.ok(results);
     }
-    // TODO: Custom Post method
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Delete an invoice and its associated document", responses = {
+        @ApiResponse(responseCode = "204", description = "Deleted"),
+        @ApiResponse(responseCode = "403", description = "Forbidden"),
+        @ApiResponse(responseCode = "404", description = "Not found")
+    })
+    public ResponseEntity<Void> deleteInvoice(@PathVariable Long id) throws IOException {
+        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+        Invoice invoice = invoiceRepository.findById(id).orElse(null);
+        if (invoice == null) return ResponseEntity.notFound().build();
+        if (!userId.equals(invoice.getUserId())) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        String storagePath = invoice.getDocument() != null ? invoice.getDocument().getStoragePath() : null;
+        invoiceRepository.delete(invoice);
+        documentStorageService.deleteFile(storagePath);
+        return ResponseEntity.noContent().build();
+    }
 
 }

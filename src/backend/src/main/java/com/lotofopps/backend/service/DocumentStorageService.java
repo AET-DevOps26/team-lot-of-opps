@@ -58,4 +58,10 @@ public class DocumentStorageService {
         }
         return resource;
     }
+
+    public void deleteFile(String storagePath) throws IOException {
+        if (storagePath != null) {
+            Files.deleteIfExists(Paths.get(storagePath));
+        }
+    }
 }
