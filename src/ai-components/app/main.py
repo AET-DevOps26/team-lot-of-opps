@@ -4,6 +4,7 @@ from datetime import date
 from typing import Optional
 from enum import Enum
 from app.ocr import extract_text
+from app.vector_store import store_embeddings, search_embeddings, get_all_chunks_for_user
 import litellm
 import os
 import asyncio
@@ -39,6 +40,16 @@ class InvoiceExtraction(BaseModel):
     value: float
     invoice_date: Optional[date] = None
     category: InvoiceCategory
+
+class EmbedRequest(BaseModel):
+    invoice_id: int
+    text: str
+
+class QueryRequest(BaseModel):
+    question: str
+
+class SuggestionRequest(BaseModel):
+    user_id: str
 
 
 async def call_llm(raw_text: str) -> InvoiceExtraction:
@@ -81,6 +92,41 @@ Invoice text:
             if attempt == 2:
                 raise
             await asyncio.sleep(2)
+
+
+
+@app.post("/embed")
+async def embed(request: EmbedRequest):
+    store_embeddings(request.invoice_id, request.text)
+    return {"status": "ok"}
+
+@app.post("/query")
+async def query(request: QueryRequest):
+    chunks = search_embeddings(request.question)
+    context = "\n\n".join(chunks)
+    response = await litellm.acompletion(
+            model=f"ollama/{LLM_MODEL}",
+            messages=[{"role": "system", "content": "You are a helpful German tax assistant. Answer questions based only on the provided invoice context."},
+                      {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {request.question}"}
+            ],
+            api_base=LLM_URL,
+    )
+    return {"answer": response.choices[0].message.content}
+
+@app.post("/suggestions")
+async def suggestions(request: SuggestionRequest):
+    user_id = request.user_id
+    all_invoices = get_all_chunks_for_user(user_id)
+    if not all_invoices:
+        return []
+    response = await litellm.acompletion(
+        model=f"ollama/{LLM_MODEL}",
+        messages=[{"role": "system", "content": "You are a German tax document expert. You are given text of invoices the client already uploaded. Your goal is to check the invoices and then suggest which other tax documents are missing." },
+                  {"role": "user", "content": f"Context: {all_invoices}."} 
+        ],
+        api_base=LLM_URL,
+    )
+    return {"answer": response.choices[0].message.content}
 
 @app.get("/health")
 def health():
