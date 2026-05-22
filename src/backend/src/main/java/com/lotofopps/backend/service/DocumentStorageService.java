@@ -1,5 +1,6 @@
 package com.lotofopps.backend.service;
 
+import com.lotofopps.backend.exception.DuplicateDocumentException;
 import com.lotofopps.backend.model.Document;
 import com.lotofopps.backend.repository.DocumentRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,7 +14,8 @@ import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
 
 @Service
@@ -31,6 +33,13 @@ public class DocumentStorageService {
     }
 
     public Document store(MultipartFile file, String userId) throws IOException {
+        byte[] bytes = file.getBytes();
+        String hash = sha256Hex(bytes);
+
+        documentRepository.findByContentHashAndUserId(hash, userId).ifPresent(existing -> {
+            throw new DuplicateDocumentException(existing);
+        });
+
         String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
         String extension = originalFilename.contains(".")
                 ? originalFilename.substring(originalFilename.lastIndexOf('.'))
@@ -38,7 +47,7 @@ public class DocumentStorageService {
         String storedFilename = UUID.randomUUID() + extension;
         Path destination = storageRoot.resolve(storedFilename);
 
-        Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
+        Files.write(destination, bytes);
 
         Document document = new Document(
                 originalFilename,
@@ -47,6 +56,7 @@ public class DocumentStorageService {
                 destination.toString()
         );
         document.setUserId(userId);
+        document.setContentHash(hash);
         return documentRepository.save(document);
     }
 
@@ -62,6 +72,18 @@ public class DocumentStorageService {
     public void deleteFile(String storagePath) throws IOException {
         if (storagePath != null) {
             Files.deleteIfExists(Paths.get(storagePath));
+        }
+    }
+
+    private static String sha256Hex(byte[] data) throws IOException {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(data);
+            StringBuilder sb = new StringBuilder(64);
+            for (byte b : digest) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IOException("SHA-256 unavailable", e);
         }
     }
 }
