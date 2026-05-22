@@ -1,10 +1,15 @@
+import { useEffect } from 'react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
-import { useAppSelector } from './store/hooks'
+import { useAppDispatch, useAppSelector } from './store/hooks'
+import { signedIn } from './features/authSlice'
 import Dashboard from './pages/Dashboard'
 import Documents from './pages/Documents'
 import Onboarding from './pages/Onboarding'
 import Upload from './pages/Upload'
+
+const IS_DEV = import.meta.env.VITE_DEV_AUTO_LOGIN === 'true'
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
 function RequireAuth() {
   const isAuthenticated = useAppSelector((state) => state.auth.user !== null)
@@ -17,6 +22,17 @@ function RedirectIfAuthenticated({ children }: { children: JSX.Element }) {
 }
 
 export default function App() {
+  const dispatch = useAppDispatch()
+  useEffect(() => {
+    if (!IS_DEV) return
+    fetch(`${API_BASE}/api/auth/dev-login`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { token: string; sub: string; email: string; name: string; picture?: string } | null) => {
+        if (data) dispatch(signedIn({ user: { sub: data.sub, email: data.email, name: data.name, picture: data.picture }, token: data.token }))
+      })
+      .catch(() => {})
+  }, [])
+
   return (
     <Routes>
       <Route element={<Layout />}>
