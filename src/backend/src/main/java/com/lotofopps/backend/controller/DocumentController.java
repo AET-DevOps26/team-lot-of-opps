@@ -2,6 +2,7 @@ package com.lotofopps.backend.controller;
 
 import com.lotofopps.backend.dto.DocumentResponse;
 import com.lotofopps.backend.dto.UploadResponse;
+import com.lotofopps.backend.exception.DuplicateDocumentException;
 import com.lotofopps.backend.model.Document;
 import com.lotofopps.backend.model.Invoice;
 import com.lotofopps.backend.repository.DocumentRepository;
@@ -78,6 +79,11 @@ public class DocumentController {
             return ResponseEntity.ok(new UploadResponse(
                     "Document received", file.getOriginalFilename(),
                     document.getId(), invoice.getId()));
+        } catch (DuplicateDocumentException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "error", "Duplicate document",
+                    "documentId", e.getExisting().getId()
+            ));
         } catch (IOException e) {
             return ResponseEntity.internalServerError().body(Map.of("error", "Failed to store file"));
         } catch (RestClientException e) {

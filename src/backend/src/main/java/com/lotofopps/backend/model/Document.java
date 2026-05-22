@@ -28,6 +28,9 @@ public class Document {
     @Column
     private String userId;
 
+    @Column(name = "content_hash", length = 64)
+    private String contentHash;
+
     @PrePersist
     private void prePersist() {
         uploadedAt = LocalDateTime.now();
@@ -54,4 +57,6 @@ public class Document {
     public void setStoragePath(String storagePath) { this.storagePath = storagePath; }
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
+    public String getContentHash() { return contentHash; }
+    public void setContentHash(String contentHash) { this.contentHash = contentHash; }
 }
