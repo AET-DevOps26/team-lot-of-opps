@@ -46,7 +46,7 @@ export default function App() {
         />
         <Route element={<RequireAuth />}>
           <Route index element={<Dashboard />} />
-          <Route path="documents" element={<Documents />} />
+          <Route path="invoices" element={<Documents />} />
           <Route path="upload" element={<Upload />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,5 +1,9 @@
+import { useEffect, useState } from 'react'
 import useT from '../i18n/useT'
 import Icon from '../components/Icon'
+import { apiGet } from '../api/client'
+import { useAppSelector } from '../store/hooks'
+import { selectToken } from '../features/authSlice'
 
 interface ExpenseBar {
   label: string
@@ -17,12 +21,8 @@ interface SummaryCardProps {
   highlight?: boolean
 }
 
-const EXPENSE_BARS: readonly ExpenseBar[] = [
-  { label: 'Fachliteratur', amount: '€850', width: '65%', bar: 'bg-primary' },
-  { label: 'Fahrtkosten', amount: '€420', width: '45%', bar: 'bg-surface-tint' },
-  { label: 'Arbeitsmittel', amount: '€310', width: '30%', bar: 'bg-primary-fixed-dim' },
-  { label: 'Reisekosten', amount: '€1200', width: '80%', bar: 'bg-surface-container-highest' },
-]
+// placeholder until we fetch real data
+const EMPTY_BARS: readonly ExpenseBar[] = []
 
 const CARD_SHADOW = 'shadow-[0px_4px_20px_rgba(26,43,60,0.05)]'
 const CARD_BASE = `bg-surface-container-lowest border border-outline-variant rounded-xl p-6 ${CARD_SHADOW}`
@@ -59,23 +59,63 @@ function SummaryCard({ label, value, hint, hintIcon, hintColor, highlight = fals
 
 export default function Dashboard() {
   const t = useT()
+  const token = useAppSelector(selectToken)
+  const [invoices, setInvoices] = useState<
+    {
+      id: number
+      itemName?: string | null
+      company?: string | null
+      price: number
+      category?: string | null
+      invoiceDate?: string | null
+    }[]
+  >([])
+
+  useEffect(() => {
+    apiGet<typeof invoices>('/api/invoices', token)
+      .then((data) => setInvoices(data || []))
+      .catch(() => setInvoices([]))
+  }, [token])
+
+  const totalExpenses = invoices.reduce((s, inv) => s + Number(inv.price || 0), 0)
+  const carryforward = totalExpenses // placeholder: same as recorded expenses
+  const taxRate = 0.3
+  const futureRefund = totalExpenses * taxRate
+
+  // compute top categories
+  const byCategory = invoices.reduce<Record<string, number>>((acc, inv) => {
+    const cat = inv.category || 'Sonstige'
+    acc[cat] = (acc[cat] || 0) + Number(inv.price || 0)
+    return acc
+  }, {})
+
+  const sorted = Object.entries(byCategory)
+    .map(([label, amount]) => ({ label, amount }))
+    .sort((a, b) => b.amount - a.amount)
+
+  const EXPENSE_BARS: readonly ExpenseBar[] = sorted.slice(0, 4).map((row) => ({
+    label: row.label,
+    amount: `€${row.amount.toFixed(2)}`,
+    width: `${Math.min(100, (row.amount / (totalExpenses || 1)) * 100).toFixed(0)}%`,
+    bar: 'bg-primary',
+  }))
 
   const summaryCards: readonly SummaryCardProps[] = [
     {
       label: t('dashboard.cards.totalExpenses'),
-      value: '€4,250.00',
+      value: `€${totalExpenses.toFixed(2)}`,
       hint: t('dashboard.cards.sinceLastUpload'),
       hintIcon: 'trending_up',
       hintColor: 'text-secondary',
     },
     {
       label: t('dashboard.cards.carryforward'),
-      value: '€3,800.00',
+      value: `€${carryforward.toFixed(2)}`,
       highlight: true,
     },
     {
       label: t('dashboard.cards.futureRefund'),
-      value: '~€1,140.00',
+      value: `~€${futureRefund.toFixed(2)}`,
       hint: t('dashboard.cards.taxRateNote'),
       hintIcon: 'info',
     },
@@ -104,7 +144,7 @@ export default function Dashboard() {
               </button>
             </div>
             <div className="space-y-4">
-              {EXPENSE_BARS.map((row) => (
+              {(EXPENSE_BARS.length ? EXPENSE_BARS : EMPTY_BARS).map((row) => (
                 <div key={row.label} className="flex items-center gap-4">
                   <div className="w-32 font-body-sm text-body-sm text-on-surface-variant truncate">
                     {row.label}
@@ -134,13 +174,13 @@ export default function Dashboard() {
                   <span className="font-body-sm text-body-sm text-on-surface-variant">
                     {t('dashboard.savings.recordedExpenses')}
                   </span>
-                  <span className="font-data-mono text-data-mono text-primary">€3,800</span>
+                  <span className="font-data-mono text-data-mono text-primary">€{totalExpenses.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="font-body-sm text-body-sm text-on-surface-variant">
                     {t('dashboard.savings.futureTaxRate')}
                   </span>
-                  <span className="font-data-mono text-data-mono text-primary">x 0.30</span>
+                  <span className="font-data-mono text-data-mono text-primary">x {taxRate}</span>
                 </div>
                 <div className="w-full h-px bg-surface-container-highest my-2" />
                 <div className="flex justify-between items-center">
@@ -148,7 +188,7 @@ export default function Dashboard() {
                     {t('dashboard.savings.futureRefund')}
                   </span>
                   <span className="font-data-mono text-data-mono text-secondary font-semibold">
-                    €1,140
+                    €{futureRefund.toFixed(2)}
                   </span>
                 </div>
               </div>
