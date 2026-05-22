@@ -26,14 +26,26 @@ def store_embeddings(invoice_id: int, text: str):
     cur.close()
     conn.close()
 
-def search_embeddings(query: str, limit: int=5) -> list[str]:
+def search_embeddings(query: str, limit: int=5, user_id: str=None) -> list[str]:
     query_embedding = model.encode(query).tolist()
     conn = psycopg2.connect(DB_URL)
     cur = conn.cursor()
-    cur.execute(
-        "SELECT chunk_text FROM invoice_embeddings ORDER BY embedding <-> %s::vector LIMIT %s",
-        (query_embedding, limit)
-    )
+    if user_id:
+        cur.execute(
+            "SELECT ie.chunk_text " 
+            "FROM invoice_embeddings ie " 
+            "JOIN invoices i ON ie.invoice_id = i.id "
+            "WHERE i.user_id = %s "
+            "ORDER BY embedding <-> %s::vector LIMIT %s",
+            (user_id,query_embedding, limit)
+        )
+    else:
+        cur.execute(
+            "SELECT chunk_text " 
+            "FROM invoice_embeddings " 
+            "ORDER BY embedding <-> %s::vector LIMIT %s",
+            (query_embedding, limit)
+        )       
     results = [row[0] for row in cur.fetchall()]
     cur.close()
     conn.close()
@@ -46,9 +58,22 @@ def get_all_chunks_for_user(user_id: str) -> list[str]:
         "SELECT ie.chunk_text "
         "FROM invoice_embeddings ie "
         "JOIN invoices i ON ie.invoice_id = i.id "
-        "WHERE i.user_id = %s"
+        "WHERE i.user_id = %s",
+        (user_id,)
     )
     results = [row[0] for row in cur.fetchall()]
     cur.close()
     conn.close()
     return results    
+
+def update_embeddings(invoice_id: int, text:str):
+    conn = psycopg2.connect(DB_URL)
+    cur = conn.cursor()
+    cur.execute(
+        "DELETE FROM invoice_embeddings WHERE invoice_id = %s",
+        (invoice_id,)
+    )
+    store_embeddings(invoice_id, text)
+    conn.commit()
+    cur.close()
+    conn.close()   

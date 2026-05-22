@@ -2,6 +2,9 @@ import pdfplumber
 import pytesseract
 from PIL import Image
 import io
+#vision AI?
+#2 step pipeline?
+#google ai vision
 
 async def extract_text(file) -> str:
     contents = await file.read()
