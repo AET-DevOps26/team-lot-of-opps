@@ -19,6 +19,7 @@ services:
       wait"
 
   ai:
+    platform: linux/amd64
     build:
       context: ./ai-components
       dockerfile: Dockerfile.dev
