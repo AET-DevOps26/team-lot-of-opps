@@ -6,7 +6,7 @@ export interface TranslationDict {
   sidebar: { title: string; subtitle: string }
   nav: {
     dashboard: string
-    documents: string
+    invoices: string
     upload: string
     settings: string
     signInRequired: string
@@ -85,6 +85,28 @@ export interface TranslationDict {
     }
     pagination: string
   }
+  invoices: {
+    title: string
+    subtitle: string
+    totalFiltered: string
+    search: string
+    allYears: string
+    allCategories: string
+    moreFilters: string
+    table: {
+      date: string
+      vendor: string
+      category: string
+      amount: string
+      action: string
+      viewReceipt: string
+      delete: string
+    }
+    pagination: string
+    confirmDelete: string
+    deleteFailed: string
+    viewFailed: string
+  }
 }
 
 const translations: Record<Language, TranslationDict> = {
@@ -96,7 +118,7 @@ const translations: Record<Language, TranslationDict> = {
     },
     nav: {
       dashboard: 'Dashboard',
-      documents: 'Documents',
+      invoices: 'Invoices',
       upload: 'Upload',
       settings: 'Settings',
       signInRequired: 'Sign in to access this section',
@@ -200,6 +222,28 @@ const translations: Record<Language, TranslationDict> = {
       },
       pagination: 'Showing 1-5 of 24 documents',
     },
+    invoices: {
+      title: 'Invoices',
+      subtitle: 'Manage and review your uploaded invoices.',
+      totalFiltered: 'Total Filtered Amount',
+      search: 'Search vendors or notes...',
+      allYears: 'All Years',
+      allCategories: 'All Categories',
+      moreFilters: 'More Filters',
+      table: {
+        date: 'Date',
+        vendor: 'Vendor',
+        category: 'Category',
+        amount: 'Amount',
+        action: 'Action',
+        viewReceipt: 'View Receipt',
+        delete: 'Delete',
+      },
+      pagination: 'Showing 1-5 of 24 invoices',
+      confirmDelete: 'Delete this invoice?',
+      deleteFailed: 'Failed to delete invoice',
+      viewFailed: 'Could not open invoice',
+    },
   },
   de: {
     brand: 'TaxForward',
@@ -209,7 +253,7 @@ const translations: Record<Language, TranslationDict> = {
     },
     nav: {
       dashboard: 'Übersicht',
-      documents: 'Dokumente',
+      invoices: 'Rechnungen',
       upload: 'Hochladen',
       settings: 'Einstellungen',
       signInRequired: 'Anmelden, um diesen Bereich zu nutzen',
@@ -313,6 +357,28 @@ const translations: Record<Language, TranslationDict> = {
         viewReceipt: 'Beleg ansehen',
       },
       pagination: '1–5 von 24 Dokumenten',
+    },
+    invoices: {
+      title: 'Rechnungen',
+      subtitle: 'Verwalte und überprüfe deine hochgeladenen Rechnungen.',
+      totalFiltered: 'Gefilterter Gesamtbetrag',
+      search: 'Lieferanten oder Notizen suchen...',
+      allYears: 'Alle Jahre',
+      allCategories: 'Alle Kategorien',
+      moreFilters: 'Weitere Filter',
+      table: {
+        date: 'Datum',
+        vendor: 'Lieferant',
+        category: 'Kategorie',
+        amount: 'Betrag',
+        action: 'Aktion',
+        viewReceipt: 'Beleg ansehen',
+        delete: 'Löschen',
+      },
+      pagination: '1–5 von 24 Rechnungen',
+      confirmDelete: 'Diese Rechnung löschen?',
+      deleteFailed: 'Rechnung konnte nicht gelöscht werden',
+      viewFailed: 'Rechnung konnte nicht geöffnet werden',
     },
   },
 }

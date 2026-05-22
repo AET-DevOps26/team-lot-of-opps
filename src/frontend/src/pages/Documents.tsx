@@ -3,7 +3,7 @@ import useT from '../i18n/useT'
 import Icon from '../components/Icon'
 import { useAppSelector } from '../store/hooks'
 import { selectToken } from '../features/authSlice'
-import { apiGet } from '../api/client'
+import { apiGet, apiDelete } from '../api/client'
 
 interface InvoiceResponse {
   id: number
@@ -12,6 +12,7 @@ interface InvoiceResponse {
   price: number
   category: string | null
   invoiceDate: string | null
+  documentId: number | null
 }
 
 const CATEGORIES: readonly string[] = [
@@ -50,7 +51,7 @@ function fmtEur(n: number): string {
   return `€ ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-export default function Documents() {
+export default function Invoices() {
   const t = useT()
   const token = useAppSelector(selectToken)
   const [invoices, setInvoices] = useState<InvoiceResponse[]>([])
@@ -61,15 +62,44 @@ export default function Documents() {
       .catch(() => {})
   }, [token])
 
+  async function handleDelete(id: number) {
+    if (!confirm(t('invoices.confirmDelete') ?? 'Delete invoice?')) return
+    try {
+      await apiDelete<void>(`/api/invoices/${id}`, token)
+      setInvoices((prev) => prev.filter((i) => i.id !== id))
+    } catch (e) {
+      // eslint-disable-next-line no-alert
+      alert(t('invoices.deleteFailed') ?? 'Delete failed')
+    }
+  }
+
+  async function handleView(documentId: number | null) {
+    if (!documentId) return
+    try {
+      const headers: Record<string, string> = {}
+      if (token) headers.Authorization = `Bearer ${token}`
+      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+      const response = await fetch(`${baseUrl}/api/documents/${documentId}/content`, { headers })
+      if (!response.ok) throw new Error(`Failed to load document: ${response.status}`)
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      window.open(objectUrl, '_blank', 'noopener,noreferrer')
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+    } catch {
+      // eslint-disable-next-line no-alert
+      alert(t('invoices.viewFailed') ?? 'Could not open invoice')
+    }
+  }
+
   const total = invoices.reduce((sum, inv) => sum + Number(inv.price), 0)
 
   return (
     <div className="space-y-lg">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="font-h1 text-h1 text-on-background mb-2">{t('documents.title')}</h1>
+          <h1 className="font-h1 text-h1 text-on-background mb-2">{t('invoices.title')}</h1>
           <p className="font-body-lg text-body-lg text-on-surface-variant">
-            {t('documents.subtitle')}
+            {t('invoices.subtitle')}
           </p>
         </div>
         <div className="bg-secondary-container text-on-secondary-container px-6 py-4 rounded-xl border border-secondary-fixed-dim/30 shadow-sm flex items-center gap-4 min-w-[250px]">
@@ -78,7 +108,7 @@ export default function Documents() {
           </div>
           <div>
             <p className="font-label-caps text-label-caps text-on-secondary-container/80 uppercase tracking-wider mb-1">
-              {t('documents.totalFiltered')}
+              {t('invoices.totalFiltered')}
             </p>
             <p className="font-h2 text-h2 text-on-secondary-container">{fmtEur(total)}</p>
           </div>
@@ -92,12 +122,12 @@ export default function Documents() {
               name="search"
               className="absolute left-3 top-1/2 -translate-y-1/2 text-outline pointer-events-none"
             />
-            <input className={inputClass} placeholder={t('documents.search')} type="text" />
+            <input className={inputClass} placeholder={t('invoices.search')} type="text" />
           </div>
 
           <div className="relative min-w-[120px]">
             <select className={selectClass} defaultValue="">
-              <option value="">{t('documents.allYears')}</option>
+              <option value="">{t('invoices.allYears')}</option>
               <option>2023</option>
               <option>2022</option>
               <option>2021</option>
@@ -110,7 +140,7 @@ export default function Documents() {
 
           <div className="relative min-w-[200px] flex-1 md:flex-none">
             <select className={selectClass} defaultValue="">
-              <option value="">{t('documents.allCategories')}</option>
+              <option value="">{t('invoices.allCategories')}</option>
               {CATEGORIES.map((category) => (
                 <option key={category}>{category}</option>
               ))}
@@ -123,7 +153,7 @@ export default function Documents() {
         </div>
         <button className="font-label-caps text-label-caps uppercase text-primary hover:bg-surface p-2 rounded transition-colors flex items-center gap-2">
           <Icon name="filter_list" size={18} />
-          {t('documents.moreFilters')}
+          {t('invoices.moreFilters')}
         </button>
       </div>
 
@@ -137,14 +167,14 @@ export default function Documents() {
                     key={key}
                     className="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider font-semibold"
                   >
-                    {t(`documents.table.${key}`)}
+                    {t(`invoices.table.${key}`)}
                   </th>
                 ))}
                 <th className="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider font-semibold text-right">
-                  {t('documents.table.amount')}
+                  {t('invoices.table.amount')}
                 </th>
                 <th className="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider font-semibold text-center">
-                  {t('documents.table.action')}
+                  {t('invoices.table.action')}
                 </th>
               </tr>
             </thead>
@@ -169,12 +199,23 @@ export default function Documents() {
                     {fmtEur(inv.price)}
                   </td>
                   <td className="py-4 px-6 text-center">
-                    <button
-                      className="text-primary hover:bg-primary/10 p-2 rounded-full transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                      title={t('documents.table.viewReceipt')}
-                    >
-                      <Icon name="visibility" />
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handleView(inv.documentId)}
+                        className="text-primary hover:bg-primary/10 p-2 rounded-full transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        title={t('invoices.table.viewReceipt')}
+                        disabled={!inv.documentId}
+                      >
+                        <Icon name="visibility" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(inv.id)}
+                        className="text-rose-600 hover:bg-rose-50 p-2 rounded-full transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        title={t('invoices.table.delete')}
+                      >
+                        <Icon name="delete" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -184,7 +225,7 @@ export default function Documents() {
 
         <div className="px-6 py-4 border-t border-surface-container-high bg-surface-bright flex items-center justify-between">
           <span className="font-body-sm text-body-sm text-on-surface-variant">
-            {t('documents.pagination')}
+            {t('invoices.pagination')}
           </span>
           <div className="flex items-center gap-2">
             <button

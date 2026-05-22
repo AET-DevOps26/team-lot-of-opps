@@ -13,7 +13,7 @@ interface NavItem {
 
 const NAV_ITEMS: readonly NavItem[] = [
   { to: '/', icon: 'dashboard', labelKey: 'nav.dashboard', end: true },
-  { to: '/documents', icon: 'description', labelKey: 'nav.documents' },
+  { to: '/invoices', icon: 'description', labelKey: 'nav.invoices' },
   { to: '/upload', icon: 'upload_file', labelKey: 'nav.upload' },
 ]
 
