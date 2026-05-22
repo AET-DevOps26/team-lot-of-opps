@@ -36,9 +36,9 @@ public class DocumentStorageService {
         byte[] bytes = file.getBytes();
         String hash = sha256Hex(bytes);
 
-        documentRepository.findByContentHashAndUserId(hash, userId).ifPresent(existing -> {
-            throw new DuplicateDocumentException(existing);
-        });
+        // documentRepository.findByContentHashAndUserId(hash, userId).ifPresent(existing -> {
+        //     throw new DuplicateDocumentException(existing);
+        // });
 
         String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
         String extension = originalFilename.contains(".")
