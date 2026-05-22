@@ -21,15 +21,13 @@ services:
   ai:
     build:
       context: ./ai-components
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     container_name: ai
     ports:
       - "8081:8081"
     environment:
       - OLLAMA_URL=http://ollama:11434
       - OLLAMA_MODEL=llama3.2
-    volumes:
-      - ./ai-components/app:/app/app
     networks:
       - network
     depends_on:
@@ -46,7 +44,7 @@ services:
     platform: linux/amd64
     build:
       context: ./backend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     container_name: backend
     ports:
       - "8080:8080"
@@ -55,8 +53,6 @@ services:
       - SPRING_APPLICATION_NAME=backend
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/app_db
       - AI_BACKEND_URL=http://ai:8081/extract
-    volumes:
-      - ./backend/src:/app/src
     networks:
       - network
     healthcheck:
@@ -97,18 +93,14 @@ services:
     platform: linux/amd64
     build:
       context: ./frontend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8080
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
+        VITE_DEV_AUTO_LOGIN: "true"
     container_name: frontend
     ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_BASE_URL=
-      - VITE_API_TARGET=http://backend:8080
-      - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
-      - VITE_DEV_AUTO_LOGIN=true
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - "5173:80"
     networks:
       - network
     depends_on:

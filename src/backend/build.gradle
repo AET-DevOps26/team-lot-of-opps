@@ -33,6 +33,7 @@ runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
 	testImplementation 'io.jsonwebtoken:jjwt-impl:0.12.6'
 	testImplementation 'org.springframework.security:spring-security-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 }
 
 tasks.named('test') {
