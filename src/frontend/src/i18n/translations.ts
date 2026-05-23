@@ -41,7 +41,7 @@ export interface TranslationDict {
       futureRefund: string
       taxRateNote: string
     }
-    categories: { title: string; filter: string }
+    categories: { title: string; reverseOrder: string }
     savings: {
       title: string
       intro: string
@@ -93,6 +93,9 @@ export interface TranslationDict {
     allYears: string
     allCategories: string
     moreFilters: string
+    minAmount: string
+    maxAmount: string
+    clearAmount: string
     table: {
       date: string
       vendor: string
@@ -153,7 +156,7 @@ const translations: Record<Language, TranslationDict> = {
       close: 'Close',
     },
     dashboard: {
-      title: 'Tax Overview 2023',
+      title: 'Tax Overview',
       subtitle: 'Here is the current state of your academic tax loss carryforward.',
       cards: {
         totalExpenses: 'Total Expenses',
@@ -161,9 +164,9 @@ const translations: Record<Language, TranslationDict> = {
         carryforward: 'Est. Loss Carryforward',
         aiVerified: 'AI Verified',
         futureRefund: 'Estimated Future Refund',
-        taxRateNote: 'Assuming 30% tax rate later',
+        taxRateNote: 'Based on your assumed tax rate',
       },
-      categories: { title: 'Expenses by Category', filter: 'Filter' },
+      categories: { title: 'Expenses by Category', reverseOrder: 'Reverse order' },
       savings: {
         title: 'How Your Savings Work',
         intro:
@@ -190,7 +193,7 @@ const translations: Record<Language, TranslationDict> = {
         subtitle: 'or click to browse from your device',
         maxSize: 'Max 25MB',
       },
-      queue: { title: 'Processing Queue', viewAll: 'View All Documents' },
+      queue: { title: 'Processing Queue', viewAll: 'View All Invoices' },
       status: {
         extracting: 'AI Extracting',
         verified: 'Verified',
@@ -230,6 +233,9 @@ const translations: Record<Language, TranslationDict> = {
       allYears: 'All Years',
       allCategories: 'All Categories',
       moreFilters: 'More Filters',
+      minAmount: 'Min Amount (€)',
+      maxAmount: 'Max Amount (€)',
+      clearAmount: 'Clear',
       table: {
         date: 'Date',
         vendor: 'Vendor',
@@ -289,7 +295,7 @@ const translations: Record<Language, TranslationDict> = {
       close: 'Schließen',
     },
     dashboard: {
-      title: 'Steuerübersicht 2023',
+      title: 'Steuerübersicht',
       subtitle: 'Hier ist der aktuelle Stand deines akademischen Verlustvortrags.',
       cards: {
         totalExpenses: 'Gesamtausgaben',
@@ -297,9 +303,9 @@ const translations: Record<Language, TranslationDict> = {
         carryforward: 'Geschätzter Verlustvortrag',
         aiVerified: 'KI-geprüft',
         futureRefund: 'Geschätzte zukünftige Rückerstattung',
-        taxRateNote: 'Bei angenommenem Steuersatz von 30 %',
+        taxRateNote: 'Basierend auf deinem angenommenen Steuersatz',
       },
-      categories: { title: 'Ausgaben nach Kategorie', filter: 'Filter' },
+      categories: { title: 'Ausgaben nach Kategorie', reverseOrder: 'Reihenfolge umkehren' },
       savings: {
         title: 'So funktionieren deine Einsparungen',
         intro:
@@ -326,7 +332,7 @@ const translations: Record<Language, TranslationDict> = {
         subtitle: 'oder klicken, um sie von deinem Gerät auszuwählen',
         maxSize: 'Max. 25 MB',
       },
-      queue: { title: 'Verarbeitungs-Warteschlange', viewAll: 'Alle Dokumente ansehen' },
+      queue: { title: 'Verarbeitungs-Warteschlange', viewAll: 'Alle Rechnungen ansehen' },
       status: {
         extracting: 'KI extrahiert',
         verified: 'Geprüft',
@@ -366,6 +372,9 @@ const translations: Record<Language, TranslationDict> = {
       allYears: 'Alle Jahre',
       allCategories: 'Alle Kategorien',
       moreFilters: 'Weitere Filter',
+      minAmount: 'Min. Betrag (€)',
+      maxAmount: 'Max. Betrag (€)',
+      clearAmount: 'Zurücksetzen',
       table: {
         date: 'Datum',
         vendor: 'Lieferant',

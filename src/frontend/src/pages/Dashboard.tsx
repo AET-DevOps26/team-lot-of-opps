@@ -4,6 +4,15 @@ import Icon from '../components/Icon'
 import { apiGet } from '../api/client'
 import { useAppSelector } from '../store/hooks'
 import { selectToken } from '../features/authSlice'
+import { usePersistentState } from '../hooks/usePersistentState'
+
+const TAX_RATE_STORAGE_KEY = 'dashboard.taxRatePercent'
+const DEFAULT_TAX_RATE_PERCENT = 30
+const MIN_TAX_RATE_PERCENT = 0
+const MAX_TAX_RATE_PERCENT = 50
+
+const clampTaxRate = (value: number) =>
+  Math.max(MIN_TAX_RATE_PERCENT, Math.min(MAX_TAX_RATE_PERCENT, value))
 
 interface ExpenseBar {
   label: string
@@ -15,6 +24,7 @@ interface ExpenseBar {
 interface SummaryCardProps {
   label: string
   value: string
+  icon: string
   hint?: string
   hintIcon?: string
   hintColor?: string
@@ -26,31 +36,40 @@ const EMPTY_BARS: readonly ExpenseBar[] = []
 
 const CARD_SHADOW = 'shadow-[0px_4px_20px_rgba(26,43,60,0.05)]'
 const CARD_BASE = `bg-surface-container-lowest border border-outline-variant rounded-xl p-6 ${CARD_SHADOW}`
+const SUMMARY_CARD_BASE = `bg-surface-container-lowest border border-outline-variant rounded-xl p-4 ${CARD_SHADOW}`
 
 function IntelligenceRail() {
   return <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#9333ea] to-[#2563eb]" />
 }
 
-function SummaryCard({ label, value, hint, hintIcon, hintColor, highlight = false }: SummaryCardProps) {
+function SummaryCard({ label, value, icon, hint, hintIcon, hintColor, highlight = false }: SummaryCardProps) {
   const containerClass = highlight
-    ? `relative overflow-hidden bg-[#ECFDF5] border border-secondary-fixed-dim rounded-xl p-6 ${CARD_SHADOW}`
-    : CARD_BASE
+    ? `relative overflow-hidden bg-[#ECFDF5] border border-secondary-fixed-dim rounded-xl p-4 ${CARD_SHADOW}`
+    : SUMMARY_CARD_BASE
 
   const labelClass = highlight ? 'text-on-secondary-container' : 'text-on-surface-variant'
   const valueClass = highlight ? 'text-secondary' : 'text-primary'
   const hintTextClass = highlight ? 'text-on-secondary-fixed-variant' : hintColor || 'text-on-surface-variant'
+  const iconClass = highlight
+    ? 'bg-white/60 text-secondary'
+    : 'bg-primary/10 text-primary'
 
   return (
     <div className={containerClass}>
       {highlight && <IntelligenceRail />}
-      <p className={`font-label-caps text-label-caps mb-2 uppercase tracking-widest ${labelClass}`}>
-        {label}
-      </p>
-      <p className={`font-h2 text-h2 mb-1 ${valueClass}`}>{value}</p>
+      <div className="flex items-center justify-between gap-4 mb-1">
+        <p className={`min-w-0 break-words font-label-caps text-label-caps uppercase tracking-widest ${labelClass}`}>
+          {label}
+        </p>
+        <span className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-full ${iconClass}`}>
+          <Icon name={icon} size={16} />
+        </span>
+      </div>
+      <p className={`font-h3 text-h3 ${valueClass}`}>{value}</p>
       {hint && (
-        <div className={`flex items-center gap-1 ${hintTextClass}`}>
-          {hintIcon && <Icon name={hintIcon} size={16} />}
-          <span className="font-body-sm text-body-sm">{hint}</span>
+        <div className={`flex items-start gap-1 mt-0.5 ${hintTextClass}`}>
+          {hintIcon && <Icon name={hintIcon} size={14} />}
+          <span className="text-xs">{hint}</span>
         </div>
       )}
     </div>
@@ -60,6 +79,11 @@ function SummaryCard({ label, value, hint, hintIcon, hintColor, highlight = fals
 export default function Dashboard() {
   const t = useT()
   const token = useAppSelector(selectToken)
+  const [reversed, setReversed] = useState(false)
+  const [taxRatePercent, setTaxRatePercent] = usePersistentState(
+    TAX_RATE_STORAGE_KEY,
+    DEFAULT_TAX_RATE_PERCENT,
+  )
   const [invoices, setInvoices] = useState<
     {
       id: number
@@ -79,7 +103,7 @@ export default function Dashboard() {
 
   const totalExpenses = invoices.reduce((s, inv) => s + Number(inv.price || 0), 0)
   const carryforward = totalExpenses // placeholder: same as recorded expenses
-  const taxRate = 0.3
+  const taxRate = taxRatePercent / 100
   const futureRefund = totalExpenses * taxRate
 
   // compute top categories
@@ -100,10 +124,13 @@ export default function Dashboard() {
     bar: 'bg-primary',
   }))
 
+  const displayedBars = reversed ? [...EXPENSE_BARS].reverse() : EXPENSE_BARS
+
   const summaryCards: readonly SummaryCardProps[] = [
     {
       label: t('dashboard.cards.totalExpenses'),
       value: `€${totalExpenses.toFixed(2)}`,
+      icon: 'payments',
       hint: t('dashboard.cards.sinceLastUpload'),
       hintIcon: 'trending_up',
       hintColor: 'text-secondary',
@@ -111,11 +138,13 @@ export default function Dashboard() {
     {
       label: t('dashboard.cards.carryforward'),
       value: `€${carryforward.toFixed(2)}`,
+      icon: 'account_balance',
       highlight: true,
     },
     {
       label: t('dashboard.cards.futureRefund'),
       value: `~€${futureRefund.toFixed(2)}`,
+      icon: 'savings',
       hint: t('dashboard.cards.taxRateNote'),
       hintIcon: 'info',
     },
@@ -139,12 +168,23 @@ export default function Dashboard() {
           <section className={CARD_BASE}>
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-h3 text-h3 text-primary">{t('dashboard.categories.title')}</h3>
-              <button className="font-body-sm text-body-sm text-surface-tint flex items-center gap-1 hover:text-primary transition-colors">
-                {t('dashboard.categories.filter')} <Icon name="filter_list" size={18} />
+              <button
+                type="button"
+                onClick={() => setReversed((r) => !r)}
+                aria-pressed={reversed}
+                aria-label={t('dashboard.categories.reverseOrder')}
+                title={t('dashboard.categories.reverseOrder')}
+                className="text-surface-tint hover:text-primary transition-colors"
+              >
+                <Icon
+                  name="filter_list"
+                  size={18}
+                  className={`transition-transform duration-200 ${reversed ? 'rotate-180' : ''}`}
+                />
               </button>
             </div>
             <div className="space-y-4">
-              {(EXPENSE_BARS.length ? EXPENSE_BARS : EMPTY_BARS).map((row) => (
+              {(displayedBars.length ? displayedBars : EMPTY_BARS).map((row) => (
                 <div key={row.label} className="flex items-center gap-4">
                   <div className="w-32 font-body-sm text-body-sm text-on-surface-variant truncate">
                     {row.label}
@@ -161,10 +201,48 @@ export default function Dashboard() {
           </section>
 
           <section className={CARD_BASE}>
-            <h3 className="font-h3 text-h3 text-primary mb-4 flex items-center gap-2">
-              <Icon name="calculate" className="text-surface-tint" />
-              {t('dashboard.savings.title')}
-            </h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-h3 text-h3 text-primary flex items-center gap-2">
+                <Icon name="calculate" className="text-surface-tint" />
+                {t('dashboard.savings.title')}
+              </h3>
+              <div
+                className="flex items-center gap-0.5 rounded-lg border border-surface-container-highest bg-surface pl-2 pr-1 py-0.5"
+                role="group"
+                aria-label={t('dashboard.savings.futureTaxRate')}
+              >
+                <input
+                  type="number"
+                  min={MIN_TAX_RATE_PERCENT}
+                  max={MAX_TAX_RATE_PERCENT}
+                  value={taxRatePercent}
+                  onChange={(e) => setTaxRatePercent(clampTaxRate(Number(e.target.value)))}
+                  aria-label={t('dashboard.savings.futureTaxRate')}
+                  className="w-9 bg-transparent text-right font-data-mono text-data-mono text-primary border-0 outline-none focus:outline-none focus:ring-0 p-0 m-0 appearance-none [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <span className="font-data-mono text-data-mono text-on-surface-variant">%</span>
+                <div className="flex flex-col">
+                  <button
+                    type="button"
+                    onClick={() => setTaxRatePercent((p) => clampTaxRate(p + 1))}
+                    disabled={taxRatePercent >= MAX_TAX_RATE_PERCENT}
+                    aria-label={`${t('dashboard.savings.futureTaxRate')} +`}
+                    className="text-surface-tint hover:text-primary disabled:opacity-30 disabled:hover:text-surface-tint transition-colors leading-none"
+                  >
+                    <Icon name="keyboard_arrow_up" size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTaxRatePercent((p) => clampTaxRate(p - 1))}
+                    disabled={taxRatePercent <= MIN_TAX_RATE_PERCENT}
+                    aria-label={`${t('dashboard.savings.futureTaxRate')} -`}
+                    className="text-surface-tint hover:text-primary disabled:opacity-30 disabled:hover:text-surface-tint transition-colors leading-none"
+                  >
+                    <Icon name="keyboard_arrow_down" size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
             <div className="bg-surface p-4 rounded-lg border border-surface-container-highest">
               <p className="font-body-sm text-body-sm text-on-surface-variant mb-4">
                 {t('dashboard.savings.intro')}
@@ -180,7 +258,9 @@ export default function Dashboard() {
                   <span className="font-body-sm text-body-sm text-on-surface-variant">
                     {t('dashboard.savings.futureTaxRate')}
                   </span>
-                  <span className="font-data-mono text-data-mono text-primary">x {taxRate}</span>
+                  <span className="font-data-mono text-data-mono text-primary">
+                    x {taxRate.toFixed(2)} ({taxRatePercent}%)
+                  </span>
                 </div>
                 <div className="w-full h-px bg-surface-container-highest my-2" />
                 <div className="flex justify-between items-center">

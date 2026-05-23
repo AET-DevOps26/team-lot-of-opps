@@ -81,6 +81,9 @@ export default function Invoices() {
   const [search, setSearch] = useState('')
   const [year, setYear] = useState('')
   const [category, setCategory] = useState('')
+  const [minAmount, setMinAmount] = useState('')
+  const [maxAmount, setMaxAmount] = useState('')
+  const [showMoreFilters, setShowMoreFilters] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
@@ -110,10 +113,15 @@ export default function Invoices() {
 
   const visibleInvoices = useMemo(() => {
     const query = search.trim().toLowerCase()
+    const min = minAmount === '' ? null : Number(minAmount)
+    const max = maxAmount === '' ? null : Number(maxAmount)
     const filtered = invoices.filter((inv) => {
       if (query && !`${inv.company} ${inv.itemName}`.toLowerCase().includes(query)) return false
       if (year && inv.invoiceDate?.slice(0, 4) !== year) return false
       if (category && inv.category !== category) return false
+      const price = Number(inv.price)
+      if (min !== null && price < min) return false
+      if (max !== null && price > max) return false
       return true
     })
 
@@ -132,7 +140,7 @@ export default function Invoices() {
           return 0
       }
     })
-  }, [invoices, search, year, category, sortKey, sortDir])
+  }, [invoices, search, year, category, minAmount, maxAmount, sortKey, sortDir])
 
   function toggleSort(key: SortKey) {
     if (key === sortKey) {
@@ -250,10 +258,65 @@ export default function Invoices() {
             />
           </div>
         </div>
-        <button className="font-label-caps text-label-caps uppercase text-primary hover:bg-surface p-2 rounded transition-colors flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setShowMoreFilters((open) => !open)}
+          aria-expanded={showMoreFilters}
+          className={`font-label-caps text-label-caps uppercase p-2 rounded transition-colors flex items-center gap-2 ${
+            showMoreFilters ? 'text-primary bg-surface' : 'text-primary hover:bg-surface'
+          }`}
+        >
           <Icon name="filter_list" size={18} />
           {t('invoices.moreFilters')}
         </button>
+
+        {showMoreFilters ? (
+          <div className="w-full border-t border-outline-variant pt-4 flex flex-wrap gap-4 items-end">
+            <div className="flex flex-col gap-1">
+              <label className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">
+                {t('invoices.minAmount')}
+              </label>
+              <input
+                className={`${inputClass} pl-4 min-w-[140px]`}
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                placeholder="0.00"
+                value={minAmount}
+                onChange={(e) => setMinAmount(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">
+                {t('invoices.maxAmount')}
+              </label>
+              <input
+                className={`${inputClass} pl-4 min-w-[140px]`}
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                placeholder="∞"
+                value={maxAmount}
+                onChange={(e) => setMaxAmount(e.target.value)}
+              />
+            </div>
+            {(minAmount || maxAmount) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMinAmount('')
+                  setMaxAmount('')
+                }}
+                className="font-label-caps text-label-caps uppercase text-on-surface-variant hover:text-on-surface p-2 rounded transition-colors flex items-center gap-1"
+              >
+                <Icon name="close" size={18} />
+                {t('invoices.clearAmount')}
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
 
       <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-[0px_4px_20px_rgba(26,43,60,0.05)] overflow-hidden">
