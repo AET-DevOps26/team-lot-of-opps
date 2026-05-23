@@ -11,6 +11,7 @@ async function request<T>(path: string, init: RequestInit, token?: string | null
     const text = await res.text().catch(() => '')
     throw new Error(`API ${init.method ?? 'GET'} ${path} failed: ${res.status} ${text}`)
   }
+  if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
 
@@ -34,17 +35,6 @@ export function apiPostFormData<T>(path: string, body: FormData, token?: string 
   return request<T>(path, { method: 'POST', body }, token)
 }
 
-export async function apiDelete<T>(path: string, token?: string | null): Promise<T> {
-  const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
-  const res = await fetch(`${BASE_URL}${path}`, { method: 'DELETE', headers })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`API DELETE ${path} failed: ${res.status} ${text}`)
-  }
-  if (res.status === 204) {
-    return undefined as unknown as T
-  }
-  return res.json() as Promise<T>
+export function apiDelete<T>(path: string, token?: string | null): Promise<T> {
+  return request<T>(path, { method: 'DELETE' }, token)
 }

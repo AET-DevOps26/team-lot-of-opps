@@ -1,5 +1,5 @@
-import { closeSettings } from '../features/uiSlice'
-import { setLanguage } from '../features/i18nSlice'
+import { closeSettings, selectSettingsOpen } from '../features/uiSlice'
+import { setLanguage, selectLanguage } from '../features/i18nSlice'
 import { SUPPORTED_LANGUAGES } from '../i18n/translations'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import useT from '../i18n/useT'
@@ -8,8 +8,8 @@ import Icon from './Icon'
 export default function SettingsModal() {
   const t = useT()
   const dispatch = useAppDispatch()
-  const open = useAppSelector((state) => state.ui.settingsOpen)
-  const language = useAppSelector((state) => state.i18n.language)
+  const open = useAppSelector(selectSettingsOpen)
+  const language = useAppSelector(selectLanguage)
 
   if (!open) return null
 

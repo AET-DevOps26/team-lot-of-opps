@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { googleLogout } from '@react-oauth/google'
-import { signedOut } from '../features/authSlice'
+import { signedOut, selectUser } from '../features/authSlice'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import useT from '../i18n/useT'
 import GoogleSignInButton from './GoogleSignInButton'
@@ -8,7 +8,7 @@ import GoogleSignInButton from './GoogleSignInButton'
 export default function AuthMenu() {
   const t = useT()
   const dispatch = useAppDispatch()
-  const user = useAppSelector((state) => state.auth.user)
+  const user = useAppSelector(selectUser)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
 
