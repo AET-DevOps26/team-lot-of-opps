@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useAppSelector } from '../store/hooks'
+import { selectLanguage } from '../features/i18nSlice'
 import translations from './translations'
 
 function resolve(obj: unknown, path: string): unknown {
@@ -14,7 +15,7 @@ function resolve(obj: unknown, path: string): unknown {
 export type Translator = (key: string) => string
 
 export default function useT(): Translator {
-  const language = useAppSelector((state) => state.i18n.language)
+  const language = useAppSelector(selectLanguage)
 
   return useCallback<Translator>(
     (key) => {

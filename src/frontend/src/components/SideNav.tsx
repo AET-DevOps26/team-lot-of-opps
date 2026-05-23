@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { openSettings } from '../features/uiSlice'
+import { selectIsAuthenticated } from '../features/authSlice'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import useT from '../i18n/useT'
 import Icon from './Icon'
@@ -32,7 +33,7 @@ function activeClass({ isActive }: { isActive: boolean }): string {
 export default function SideNav() {
   const t = useT()
   const dispatch = useAppDispatch()
-  const isAuthenticated = useAppSelector((state) => state.auth.user !== null)
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
 
   return (
     <aside className="hidden md:flex fixed left-0 top-16 h-[calc(100vh-64px)] w-64 p-4 flex-col justify-between bg-slate-50 border-r border-slate-200 z-40">

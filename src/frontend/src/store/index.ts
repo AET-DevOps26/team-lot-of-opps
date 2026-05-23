@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit'
 import authReducer from '../features/authSlice'
 import i18nReducer from '../features/i18nSlice'
 import uiReducer from '../features/uiSlice'
+import { persistenceListener } from './persistence'
 
 export const store = configureStore({
   reducer: {
@@ -9,6 +10,8 @@ export const store = configureStore({
     i18n: i18nReducer,
     ui: uiReducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().prepend(persistenceListener.middleware),
 })
 
 export type RootState = ReturnType<typeof store.getState>

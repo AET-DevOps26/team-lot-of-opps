@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import useT, { type Translator } from '../i18n/useT'
 import Icon from '../components/Icon'
 import { useAppSelector } from '../store/hooks'
@@ -245,9 +246,12 @@ export default function Upload() {
       <section className="flex flex-col gap-md">
         <div className="flex items-center justify-between border-b border-surface-variant pb-2">
           <h3 className="font-h3 text-h3 text-on-surface">{t('upload.queue.title')}</h3>
-          <button className="font-body-sm text-body-sm text-primary font-medium hover:underline">
+          <Link
+            to="/invoices"
+            className="font-body-sm text-body-sm text-primary font-medium hover:underline"
+          >
             {t('upload.queue.viewAll')}
-          </button>
+          </Link>
         </div>
         <div className="grid grid-cols-1 gap-sm">
           {queue.map((item) => (

@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import { useAppDispatch, useAppSelector } from './store/hooks'
-import { signedIn } from './features/authSlice'
+import { signedIn, selectIsAuthenticated } from './features/authSlice'
 import Dashboard from './pages/Dashboard'
 import Documents from './pages/Documents'
 import Onboarding from './pages/Onboarding'
@@ -12,12 +12,12 @@ const IS_DEV = import.meta.env.VITE_DEV_AUTO_LOGIN === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
 function RequireAuth() {
-  const isAuthenticated = useAppSelector((state) => state.auth.user !== null)
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
   return isAuthenticated ? <Outlet /> : <Navigate to="/welcome" replace />
 }
 
 function RedirectIfAuthenticated({ children }: { children: JSX.Element }) {
-  const isAuthenticated = useAppSelector((state) => state.auth.user !== null)
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
   return isAuthenticated ? <Navigate to="/" replace /> : children
 }
 

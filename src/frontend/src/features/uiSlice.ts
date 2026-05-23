@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit'
+import type { RootState } from '../store'
 
 interface UiState {
   settingsOpen: boolean
@@ -22,4 +23,5 @@ const uiSlice = createSlice({
 })
 
 export const { openSettings, closeSettings } = uiSlice.actions
+export const selectSettingsOpen = (state: RootState) => state.ui.settingsOpen
 export default uiSlice.reducer
