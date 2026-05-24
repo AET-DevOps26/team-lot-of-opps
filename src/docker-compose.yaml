@@ -29,12 +29,17 @@ services:
     environment:
       - OLLAMA_URL=http://ollama:11434
       - OLLAMA_MODEL=llama3.2
+      - LITELLM_SSL_VERIFY=False
+      - DATABASE_URL=postgresql://appuser:password@db:5432/app_db
     volumes:
       - ./ai-components/app:/app/app
     networks:
       - network
     depends_on:
-      - ollama
+      ollama:
+        condition: service_started
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 30s
@@ -85,6 +90,7 @@ services:
       - POSTGRES_DB=app_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - network
     healthcheck:

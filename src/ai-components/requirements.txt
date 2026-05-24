@@ -7,3 +7,8 @@ pdfplumber
 pytesseract
 Pillow
 langextract
+sentence-transformers
+psycopg2-binary
+pytest 
+requests
+pymupdf
