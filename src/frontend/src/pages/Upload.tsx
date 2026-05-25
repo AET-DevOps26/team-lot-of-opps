@@ -32,7 +32,7 @@ interface UploadResponse {
   message: string
   filename: string
   documentId: number
-  invoiceId: number
+  invoiceIds: number[]
 }
 
 interface InvoiceResponse {
@@ -170,7 +170,7 @@ export default function Upload() {
               prev.map((item) =>
                 item.id === tempId
                   ? {
-                      id: `invoice-${res.invoiceId}`,
+                      id: `invoice-doc-${res.documentId}`,
                       type: 'verified',
                       name: res.filename,
                       meta: t('upload.meta.uploadedToday'),

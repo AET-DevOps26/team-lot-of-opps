@@ -1,7 +1,9 @@
 package com.lotofopps.backend.controller;
 
 import com.lotofopps.backend.dto.InvoiceResponse;
+import com.lotofopps.backend.model.Document;
 import com.lotofopps.backend.model.Invoice;
+import com.lotofopps.backend.repository.DocumentRepository;
 import com.lotofopps.backend.repository.InvoiceRepository;
 import com.lotofopps.backend.service.DocumentStorageService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,10 +26,12 @@ import java.util.List;
 public class InvoiceController {
 
     private final InvoiceRepository invoiceRepository;
+    private final DocumentRepository documentRepository;
     private final DocumentStorageService documentStorageService;
 
-    public InvoiceController(InvoiceRepository invoiceRepository, DocumentStorageService documentStorageService) {
+    public InvoiceController(InvoiceRepository invoiceRepository, DocumentRepository documentRepository, DocumentStorageService documentStorageService) {
         this.invoiceRepository = invoiceRepository;
+        this.documentRepository = documentRepository;
         this.documentStorageService = documentStorageService;
     }
 
@@ -59,9 +63,12 @@ public class InvoiceController {
         Invoice invoice = invoiceRepository.findById(id).orElse(null);
         if (invoice == null) return ResponseEntity.notFound().build();
         if (!userId.equals(invoice.getUserId())) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        String storagePath = invoice.getDocument() != null ? invoice.getDocument().getStoragePath() : null;
+        Document doc = invoice.getDocument();
         invoiceRepository.delete(invoice);
-        documentStorageService.deleteFile(storagePath);
+        if (doc != null && invoiceRepository.findByDocumentId(doc.getId()).isEmpty()) {
+            documentRepository.delete(doc);
+            documentStorageService.deleteFile(doc.getStoragePath());
+        }
         return ResponseEntity.noContent().build();
     }
 

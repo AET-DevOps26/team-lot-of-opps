@@ -75,10 +75,11 @@ public class DocumentController {
         }
         try {
             Document document = documentStorageService.store(file, currentUserId());
-            Invoice invoice = aiBackendService.extractAndStore(document);
+            List<Invoice> invoices = aiBackendService.extractAndStore(document);
+            List<Long> invoiceIds = invoices.stream().map(Invoice::getId).toList();
             return ResponseEntity.ok(new UploadResponse(
                     "Document received", file.getOriginalFilename(),
-                    document.getId(), invoice.getId()));
+                    document.getId(), invoiceIds));
         } catch (DuplicateDocumentException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
                     "error", "Duplicate document",
