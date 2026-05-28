@@ -1,9 +1,14 @@
 package com.lotofopps.backend.controller;
 
 import com.lotofopps.backend.dto.InvoiceResponse;
+import com.lotofopps.backend.model.Document;
 import com.lotofopps.backend.model.Invoice;
+import com.lotofopps.backend.repository.DocumentRepository;
 import com.lotofopps.backend.repository.InvoiceRepository;
+import com.lotofopps.backend.service.AiBackendService;
 import com.lotofopps.backend.service.DocumentStorageService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,12 +28,19 @@ import java.util.List;
 @Tag(name = "Invoices")
 public class InvoiceController {
 
-    private final InvoiceRepository invoiceRepository;
-    private final DocumentStorageService documentStorageService;
+    private static final Logger log = LoggerFactory.getLogger(InvoiceController.class);
 
-    public InvoiceController(InvoiceRepository invoiceRepository, DocumentStorageService documentStorageService) {
+    private final InvoiceRepository invoiceRepository;
+    private final DocumentRepository documentRepository;
+    private final DocumentStorageService documentStorageService;
+    private final AiBackendService aiBackendService;
+
+    public InvoiceController(InvoiceRepository invoiceRepository, DocumentRepository documentRepository,
+                             DocumentStorageService documentStorageService, AiBackendService aiBackendService) {
         this.invoiceRepository = invoiceRepository;
+        this.documentRepository = documentRepository;
         this.documentStorageService = documentStorageService;
+        this.aiBackendService = aiBackendService;
     }
 
     @GetMapping
@@ -59,9 +71,18 @@ public class InvoiceController {
         Invoice invoice = invoiceRepository.findById(id).orElse(null);
         if (invoice == null) return ResponseEntity.notFound().build();
         if (!userId.equals(invoice.getUserId())) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        String storagePath = invoice.getDocument() != null ? invoice.getDocument().getStoragePath() : null;
+        try {
+            aiBackendService.deleteEmbeddings(invoice.getId());
+        } catch (Exception e) {
+            log.warn("Failed to delete embeddings for invoice {}: {}", invoice.getId(), e.getMessage());
+        }
+
+        Document doc = invoice.getDocument();
         invoiceRepository.delete(invoice);
-        documentStorageService.deleteFile(storagePath);
+        if (doc != null && invoiceRepository.findByDocumentId(doc.getId()).isEmpty()) {
+            documentRepository.delete(doc);
+            documentStorageService.deleteFile(doc.getStoragePath());
+        }
         return ResponseEntity.noContent().build();
     }
 

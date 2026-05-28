@@ -76,4 +76,15 @@ def update_embeddings(invoice_id: int, text:str):
     store_embeddings(invoice_id, text)
     conn.commit()
     cur.close()
-    conn.close()   
+    conn.close()
+
+def delete_embeddings(invoice_id: int):
+    conn = psycopg2.connect(DB_URL)
+    cur = conn.cursor()
+    cur.execute(
+        "DELETE FROM invoice_embeddings WHERE invoice_id = %s",
+        (invoice_id,)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
