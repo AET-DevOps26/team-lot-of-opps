@@ -4,6 +4,8 @@ import com.lotofopps.backend.model.Document;
 import com.lotofopps.backend.model.Invoice;
 import com.lotofopps.backend.model.InvoiceCategory;
 import com.lotofopps.backend.repository.InvoiceRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.FileSystemResource;
@@ -22,6 +24,8 @@ import java.util.Map;
 @Service
 public class AiBackendService {
 
+    private static final Logger logger = LoggerFactory.getLogger(AiBackendService.class);
+
     private final String aiBackendUrl;
     private final InvoiceRepository invoiceRepository;
     private final RestTemplate restTemplate = new RestTemplate();
@@ -35,6 +39,10 @@ public class AiBackendService {
 
     public List<Invoice> extractAndStore(Document document) {
         List<Map<String, Object>> items = sendToAiBackend(document);
+        logger.info("AI backend returned {} item(s) for document {}", items.size(), document.getStoragePath());
+        if (items.isEmpty()) {
+            logger.warn("AI backend returned 0 items — no invoices will be created for document {}", document.getStoragePath());
+        }
 
         List<Invoice> invoices = items.stream().map(item -> {
             Invoice invoice = new Invoice(
@@ -52,7 +60,34 @@ public class AiBackendService {
             return invoice;
         }).toList();
 
-        return invoiceRepository.saveAll(invoices);
+        List<Invoice> saved = invoiceRepository.saveAll(invoices);
+        // TODO: re-enable once embedding pipeline is stable
+        // saved.forEach(inv -> {
+        //     try {
+        //         storeEmbeddings(inv);
+        //     } catch (Exception e) {
+        //         logger.warn("Failed to store embeddings for invoice {}: {}", inv.getId(), e.getMessage());
+        //     }
+        // });
+        return saved;
+    }
+
+    private void storeEmbeddings(Invoice invoice) {
+        String text = String.format("product: %s, company: %s, value: %s, date: %s, category: %s",
+                invoice.getItemName(), invoice.getCompany(), invoice.getPrice(),
+                invoice.getInvoiceDate(), invoice.getCategory());
+        String base = aiBackendUrl.endsWith("/") ? aiBackendUrl.substring(0, aiBackendUrl.length() - 1) : aiBackendUrl;
+        String url = base + "/embed";
+        Map<String, Object> body = Map.of("invoice_id", invoice.getId(), "text", text);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(body, headers), Void.class);
+        logger.info("Stored embeddings for invoice {}", invoice.getId());
+    }
+
+    public void deleteEmbeddings(Long invoiceId) {
+        String url = aiBackendUrl + "/embed/" + invoiceId;
+        restTemplate.exchange(url, HttpMethod.DELETE, null, Void.class);
     }
 
     private List<Map<String, Object>> sendToAiBackend(Document document) {
@@ -62,16 +97,16 @@ public class AiBackendService {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("file", new FileSystemResource(Paths.get(document.getStoragePath())));
 
-        String contentType = document.getContentType();
-        String url = (contentType != null && contentType.startsWith("image/"))
-                ? aiBackendUrl + "/vision"
-                : aiBackendUrl;
+        String base = aiBackendUrl.endsWith("/") ? aiBackendUrl.substring(0, aiBackendUrl.length() - 1) : aiBackendUrl;
+        String url = base + "/extract";
 
+        logger.info("Sending extract request to {} for document {}", url, document.getStoragePath());
         HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);
         ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
                 url, HttpMethod.POST, request,
                 new ParameterizedTypeReference<>() {});
 
+        logger.info("AI backend responded with status {}", response.getStatusCode());
         if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
             throw new RuntimeException("AI backend returned non-2xx or empty response");
         }

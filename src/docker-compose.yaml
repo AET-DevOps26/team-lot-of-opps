@@ -15,7 +15,7 @@ services:
     command: >
       "ollama serve &
       until ollama list >/dev/null 2>&1; do sleep 1; done &&
-      ollama pull $${OLLAMA_MODEL} &&
+      ollama list | grep -q \"$${OLLAMA_MODEL}\" || ollama pull $${OLLAMA_MODEL} &&
       wait"
 
   ai:
@@ -29,6 +29,7 @@ services:
     environment:
       - OLLAMA_URL=http://ollama:11434
       - OLLAMA_MODEL=llama3.2
+      - OLLAMA_MODEL_VISION=llama3.2
       - LITELLM_SSL_VERIFY=False
       - DATABASE_URL=postgresql://appuser:password@db:5432/app_db
     volumes:
@@ -60,7 +61,7 @@ services:
       - SPRING_PROFILES_ACTIVE=dev
       - SPRING_APPLICATION_NAME=backend
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/app_db
-      - AI_BACKEND_URL=http://ai:8081/extract
+      - AI_BACKEND_URL=http://ai:8081
     volumes:
       - ./backend/src:/app/src
     networks:
