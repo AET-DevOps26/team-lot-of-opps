@@ -75,6 +75,7 @@ export default function Onboarding() {
           )}
         </div>
         <p className="text-xs text-slate-500 mt-3">{t('onboarding.signInHint')}</p>
+        {IS_DEV && <DevLoginButton />}
       </section>
 
       <section className="mt-xl grid gap-md md:grid-cols-3">
