@@ -1,5 +1,5 @@
 from fastapi import FastAPI, UploadFile, File
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import date
 from typing import Optional
 from app.ocr import extract_text
@@ -18,21 +18,23 @@ logger = logging.getLogger(__name__)
 DB_URL = os.getenv("DATABASE_URL")
 
 LLM_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
+LLM_URL_VISION = os.getenv("OLLAMA_URL_VISION", "http://host.docker.internal:11434")
 LLM_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
-LLM_MODEL_VISION = os.getenv("OLLAMA_MODEL_VISION", "qwen3.5:4b")
+LLM_MODEL_VISION = os.getenv("OLLAMA_MODEL_VISION", "qwen3.5")
 LLM_THINK = os.getenv("OLLAMA_THINK", "false").lower() == "true"
 
 app = FastAPI(title="AI Extraction service", version="1.0.0")
 
 _client = ollama.AsyncClient(host=LLM_URL)
+_client_vision = ollama.AsyncClient(host=LLM_URL_VISION)
 
 
 class InvoiceItem(BaseModel):
-    product_name: str = "N/A"
-    company: str = "N/A"
-    value: float
-    invoice_date: Optional[date] = None
-    category: InvoiceCategory
+    product_name: str = Field(default="N/A", description="Name of the product or service from the invoice line item")
+    company: str = Field(default="N/A", description="Name of the seller/issuing company — NOT the buyer, NOT the bank, NOT an email or address")
+    value: float = Field(description="Gross amount for this line item as a decimal number")
+    invoice_date: Optional[date] = Field(default=None, description="Invoice date in YYYY-MM-DD format")
+    category: InvoiceCategory = Field(description="Best matching German tax category")
 
 class InvoiceList(BaseModel):
     items: list[InvoiceItem] = []
@@ -56,12 +58,13 @@ class UpdateRequest(BaseModel):
 ITEM_FIELDS = """
 Return a JSON object with a single key "items" containing a list. Each element represents one line item and has:
 - product_name: name of the item or service
-- company: name of the SELLER who issued this invoice. Look in the top section labeled FROM, Absender, Von, Lieferant, or the header block above the invoice details. Return ONLY the company or person name — do NOT include words like "INVOICE", "RECHNUNG", address lines, or anything from the payment/bank section or the buyer/recipient block. Use the same value for every item.
-- value: line item total as a plain number (no currency symbol). IMPORTANT: invoices may use German number format — convert correctly: "1.234,56" → 1234.56, "43,92" → 43.92.
-- invoice_date: date of the invoice in YYYY-MM-DD format, or null if not found. Use the same value for every item.
+- company: name of the SELLER who issued this invoice. The seller is the entity that sent the invoice. Return ONLY the business or person name — a short name like "DB Fernverkehr AG", "Schmidtke", "Trüb Becker GmbH". Rules: (1) never return email addresses, phone numbers, VAT/tax IDs, IBAN numbers (starting with 2 letters + digits), or street addresses; (2) never include the words INVOICE or RECHNUNG; (3) do NOT confuse the BUYER (TO/An/Empfänger section) with the SELLER. Use the same value for every item.
+- value: line item gross total as a decimal number. German invoices use comma as decimal separator — convert correctly: "418,93" → 418.93 (NOT 41893), "1.234,56" → 1234.56, "43,92" → 43.92. The comma is ALWAYS the decimal point, never strip it.
+- invoice_date: date of the invoice in YYYY-MM-DD format. Convert any format: "10.10.2025" → "2025-10-10", "11 Aug 2025" → "2025-08-11". Use null only if truly absent. Use the same value for every item.
 - category: best matching category for this specific item (use exact enum string, fall back to SONSTIGE_AUSGABEN if unsure)
 
-If the invoice has no individual line items, return a single item using the invoice's overall product/service description and grand total.
+If the invoice has no individual line items, return a single item using the invoice's overall product/service description and grand total (Summe brutto / Gesamtbetrag).
+Do NOT create separate items for VAT rows, net subtotals, or tax breakdowns — only real product/service rows.
 
 Category values:
   KONTOFUEHRUNGSGEBUEHREN, WEGE_ZUR_ARBEIT, HOMEOFFICE_UND_ARBEITSZIMMER,
@@ -69,6 +72,13 @@ Category values:
   STEUERBERATUNGSKOSTEN, REISEKOSTEN, BEWERBUNGEN, FORTBILDUNGEN,
   UMZUG, BEWIRTUNG, DOPPELTER_HAUSHALT, AUSSERGEWOEHNLICHE_FAHRZEUGKOSTEN,
   SONSTIGE_AUSGABEN
+"""
+
+VISION_LAYOUT_HINT = """
+Use the VISUAL LAYOUT to identify sections:
+- The SELLER (Absender/Von) is typically in the top-right corner or letterhead — this is who sent the invoice
+- The BUYER (Empfänger/An) is typically in the middle-left address block — this is who received it
+- Do NOT confuse the two
 """
 
 async def call_llm(raw_text: str) -> list[InvoiceItem]:
@@ -82,7 +92,7 @@ Invoice text:
             response = await _client.chat(
                 model=LLM_MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                format=InvoiceList.model_json_schema(),
+                format="json",
                 think=LLM_THINK,
             )
             content = response.message.content
@@ -108,11 +118,12 @@ Invoice text:
 
 async def call_llm_vision(images: list[str]) -> list[InvoiceItem]:
     prompt = f"""You are a German tax document classifier. Extract invoice line items from the images below and return valid JSON. The invoice may be in German or English.
+{VISION_LAYOUT_HINT}
 {ITEM_FIELDS}"""
     for attempt in range(3):
         try:
             logger.info("Vision LLM attempt %d/3 model=%s images=%d think=%s", attempt + 1, LLM_MODEL_VISION, len(images), LLM_THINK)
-            response = await _client.chat(
+            response = await _client_vision.chat(
                 model=LLM_MODEL_VISION,
                 messages=[{
                     "role": "user",
@@ -141,6 +152,7 @@ async def call_llm_vision(images: list[str]) -> list[InvoiceItem]:
             if attempt == 2:
                 raise
             await asyncio.sleep(2)
+
 
 @app.post("/extract/vision", response_model=list[InvoiceItem])
 async def extract_vision(file: UploadFile = File(...)):
