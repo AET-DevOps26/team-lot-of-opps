@@ -11,6 +11,7 @@ services:
     restart: unless-stopped
     environment:
       - OLLAMA_MODEL=llama3.2
+      - OLLAMA_MODEL_VISION=qwen3.5
     entrypoint: ["/bin/sh", "-c"]
     command: >
       "ollama serve &
@@ -28,8 +29,9 @@ services:
       - "8081:8081"
     environment:
       - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_URL_VISION=http://ollama:11434
       - OLLAMA_MODEL=llama3.2
-      - OLLAMA_MODEL_VISION=llama3.2
+      - OLLAMA_MODEL_VISION=qwen3.5
       - LITELLM_SSL_VERIFY=False
       - DATABASE_URL=postgresql://appuser:password@db:5432/app_db
     volumes:
@@ -45,8 +47,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 20s
+      retries: 5
+      start_period: 120s
     restart: unless-stopped
 
   backend:
