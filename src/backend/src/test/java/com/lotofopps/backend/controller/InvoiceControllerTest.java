@@ -1,7 +1,9 @@
 package com.lotofopps.backend.controller;
 
 import com.lotofopps.backend.model.Invoice;
+import com.lotofopps.backend.repository.DocumentRepository;
 import com.lotofopps.backend.repository.InvoiceRepository;
+import com.lotofopps.backend.service.AiBackendService;
 import com.lotofopps.backend.service.DocumentStorageService;
 import com.lotofopps.backend.service.JwtService;
 import org.junit.jupiter.api.Test;
@@ -36,6 +38,12 @@ class InvoiceControllerTest {
 
     @MockitoBean
     private InvoiceRepository invoiceRepository;
+
+    @MockitoBean
+    private DocumentRepository documentRepository;
+
+    @MockitoBean
+    private AiBackendService aiBackendService;
 
     @MockitoBean
     private DocumentStorageService documentStorageService;
