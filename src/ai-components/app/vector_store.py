@@ -2,8 +2,15 @@ import os
 import psycopg2
 from sentence_transformers import SentenceTransformer
 
-model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 DB_URL = os.getenv("DATABASE_URL")
+
+_model = None
+
+def get_model() -> SentenceTransformer:
+    global _model
+    if _model is None:
+        _model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+    return _model
 
 def chunk_text(text: str, chunk_size: int = 500) -> list[str]:
     chunks = []
@@ -16,7 +23,7 @@ def store_embeddings(invoice_id: int, text: str):
     conn = psycopg2.connect(DB_URL)
     cur = conn.cursor()
     for chunk in chunks:
-        embedding = model.encode(chunk).tolist()
+        embedding = get_model().encode(chunk).tolist()
         cur.execute(
             "INSERT INTO invoice_embeddings (invoice_id, chunk_text, embedding) VALUES (%s, %s, %s)",
             (invoice_id, chunk, embedding)
@@ -27,7 +34,7 @@ def store_embeddings(invoice_id: int, text: str):
     conn.close()
 
 def search_embeddings(query: str, limit: int=5, user_id: str=None) -> list[str]:
-    query_embedding = model.encode(query).tolist()
+    query_embedding = get_model().encode(query).tolist()
     conn = psycopg2.connect(DB_URL)
     cur = conn.cursor()
     if user_id:

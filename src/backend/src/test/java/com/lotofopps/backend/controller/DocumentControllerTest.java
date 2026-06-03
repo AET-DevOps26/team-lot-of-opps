@@ -53,7 +53,7 @@ class DocumentControllerTest {
         ReflectionTestUtils.setField(invoice, "id", 1L);
 
         when(documentStorageService.store(any(), any())).thenReturn(document);
-        when(aiBackendService.extractAndStore(any())).thenReturn(invoice);
+        when(aiBackendService.extractAndStore(any())).thenReturn(List.of(invoice));
 
         MockMultipartFile file = new MockMultipartFile(
                 "file", "invoice.pdf", "application/pdf", "dummy content".getBytes());
@@ -63,7 +63,7 @@ class DocumentControllerTest {
                 .andExpect(jsonPath("$.message").value("Document received"))
                 .andExpect(jsonPath("$.filename").value("invoice.pdf"))
                 .andExpect(jsonPath("$.documentId").exists())
-                .andExpect(jsonPath("$.invoiceId").exists());
+                .andExpect(jsonPath("$.invoiceIds").isArray());
     }
 
     @Test
