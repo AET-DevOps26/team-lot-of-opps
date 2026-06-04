@@ -9,7 +9,11 @@ Pillow
 langextract
 sentence-transformers
 psycopg2-binary
-pytest 
+pytest
 requests
 pymupdf
 sqlalchemy
+langchain>=1.3.4
+langchain-ollama>=1.1.0
+langchain-core>=1.0.0
+langgraph>=1.0.0

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Agent Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: monospace; background: #1a1a1a; color: #e0e0e0; padding: 24px; }
+    h1 { font-size: 1.1rem; color: #aaa; margin-bottom: 16px; }
+
+    .controls { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    input { background: #2a2a2a; border: 1px solid #444; color: #e0e0e0; padding: 8px 12px; border-radius: 4px; font-family: monospace; font-size: 14px; }
+    #question { flex: 1; min-width: 300px; }
+    #token { flex: 1; min-width: 300px; }
+    #endpoint { width: 260px; }
+
+    button { padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; font-family: monospace; font-size: 14px; }
+    #sendBtn { background: #2d6a4f; color: #fff; }
+    #sendBtn:disabled { background: #333; color: #666; cursor: not-allowed; }
+    #clearBtn { background: #3a3a3a; color: #aaa; }
+    #loginBtn { background: #3a3060; color: #c4b5fd; }
+    #loginBtn:disabled { background: #333; color: #666; cursor: not-allowed; }
+    .login-ok { color: #98c379; font-size: 12px; margin-left: 4px; }
+
+    #output {
+      background: #111; border: 1px solid #333; border-radius: 6px;
+      padding: 16px; min-height: 300px; max-height: 70vh;
+      overflow-y: auto; white-space: pre-wrap; line-height: 1.6; font-size: 13px;
+    }
+
+    .token { color: #e0e0e0; }
+    .tool-start { color: #61afef; }
+    .tool-end { color: #98c379; }
+    .done { color: #56b6c2; }
+    .error { color: #e06c75; }
+    .meta { color: #555; font-style: italic; }
+    .divider { color: #333; }
+  </style>
+</head>
+<body>
+  <h1>Agent SSE Test</h1>
+
+  <div class="controls">
+    <input id="endpoint" type="text" value="http://localhost:8080/api/agent/chat" placeholder="Endpoint URL" />
+  </div>
+  <div class="controls">
+    <input id="token" type="text" placeholder="JWT Bearer token (without 'Bearer ' prefix)" />
+    <button id="loginBtn" onclick="devLogin()">Dev Login</button>
+  </div>
+  <div class="controls">
+    <input id="question" type="text" placeholder="Ask something..." value="Was habe ich hochgeladen?" />
+    <button id="sendBtn" onclick="send()">Send</button>
+    <button id="clearBtn" onclick="clear_()">Clear</button>
+  </div>
+
+  <div id="output"><span class="meta">Output will appear here…</span></div>
+
+  <script>
+    const out = document.getElementById('output');
+    const btn = document.getElementById('sendBtn');
+
+    function append(text, cls) {
+      const span = document.createElement('span');
+      span.className = cls;
+      span.textContent = text;
+      out.appendChild(span);
+      out.scrollTop = out.scrollHeight;
+    }
+
+    function clear_() {
+      out.innerHTML = '';
+    }
+
+    async function devLogin() {
+      const loginBtn = document.getElementById('loginBtn');
+      const base = document.getElementById('endpoint').value.trim().replace(/\/api\/agent\/chat.*/, '');
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Logging in…';
+      try {
+        const resp = await fetch(`${base}/api/auth/dev-login`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        document.getElementById('token').value = data.token;
+        loginBtn.textContent = `Dev Login ✓ (${data.name || data.email})`;
+      } catch (e) {
+        loginBtn.textContent = `Dev Login ✗ ${e.message}`;
+      } finally {
+        loginBtn.disabled = false;
+      }
+    }
+
+    async function send() {
+      const question = document.getElementById('question').value.trim();
+      const token    = document.getElementById('token').value.trim();
+      const endpoint = document.getElementById('endpoint').value.trim();
+      if (!question) return;
+
+      clear_();
+      btn.disabled = true;
+
+      append(`[→ POST ${endpoint}]\n`, 'meta');
+      if (token) append(`[Authorization: Bearer ${token.slice(0, 20)}…]\n`, 'meta');
+      append(`[question: ${question}]\n\n`, 'meta');
+
+      const headers = { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      try {
+        const resp = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ question }),
+        });
+
+        if (!resp.ok) {
+          append(`HTTP ${resp.status} ${resp.statusText}\n`, 'error');
+          btn.disabled = false;
+          return;
+        }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // keep incomplete line
+
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue;
+            const raw = line.slice(5).trim();
+            if (!raw) continue;
+
+            let evt;
+            try { evt = JSON.parse(raw); } catch { append(raw + '\n', 'meta'); continue; }
+
+            switch (evt.type) {
+              case 'token':
+                append(evt.content, 'token');
+                break;
+              case 'tool_start':
+                append(`\n\n[TOOL CALL: ${evt.tool}]`, 'tool-start');
+                if (evt.input) append(` input="${evt.input}"`, 'tool-start');
+                append('\n', 'tool-start');
+                break;
+              case 'tool_end':
+                append(`[TOOL RESULT: ${evt.tool}]\n`, 'tool-end');
+                if (evt.result) append(evt.result + '\n', 'tool-end');
+                append('\n', 'tool-end');
+                break;
+              case 'done':
+                append('\n\n[DONE]', 'done');
+                reader.cancel();
+                btn.disabled = false;
+                return;
+              case 'error':
+                append(`\n[ERROR] ${evt.message}\n`, 'error');
+                break;
+              default:
+                append(JSON.stringify(evt) + '\n', 'meta');
+            }
+          }
+        }
+      } catch (e) {
+        append(`\n[FETCH ERROR] ${e.message}\n`, 'error');
+      }
+
+      btn.disabled = false;
+    }
+
+    document.getElementById('question').addEventListener('keydown', e => {
+      if (e.key === 'Enter') send();
+    });
+  </script>
+</body>
+</html>

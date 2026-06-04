@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from datetime import date
 from typing import Optional
@@ -7,6 +8,9 @@ from app.vector_store import store_embeddings, search_embeddings, get_all_chunks
 from app.categories import InvoiceCategory
 from app.ocr_vision import pdf_to_base64_images, image_to_base64
 from app.database import SessionLocal, Suggestion
+from app.agent import run_agent_streaming
+from fastapi.sse import EventSourceResponse, ServerSentEvent
+from collections.abc import AsyncIterable
 import ollama
 import os
 import asyncio
@@ -24,6 +28,13 @@ LLM_MODEL_VISION = os.getenv("OLLAMA_MODEL_VISION", "qwen3.5")
 LLM_THINK = os.getenv("OLLAMA_THINK", "false").lower() == "true"
 
 app = FastAPI(title="AI Extraction service", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 _client = ollama.AsyncClient(host=LLM_URL)
 _client_vision = ollama.AsyncClient(host=LLM_URL_VISION)
@@ -239,6 +250,17 @@ async def get_suggestions(user_id: str):
     results = db.query(Suggestion).filter(Suggestion.user_id==user_id).order_by(Suggestion.created_at.desc()).all()
     db.close()
     return [{"suggestion": r.suggestion, "created_at": str(r.created_at)} for r in results]
+
+class AgentChatRequest(BaseModel):
+    question: str
+    user_id: str
+
+
+@app.post("/api/agent/chat", response_class=EventSourceResponse)
+async def agent_chat(request: AgentChatRequest) -> AsyncIterable[ServerSentEvent]:
+    async for event_dict in run_agent_streaming(request.question, request.user_id):
+        yield ServerSentEvent(data=event_dict)
+
 
 @app.get("/health")
 def health():
