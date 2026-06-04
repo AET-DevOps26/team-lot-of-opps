@@ -6,10 +6,10 @@ from app.ocr import extract_text
 from app.vector_store import store_embeddings, search_embeddings, get_all_chunks_for_user, update_embeddings, delete_embeddings
 from app.categories import InvoiceCategory
 from app.ocr_vision import pdf_to_base64_images, image_to_base64
+from app.database import SessionLocal, Suggestion
 import ollama
 import os
 import asyncio
-import psycopg2
 import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s – %(message)s")
@@ -45,10 +45,11 @@ class EmbedRequest(BaseModel):
 
 class QueryRequest(BaseModel):
     question: str
-    user_id: str=None
+    user_id: Optional[str] = None
 
 class SuggestionRequest(BaseModel):
     user_id: str
+    items: list[dict] = []
 
 class UpdateRequest(BaseModel):
     invoice_id: int
@@ -82,6 +83,7 @@ Use the VISUAL LAYOUT to identify sections:
 """
 
 async def call_llm(raw_text: str) -> list[InvoiceItem]:
+    raw_text = raw_text[:6000]  # keep ~1500 tokens for invoice text
     prompt = f"""You are a German tax document classifier. Extract invoice line items from the text below and return valid JSON. The invoice may be in German or English.
 {ITEM_FIELDS}
 Invoice text:
@@ -194,40 +196,49 @@ async def query(request: QueryRequest):
 @app.post("/suggestions")
 async def suggestions(request: SuggestionRequest):
     user_id = request.user_id
-    all_invoices = get_all_chunks_for_user(user_id)
-    if not all_invoices:
-        return []
+
+    if request.items:
+        context = "\n".join(
+            f"- {item.get('product_name', 'N/A')} | {item.get('company', 'N/A')} | {item.get('value', '')} EUR | {item.get('category', '')} | {item.get('invoice_date', '')}"
+            for item in request.items
+        )
+    else:
+        chunks = get_all_chunks_for_user(user_id)
+        if not chunks:
+            return []
+        context = "\n".join(chunks)
+
     response = await _client.chat(
         model=LLM_MODEL,
         messages=[
-            {"role": "system", "content": "You are a German tax document expert. Analyze the user's uploaded invoices and identify missing documents based on common tax deduction pairs: Hotel receipts suggest flight/train receipts, internet bills suggest phone bills, training courses suggest travel receipts, home office claims suggest internet bills, work equipment purchases suggest related accessories. List specific missing documents the user should upload to maximize their tax refund. Be concise and specific."},
-            {"role": "user", "content": f"Here are the user's uploaded invoices:\n{all_invoices}\n\nWhat tax documents are missing?"},
+            {"role": "system", "content": """You are a German tax expert helping students maximize their tax refund.
+Analyze the uploaded invoices and identify missing documents based on these German tax deduction pairs:
+- Hotel receipt → flight/train receipt (Reisekosten require both)
+- Train/flight receipt → hotel receipt
+- Internet bill → phone bill (both deductible for home office)
+- Work equipment (laptop, desk) → software licenses, accessories
+- Training/course receipt → travel receipt to the training location
+- Home office claim → internet bill
+- Conference registration → travel + hotel receipts
+- Business meal → names of attendees and business purpose
+
+Give 2-4 specific, actionable suggestions. Reference actual items from the invoices where possible (e.g., "You uploaded a hotel in Berlin — do you have the train or flight receipt?"). Be concise."""},
+            {"role": "user", "content": f"Here are the user's uploaded invoices:\n{context}\n\nWhat tax documents are missing? Give specific suggestions."},
         ],
     )
     suggestion_text = response.message.content
-    conn = psycopg2.connect(DB_URL)
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO suggestions (user_id, suggestion) VALUES (%s, %s)",
-        (user_id, suggestion_text)
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+    db = SessionLocal()
+    db.add(Suggestion(user_id=user_id, suggestion=suggestion_text))
+    db.commit()
+    db.close()
     return {"answer": suggestion_text}
 
 @app.get("/api/suggestions")
 async def get_suggestions(user_id: str):
-    conn = psycopg2.connect(DB_URL)
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT suggestion, created_at FROM suggestions WHERE user_id = %s ORDER BY created_at DESC",
-        (user_id,)
-    )
-    results = [{"suggestion": row[0], "created_at": str(row[1])} for row in cur.fetchall()]
-    cur.close()
-    conn.close()
-    return results
+    db = SessionLocal()
+    results = db.query(Suggestion).filter(Suggestion.user_id==user_id).order_by(Suggestion.created_at.desc()).all()
+    db.close()
+    return [{"suggestion": r.suggestion, "created_at": str(r.created_at)} for r in results]
 
 @app.get("/health")
 def health():
