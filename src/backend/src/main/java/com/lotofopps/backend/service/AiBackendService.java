@@ -84,6 +84,33 @@ public class AiBackendService {
         logger.info("Stored embeddings for invoice {}", invoice.getId());
     }
 
+    public String getSuggestions(String userId, List<Invoice> invoices) {
+        String base = aiBackendUrl.endsWith("/") ? aiBackendUrl.substring(0, aiBackendUrl.length() - 1) : aiBackendUrl;
+        String url = base + "/suggestions";
+
+        List<Map<String, Object>> items = invoices.stream().map(inv -> {
+            Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("itemName", inv.getItemName());
+            item.put("company", inv.getCompany());
+            item.put("price", inv.getPrice());
+            item.put("invoiceDate", inv.getInvoiceDate() != null ? inv.getInvoiceDate().toString() : null);
+            item.put("category", inv.getCategory() != null ? inv.getCategory().name() : null);
+            return item;
+        }).toList();
+
+        Map<String, Object> body = Map.of("userId", userId, "items", items);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                url, HttpMethod.POST, new HttpEntity<>(body, headers),
+                new ParameterizedTypeReference<>() {});
+
+        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+            throw new RuntimeException("AI backend returned non-2xx or empty response for suggestions");
+        }
+        return (String) response.getBody().get("answer");
+    }
+
     public void deleteEmbeddings(Long invoiceId) {
         String url = aiBackendUrl + "/embed/" + invoiceId;
         restTemplate.exchange(url, HttpMethod.DELETE, null, Void.class);
@@ -97,7 +124,7 @@ public class AiBackendService {
         body.add("file", new FileSystemResource(Paths.get(document.getStoragePath())));
 
         String base = aiBackendUrl.endsWith("/") ? aiBackendUrl.substring(0, aiBackendUrl.length() - 1) : aiBackendUrl;
-        String url = base + "/extract";
+        String url = base + "/extract/vision"; // TODO: Change back to /extract if vision doesnt work well enough
 
         logger.info("Sending extract request to {} for document {}", url, document.getStoragePath());
         HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);

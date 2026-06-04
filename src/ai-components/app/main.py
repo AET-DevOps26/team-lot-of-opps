@@ -1,20 +1,22 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+from pydantic.alias_generators import to_camel
 from datetime import date
 from typing import Optional
 from app.ocr import extract_text
-from app.vector_store import store_embeddings, search_embeddings, get_all_chunks_for_user, update_embeddings, delete_embeddings, get_vectorstore
+from app.vector_store import store_embeddings, search_embeddings, update_embeddings, delete_embeddings, get_vectorstore
 from app.categories import InvoiceCategory
 from app.ocr_vision import pdf_to_base64_images, image_to_base64
-from app.database import SessionLocal, Suggestion
+from app.database import AsyncSessionLocal, Suggestion, Base, engine
+from sqlalchemy import select
 from app.agent import run_agent_streaming
-from fastapi.sse import EventSourceResponse, ServerSentEvent
-from collections.abc import AsyncIterable
+from starlette.responses import StreamingResponse
 import ollama
 import os
 import asyncio
+import json
 import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s – %(message)s")
@@ -25,11 +27,13 @@ DB_URL = os.getenv("DATABASE_URL")
 LLM_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
 LLM_URL_VISION = os.getenv("OLLAMA_URL_VISION", "http://host.docker.internal:11434")
 LLM_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
-LLM_MODEL_VISION = os.getenv("OLLAMA_MODEL_VISION", "qwen3.5")
+LLM_MODEL_VISION = os.getenv("OLLAMA_MODEL_VISION", "qwen3.5:4b")
 LLM_THINK = os.getenv("OLLAMA_THINK", "false").lower() == "true"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     await get_vectorstore()
     yield
 
@@ -65,9 +69,21 @@ class QueryRequest(BaseModel):
     question: str
     user_id: Optional[str] = None
 
+class SuggestionInvoiceItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, alias_generator=to_camel)
+
+    item_name: str = "N/A"
+    company: str = "N/A"
+    price: Optional[float] = None
+    invoice_date: Optional[date] = None
+    category: Optional[str] = None
+
+
 class SuggestionRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, alias_generator=to_camel)
+
     user_id: str
-    items: list[dict] = []
+    items: list[SuggestionInvoiceItem] = []
 
 class UpdateRequest(BaseModel):
     invoice_id: int
@@ -199,33 +215,30 @@ async def embed(request: EmbedRequest):
     await store_embeddings(request.invoice_id, request.text, request.user_id)
     return {"status": "ok"}
 
-@app.post("/api/chat")
-async def query(request: QueryRequest):
-    chunks = await search_embeddings(request.question, user_id=request.user_id)
-    context = "\n\n".join(chunks)
-    response = await _client.chat(
-        model=LLM_MODEL,
-        messages=[
-            {"role": "system", "content": "You are a helpful German tax assistant. Answer questions based only on the provided invoice context."},
-            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {request.question}"},
-        ],
-    )
-    return {"answer": response.message.content}
+# @app.post("/api/chat")
+# async def query(request: QueryRequest):
+#     chunks = await search_embeddings(request.question, user_id=request.user_id)
+#     context = "\n\n".join(chunks)
+#     response = await _client.chat(
+#         model=LLM_MODEL,
+#         messages=[
+#             {"role": "system", "content": "You are a helpful German tax assistant. Answer questions based only on the provided invoice context."},
+#             {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {request.question}"},
+#         ],
+#     )
+#     return {"answer": response.message.content}
 
 @app.post("/suggestions")
 async def suggestions(request: SuggestionRequest):
     user_id = request.user_id
 
-    if request.items:
-        context = "\n".join(
-            f"- {item.get('product_name', 'N/A')} | {item.get('company', 'N/A')} | {item.get('value', '')} EUR | {item.get('category', '')} | {item.get('invoice_date', '')}"
-            for item in request.items
-        )
-    else:
-        chunks = get_all_chunks_for_user(user_id)
-        if not chunks:
-            return []
-        context = "\n".join(chunks)
+    if not request.items:
+        return {"answer": ""}
+
+    context = "\n".join(
+        f"- {item.item_name} | {item.company} | {item.price or ''} EUR | {item.category or ''} | {item.invoice_date or ''}"
+        for item in request.items
+    )
 
     response = await _client.chat(
         model=LLM_MODEL,
@@ -246,28 +259,35 @@ Give 2-4 specific, actionable suggestions. Reference actual items from the invoi
         ],
     )
     suggestion_text = response.message.content
-    db = SessionLocal()
-    db.add(Suggestion(user_id=user_id, suggestion=suggestion_text))
-    db.commit()
-    db.close()
+
+    async with AsyncSessionLocal() as db:
+        db.add(Suggestion(user_id=user_id, suggestion=suggestion_text))
+        await db.commit()
+
     return {"answer": suggestion_text}
 
 @app.get("/api/suggestions")
 async def get_suggestions(user_id: str):
-    db = SessionLocal()
-    results = db.query(Suggestion).filter(Suggestion.user_id==user_id).order_by(Suggestion.created_at.desc()).all()
-    db.close()
-    return [{"suggestion": r.suggestion, "created_at": str(r.created_at)} for r in results]
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(Suggestion)
+            .where(Suggestion.user_id == user_id)
+            .order_by(Suggestion.created_at.desc())
+        )
+        rows = result.scalars().all()
+    return [{"suggestion": r.suggestion, "created_at": str(r.created_at)} for r in rows]
 
 class AgentChatRequest(BaseModel):
     question: str
     user_id: str
 
 
-@app.post("/api/agent/chat", response_class=EventSourceResponse)
-async def agent_chat(request: AgentChatRequest) -> AsyncIterable[ServerSentEvent]:
-    async for event_dict in run_agent_streaming(request.question, request.user_id):
-        yield ServerSentEvent(data=event_dict)
+@app.post("/api/agent/chat")
+async def agent_chat(request: AgentChatRequest):
+    async def _gen():
+        async for event_dict in run_agent_streaming(request.question, request.user_id):
+            yield f"data: {json.dumps(event_dict)}\n\n"
+    return StreamingResponse(_gen(), media_type="text/event-stream")
 
 
 @app.get("/health")

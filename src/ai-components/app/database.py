@@ -1,11 +1,18 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.orm import declarative_base
+from sqlalchemy import Column, Integer, String, Text, DateTime
 from datetime import datetime
 import os
 
+
+def _async_url(url: str) -> str:
+    return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+
 Base = declarative_base()
-engine = create_engine(os.getenv("DATABASE_URL"))
-SessionLocal = sessionmaker(bind=engine)
+engine = create_async_engine(_async_url(os.getenv("DATABASE_URL")))
+AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+
 
 class Suggestion(Base):
     __tablename__ = "suggestions"

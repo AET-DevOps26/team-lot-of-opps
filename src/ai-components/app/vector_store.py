@@ -11,7 +11,6 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 TABLE_NAME = "langchain_invoice_embeddings"
 VECTOR_SIZE = 384  # sentence-transformers/all-MiniLM-L6-v2
 
-# TODO: Connect the actual stored documents in the realtinos db with the documents stored in the vector db
 def _asyncpg_url(url: str) -> str:
     return url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
@@ -73,19 +72,6 @@ async def search_embeddings(query: str, limit: int = 5, user_id: str | None = No
     filter_dict = {"user_id": user_id} if user_id else None
     results: list[Document] = await vs.asimilarity_search(query, k=limit, filter=filter_dict)
     return [doc.page_content for doc in results]
-
-# TODO: Brauchen wir das überhaupt
-async def get_all_chunks_for_user(user_id: str) -> list[str]:
-    conn = await asyncpg.connect(DATABASE_URL)
-    try:
-        rows = await conn.fetch(
-            f"SELECT content FROM {TABLE_NAME} WHERE langchain_metadata->>'user_id' = $1",
-            user_id,
-        )
-        return [row["content"] for row in rows]
-    finally:
-        await conn.close()
-
 
 async def update_embeddings(invoice_id: int, text: str, user_id: str) -> None:
     await delete_embeddings(invoice_id)

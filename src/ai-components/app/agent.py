@@ -1,9 +1,8 @@
 import os
-import asyncio
 import logging
 from typing import AsyncIterator
 
-import psycopg2
+import asyncpg
 from langchain_ollama import ChatOllama
 from langchain_core.tools import Tool
 from langchain.agents import create_agent
@@ -51,23 +50,20 @@ async def _search_documents_async(query: str, user_id: str) -> str:
     return "\n---\n".join(f"Result {i + 1}:\n{chunk}" for i, chunk in enumerate(chunks))
 
 
-def _list_user_documents_sync(user_id: str) -> str:
-    conn = psycopg2.connect(DB_URL)
-    cur = conn.cursor()
+async def _list_user_documents_async(user_id: str) -> str:
+    conn = await asyncpg.connect(DB_URL)
     try:
-        cur.execute(
+        rows = await conn.fetch(
             """
-            SELECT i.id, i.item_name, i.company, i.price, i.category, i.invoice_date
-            FROM invoices i
-            WHERE i.user_id = %s
-            ORDER BY i.invoice_date DESC NULLS LAST
+            SELECT id, item_name, company, price, category, invoice_date
+            FROM invoices
+            WHERE user_id = $1
+            ORDER BY invoice_date DESC NULLS LAST
             """,
-            (user_id,),
+            user_id,
         )
-        rows = cur.fetchall()
     finally:
-        cur.close()
-        conn.close()
+        await conn.close()
 
     if not rows:
         return "The user has no uploaded documents yet."
@@ -75,7 +71,12 @@ def _list_user_documents_sync(user_id: str) -> str:
     lines = ["ID  | Item                          | Company              | Price   | Category                    | Date"]
     lines.append("-" * 105)
     for row in rows:
-        inv_id, item, company, price, category, inv_date = row
+        inv_id = row["id"]
+        item = row["item_name"]
+        company = row["company"]
+        price = row["price"]
+        category = row["category"]
+        inv_date = row["invoice_date"]
         price_str = f"{price:.2f}€" if price is not None else "N/A"
         date_str = str(inv_date) if inv_date else "N/A"
         lines.append(
@@ -84,19 +85,17 @@ def _list_user_documents_sync(user_id: str) -> str:
     return "\n".join(lines)
 
 
-def _suggest_missing_documents_sync(user_id: str) -> str:
-    conn = psycopg2.connect(DB_URL)
-    cur = conn.cursor()
+async def _suggest_missing_documents_async(user_id: str) -> str:
+    conn = await asyncpg.connect(DB_URL)
     try:
-        cur.execute(
-            "SELECT DISTINCT category FROM invoices WHERE user_id = %s AND category IS NOT NULL",
-            (user_id,),
+        rows = await conn.fetch(
+            "SELECT DISTINCT category FROM invoices WHERE user_id = $1 AND category IS NOT NULL",
+            user_id,
         )
-        present = {row[0] for row in cur.fetchall()}
     finally:
-        cur.close()
-        conn.close()
+        await conn.close()
 
+    present = {row["category"] for row in rows}
     all_categories = [c.value for c in InvoiceCategory]
     missing = [c for c in all_categories if c not in present]
 
@@ -112,21 +111,14 @@ def _suggest_missing_documents_sync(user_id: str) -> str:
 
 
 def _make_tools(user_id: str) -> list[Tool]:
-    loop_ref: list[asyncio.AbstractEventLoop] = []
-
-    def _get_loop() -> asyncio.AbstractEventLoop:
-        if not loop_ref:
-            loop_ref.append(asyncio.get_event_loop())
-        return loop_ref[0]
-
     async def _async_search(query: str) -> str:
         return await _search_documents_async(query, user_id)
 
     async def _async_list(_: str = "") -> str:
-        return await _get_loop().run_in_executor(None, _list_user_documents_sync, user_id)
+        return await _list_user_documents_async(user_id)
 
     async def _async_suggest(_: str = "") -> str:
-        return await _get_loop().run_in_executor(None, _suggest_missing_documents_sync, user_id)
+        return await _suggest_missing_documents_async(user_id)
 
     return [
         Tool(
@@ -145,7 +137,7 @@ def _make_tools(user_id: str) -> list[Tool]:
                 "Lists all invoices the user has uploaded with ID, item, company, price, "
                 "category, and date. Use this first to get an overview. Input: empty string."
             ),
-            func=lambda _="": _list_user_documents_sync(user_id),
+            func=lambda _="": "Async only — use coroutine path",
             coroutine=_async_list,
         ),
         Tool(
@@ -154,7 +146,7 @@ def _make_tools(user_id: str) -> list[Tool]:
                 "Analyzes which German tax document categories the user is missing and suggests "
                 "specific documents to upload to maximize their tax refund. Input: empty string."
             ),
-            func=lambda _="": _suggest_missing_documents_sync(user_id),
+            func=lambda _="": "Async only — use coroutine path",
             coroutine=_async_suggest,
         ),
     ]
@@ -167,11 +159,7 @@ def _build_agent(user_id: str):
         temperature=0.1,
     )
     tools = _make_tools(user_id)
-    return create_agent(
-        model=llm,
-        tools=tools,
-        system_prompt=SYSTEM_PROMPT,
-    )
+    return create_agent(llm, tools, system_prompt=SYSTEM_PROMPT)
 
 
 async def run_agent_streaming(question: str, user_id: str) -> AsyncIterator[dict]:

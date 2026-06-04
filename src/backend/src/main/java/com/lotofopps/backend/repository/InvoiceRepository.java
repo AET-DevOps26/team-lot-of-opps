@@ -20,4 +20,6 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     Page<Invoice> findByUserIdAndInvoiceDateYear(String userId, int invoiceYear, Pageable pageable);
 
     List<Invoice> findByDocumentId(Long documentId);
+
+    List<Invoice> findTop5ByUserIdOrderByCreatedAtDesc(String userId);
 }
