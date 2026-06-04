@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import useT from '../i18n/useT'
 import Icon from '../components/Icon'
 import { apiGet } from '../api/client'
@@ -19,6 +20,18 @@ interface ExpenseBar {
   amount: string
   width: string
   bar: string
+}
+
+interface Suggestion {
+  suggestion: string
+  createdAt: string
+}
+
+function formatSuggestionDate(value: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 interface SummaryCardProps {
@@ -95,10 +108,36 @@ export default function Dashboard() {
     }[]
   >([])
 
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [suggestionsLoading, setSuggestionsLoading] = useState(true)
+  const [suggestionsError, setSuggestionsError] = useState(false)
+
   useEffect(() => {
     apiGet<typeof invoices>('/api/invoices', token)
       .then((data) => setInvoices(data || []))
       .catch(() => setInvoices([]))
+  }, [token])
+
+  useEffect(() => {
+    let cancelled = false
+    setSuggestionsLoading(true)
+    setSuggestionsError(false)
+    apiGet<Suggestion[]>('/api/suggestions', token)
+      .then((data) => {
+        if (cancelled) return
+        setSuggestions(data || [])
+      })
+      .catch(() => {
+        if (cancelled) return
+        setSuggestionsError(true)
+        setSuggestions([])
+      })
+      .finally(() => {
+        if (!cancelled) setSuggestionsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [token])
 
   const totalExpenses = invoices.reduce((s, inv) => s + Number(inv.price || 0), 0)
@@ -279,27 +318,49 @@ export default function Dashboard() {
         <aside className="space-y-6">
           <section className={`relative overflow-hidden ${CARD_BASE}`}>
             <IntelligenceRail />
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-1">
               <Icon name="auto_awesome" className="text-[#9333ea]" />
               <h3 className="font-h3 text-h3 text-primary">{t('dashboard.ai.title')}</h3>
             </div>
+            <p className="font-body-sm text-body-sm text-on-surface-variant mb-4">
+              {t('dashboard.ai.subtitle')}
+            </p>
             <div className="space-y-4">
-              <div className="bg-error-container/30 border border-error-container p-4 rounded-lg">
-                <p className="font-body-sm text-body-sm text-on-surface mb-3">
-                  {t('dashboard.ai.suggestion1')}
+              {suggestionsLoading ? (
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  {t('dashboard.ai.loading')}
                 </p>
-                <button className="bg-white border border-outline-variant text-primary font-body-sm text-body-sm px-3 py-1.5 rounded hover:bg-surface-container transition-colors flex items-center gap-1 w-full justify-center">
-                  <Icon name="upload" size={16} /> {t('dashboard.ai.uploadFlight')}
-                </button>
-              </div>
-              <div className="bg-surface p-4 rounded-lg border border-surface-container-highest">
-                <p className="font-body-sm text-body-sm text-on-surface mb-3">
-                  {t('dashboard.ai.suggestion2')}
+              ) : suggestionsError ? (
+                <p className="font-body-sm text-body-sm text-error">
+                  {t('dashboard.ai.error')}
                 </p>
-                <button className="text-surface-tint font-body-sm text-body-sm hover:text-primary transition-colors flex items-center gap-1">
-                  {t('dashboard.ai.addPauschale')} <Icon name="arrow_forward" size={16} />
-                </button>
-              </div>
+              ) : suggestions.length === 0 ? (
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  {t('dashboard.ai.empty')}
+                </p>
+              ) : (
+                suggestions.map((s, i) => (
+                  <div
+                    key={`${s.createdAt}-${i}`}
+                    className="bg-surface p-4 rounded-lg border border-surface-container-highest"
+                  >
+                    <p className="font-body-sm text-body-sm text-on-surface mb-2">
+                      {s.suggestion}
+                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-data-mono text-xs text-on-surface-variant">
+                        {formatSuggestionDate(s.createdAt)}
+                      </p>
+                      <Link
+                        to="/upload"
+                        className="shrink-0 bg-white border border-outline-variant text-primary font-body-sm text-body-sm px-3 py-1.5 rounded hover:bg-surface-container transition-colors flex items-center gap-1"
+                      >
+                        <Icon name="upload" size={16} /> {t('dashboard.ai.uploadCta')}
+                      </Link>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </section>
         </aside>

@@ -51,10 +51,11 @@ export interface TranslationDict {
     }
     ai: {
       title: string
-      suggestion1: string
-      uploadFlight: string
-      suggestion2: string
-      addPauschale: string
+      subtitle: string
+      loading: string
+      error: string
+      empty: string
+      uploadCta: string
     }
   }
   upload: {
@@ -177,11 +178,11 @@ const translations: Record<Language, TranslationDict> = {
       },
       ai: {
         title: 'AI Suggestions',
-        suggestion1:
-          '"I see you uploaded a hotel receipt for Barcelona (Nov 12). Do you have the corresponding flight bill to claim full Reisekosten?"',
-        uploadFlight: 'Upload Flight Bill',
-        suggestion2: "You haven't claimed the Internet Pauschale (Internet Flatrate) for this year.",
-        addPauschale: 'Add Pauschale',
+        subtitle: 'Based on your invoices, here is what we found.',
+        loading: 'Analyzing your invoices…',
+        error: 'Could not load suggestions right now.',
+        empty: 'No suggestions yet — upload a document to get started.',
+        uploadCta: 'Upload',
       },
     },
     upload: {
@@ -316,11 +317,11 @@ const translations: Record<Language, TranslationDict> = {
       },
       ai: {
         title: 'KI-Vorschläge',
-        suggestion1:
-          '„Ich sehe, du hast eine Hotelrechnung für Barcelona (12. Nov) hochgeladen. Hast du die zugehörige Flugrechnung, um die vollen Reisekosten geltend zu machen?"',
-        uploadFlight: 'Flugrechnung hochladen',
-        suggestion2: 'Du hast die Internet-Pauschale für dieses Jahr noch nicht geltend gemacht.',
-        addPauschale: 'Pauschale hinzufügen',
+        subtitle: 'Basierend auf deinen Rechnungen haben wir Folgendes gefunden.',
+        loading: 'Deine Rechnungen werden analysiert…',
+        error: 'Vorschläge konnten gerade nicht geladen werden.',
+        empty: 'Noch keine Vorschläge — lade ein Dokument hoch, um zu starten.',
+        uploadCta: 'Hochladen',
       },
     },
     upload: {
