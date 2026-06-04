@@ -44,8 +44,8 @@ When helping users:
 4. Always cite specific invoices (company, date, amount) when answering"""
 
 
-def _search_documents_sync(query: str, user_id: str) -> str:
-    chunks = search_embeddings(query, user_id=user_id)
+async def _search_documents_async(query: str, user_id: str) -> str:
+    chunks = await search_embeddings(query, user_id=user_id)
     if not chunks:
         return "No matching documents found for that query."
     return "\n---\n".join(f"Result {i + 1}:\n{chunk}" for i, chunk in enumerate(chunks))
@@ -120,7 +120,7 @@ def _make_tools(user_id: str) -> list[Tool]:
         return loop_ref[0]
 
     async def _async_search(query: str) -> str:
-        return await _get_loop().run_in_executor(None, _search_documents_sync, query, user_id)
+        return await _search_documents_async(query, user_id)
 
     async def _async_list(_: str = "") -> str:
         return await _get_loop().run_in_executor(None, _list_user_documents_sync, user_id)
@@ -136,7 +136,7 @@ def _make_tools(user_id: str) -> list[Tool]:
                 "Use to find specific invoices by company name, product, service, or date. "
                 "Input: a natural language search query string."
             ),
-            func=lambda q: _search_documents_sync(q, user_id),
+            func=lambda _: "Async only — use coroutine path",
             coroutine=_async_search,
         ),
         Tool(

@@ -1,97 +1,103 @@
 import os
-import psycopg2
-from sentence_transformers import SentenceTransformer
+import asyncio
+import asyncpg
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_postgres import PGEngine, PGVectorStore
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
+from sqlalchemy.exc import ProgrammingError
 
-DB_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
+TABLE_NAME = "langchain_invoice_embeddings"
+VECTOR_SIZE = 384  # sentence-transformers/all-MiniLM-L6-v2
 
-_model = None
+# TODO: Connect the actual stored documents in the realtinos db with the documents stored in the vector db
+def _asyncpg_url(url: str) -> str:
+    return url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-def get_model() -> SentenceTransformer:
-    global _model
-    if _model is None:
-        _model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-    return _model
+_embeddings: HuggingFaceEmbeddings | None = None
+_engine: PGEngine | None = None
+_vectorstore: PGVectorStore | None = None
+_init_lock = asyncio.Lock()
 
-def chunk_text(text: str, chunk_size: int = 500) -> list[str]:
-    chunks = []
-    for i in range(0, len(text), chunk_size):
-        chunks.append(text[i:i+chunk_size])
-    return chunks
+_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=500, chunk_overlap=50, add_start_index=True
+)
 
-def store_embeddings(invoice_id: int, text: str):
-    chunks  = chunk_text(text)
-    conn = psycopg2.connect(DB_URL)
-    cur = conn.cursor()
-    for chunk in chunks:
-        embedding = get_model().encode(chunk).tolist()
-        cur.execute(
-            "INSERT INTO invoice_embeddings (invoice_id, chunk_text, embedding) VALUES (%s, %s, %s)",
-            (invoice_id, chunk, embedding)
 
+def chunk_text(text: str, invoice_id: int, user_id: str) -> list[Document]:
+    splits = _splitter.create_documents([text])
+    for doc in splits:
+        doc.metadata["invoice_id"] = invoice_id
+        doc.metadata["user_id"] = user_id
+    return splits
+
+
+def get_embeddings() -> HuggingFaceEmbeddings:
+    global _embeddings
+    if _embeddings is None:
+        _embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
         )
-    conn.commit()
-    cur.close()
-    conn.close()
+    return _embeddings
 
-def search_embeddings(query: str, limit: int=5, user_id: str=None) -> list[str]:
-    query_embedding = get_model().encode(query).tolist()
-    conn = psycopg2.connect(DB_URL)
-    cur = conn.cursor()
-    if user_id:
-        cur.execute(
-            "SELECT ie.chunk_text " 
-            "FROM invoice_embeddings ie " 
-            "JOIN invoices i ON ie.invoice_id = i.id "
-            "WHERE i.user_id = %s "
-            "ORDER BY embedding <-> %s::vector LIMIT %s",
-            (user_id,query_embedding, limit)
+
+async def get_vectorstore() -> PGVectorStore:
+    global _engine, _vectorstore
+    async with _init_lock:
+        if _vectorstore is not None:
+            return _vectorstore
+        _engine = PGEngine.from_connection_string(url=_asyncpg_url(DATABASE_URL))
+        try:
+            await _engine.ainit_vectorstore_table(
+                table_name=TABLE_NAME,
+                vector_size=VECTOR_SIZE,
+            )
+        except ProgrammingError:
+            pass  # Table already exists from a previous run
+        _vectorstore = await PGVectorStore.create(
+            engine=_engine,
+            table_name=TABLE_NAME,
+            embedding_service=get_embeddings(),
         )
-    else:
-        cur.execute(
-            "SELECT chunk_text " 
-            "FROM invoice_embeddings " 
-            "ORDER BY embedding <-> %s::vector LIMIT %s",
-            (query_embedding, limit)
-        )       
-    results = [row[0] for row in cur.fetchall()]
-    cur.close()
-    conn.close()
-    return results
+    return _vectorstore
 
-def get_all_chunks_for_user(user_id: str) -> list[str]:
-    conn = psycopg2.connect(DB_URL)
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT ie.chunk_text "
-        "FROM invoice_embeddings ie "
-        "JOIN invoices i ON ie.invoice_id = i.id "
-        "WHERE i.user_id = %s",
-        (user_id,)
-    )
-    results = [row[0] for row in cur.fetchall()]
-    cur.close()
-    conn.close()
-    return results    
 
-def update_embeddings(invoice_id: int, text:str):
-    conn = psycopg2.connect(DB_URL)
-    cur = conn.cursor()
-    cur.execute(
-        "DELETE FROM invoice_embeddings WHERE invoice_id = %s",
-        (invoice_id,)
-    )
-    store_embeddings(invoice_id, text)
-    conn.commit()
-    cur.close()
-    conn.close()
+async def store_embeddings(invoice_id: int, text: str, user_id: str) -> None:
+    vs = await get_vectorstore()
+    await vs.aadd_documents(chunk_text(text, invoice_id, user_id))
 
-def delete_embeddings(invoice_id: int):
-    conn = psycopg2.connect(DB_URL)
-    cur = conn.cursor()
-    cur.execute(
-        "DELETE FROM invoice_embeddings WHERE invoice_id = %s",
-        (invoice_id,)
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+
+async def search_embeddings(query: str, limit: int = 5, user_id: str | None = None) -> list[str]:
+    vs = await get_vectorstore()
+    filter_dict = {"user_id": user_id} if user_id else None
+    results: list[Document] = await vs.asimilarity_search(query, k=limit, filter=filter_dict)
+    return [doc.page_content for doc in results]
+
+# TODO: Brauchen wir das überhaupt
+async def get_all_chunks_for_user(user_id: str) -> list[str]:
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        rows = await conn.fetch(
+            f"SELECT content FROM {TABLE_NAME} WHERE langchain_metadata->>'user_id' = $1",
+            user_id,
+        )
+        return [row["content"] for row in rows]
+    finally:
+        await conn.close()
+
+
+async def update_embeddings(invoice_id: int, text: str, user_id: str) -> None:
+    await delete_embeddings(invoice_id)
+    await store_embeddings(invoice_id, text, user_id)
+
+
+async def delete_embeddings(invoice_id: int) -> None:
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        await conn.execute(
+            f"DELETE FROM {TABLE_NAME} WHERE langchain_metadata->>'invoice_id' = $1",
+            str(invoice_id),
+        )
+    finally:
+        await conn.close()

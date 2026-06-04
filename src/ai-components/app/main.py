@@ -1,10 +1,11 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from datetime import date
 from typing import Optional
 from app.ocr import extract_text
-from app.vector_store import store_embeddings, search_embeddings, get_all_chunks_for_user, update_embeddings, delete_embeddings
+from app.vector_store import store_embeddings, search_embeddings, get_all_chunks_for_user, update_embeddings, delete_embeddings, get_vectorstore
 from app.categories import InvoiceCategory
 from app.ocr_vision import pdf_to_base64_images, image_to_base64
 from app.database import SessionLocal, Suggestion
@@ -27,7 +28,12 @@ LLM_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 LLM_MODEL_VISION = os.getenv("OLLAMA_MODEL_VISION", "qwen3.5")
 LLM_THINK = os.getenv("OLLAMA_THINK", "false").lower() == "true"
 
-app = FastAPI(title="AI Extraction service", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await get_vectorstore()
+    yield
+
+app = FastAPI(title="AI Extraction service", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,6 +59,7 @@ class InvoiceList(BaseModel):
 class EmbedRequest(BaseModel):
     invoice_id: int
     text: str
+    user_id: str
 
 class QueryRequest(BaseModel):
     question: str
@@ -65,6 +72,7 @@ class SuggestionRequest(BaseModel):
 class UpdateRequest(BaseModel):
     invoice_id: int
     text: str
+    user_id: str
 
 
 ITEM_FIELDS = """
@@ -178,22 +186,22 @@ async def extract_vision(file: UploadFile = File(...)):
 
 @app.put("/embed")
 async def update(request: UpdateRequest):
-    update_embeddings(request.invoice_id, request.text)
+    await update_embeddings(request.invoice_id, request.text, request.user_id)
     return {"status": "ok"}
 
 @app.delete("/embed/{invoice_id}")
 async def delete_embed(invoice_id: int):
-    delete_embeddings(invoice_id)
+    await delete_embeddings(invoice_id)
     return {"status": "ok"}
 
 @app.post("/embed")
 async def embed(request: EmbedRequest):
-    store_embeddings(request.invoice_id, request.text)
+    await store_embeddings(request.invoice_id, request.text, request.user_id)
     return {"status": "ok"}
 
 @app.post("/api/chat")
 async def query(request: QueryRequest):
-    chunks = search_embeddings(request.question, user_id=request.user_id)
+    chunks = await search_embeddings(request.question, user_id=request.user_id)
     context = "\n\n".join(chunks)
     response = await _client.chat(
         model=LLM_MODEL,

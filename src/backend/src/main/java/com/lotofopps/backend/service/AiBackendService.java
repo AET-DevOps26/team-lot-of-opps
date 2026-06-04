@@ -61,14 +61,13 @@ public class AiBackendService {
         }).toList();
 
         List<Invoice> saved = invoiceRepository.saveAll(invoices);
-        // TODO: re-enable once embedding pipeline is stable
-        // saved.forEach(inv -> {
-        //     try {
-        //         storeEmbeddings(inv);
-        //     } catch (Exception e) {
-        //         logger.warn("Failed to store embeddings for invoice {}: {}", inv.getId(), e.getMessage());
-        //     }
-        // });
+        saved.forEach(inv -> {
+            try {
+                storeEmbeddings(inv);
+            } catch (Exception e) {
+                logger.warn("Failed to store embeddings for invoice {}: {}", inv.getId(), e.getMessage());
+            }
+        });
         return saved;
     }
 
@@ -78,7 +77,7 @@ public class AiBackendService {
                 invoice.getInvoiceDate(), invoice.getCategory());
         String base = aiBackendUrl.endsWith("/") ? aiBackendUrl.substring(0, aiBackendUrl.length() - 1) : aiBackendUrl;
         String url = base + "/embed";
-        Map<String, Object> body = Map.of("invoice_id", invoice.getId(), "text", text);
+        Map<String, Object> body = Map.of("invoice_id", invoice.getId(), "text", text, "user_id", invoice.getUserId());
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(body, headers), Void.class);
