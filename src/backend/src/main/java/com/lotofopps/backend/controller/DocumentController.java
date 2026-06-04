@@ -6,11 +6,14 @@ import com.lotofopps.backend.exception.DuplicateDocumentException;
 import com.lotofopps.backend.model.Document;
 import com.lotofopps.backend.model.Invoice;
 import com.lotofopps.backend.repository.DocumentRepository;
+import com.lotofopps.backend.repository.InvoiceRepository;
 import com.lotofopps.backend.service.AiBackendService;
 import com.lotofopps.backend.service.DocumentStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -32,22 +35,27 @@ import java.util.Set;
 @Tag(name = "Documents")
 public class DocumentController {
 
+    private static final Logger log = LoggerFactory.getLogger(DocumentController.class);
+
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "application/pdf", "image/jpeg", "image/png", "image/webp", "image/tiff"
     );
 
     private final DocumentStorageService documentStorageService;
     private final DocumentRepository documentRepository;
+    private final InvoiceRepository invoiceRepository;
     private final AiBackendService aiBackendService;
     private final long maxSizeBytes;
 
     public DocumentController(
             DocumentStorageService documentStorageService,
             DocumentRepository documentRepository,
+            InvoiceRepository invoiceRepository,
             AiBackendService aiBackendService,
             @Value("${upload.max-size-bytes:10485760}") long maxSizeBytes) {
         this.documentStorageService = documentStorageService;
         this.documentRepository = documentRepository;
+        this.invoiceRepository = invoiceRepository;
         this.aiBackendService = aiBackendService;
         this.maxSizeBytes = maxSizeBytes;
     }
@@ -128,5 +136,30 @@ public class DocumentController {
         return ResponseEntity.ok(documentRepository.findByUserId(currentUserId()).stream()
                 .map(DocumentResponse::from)
                 .toList());
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Delete a document and all its invoices and embeddings", responses = {
+        @ApiResponse(responseCode = "204", description = "Deleted"),
+        @ApiResponse(responseCode = "403", description = "Forbidden"),
+        @ApiResponse(responseCode = "404", description = "Not found")
+    })
+    public ResponseEntity<Void> deleteDocument(@PathVariable Long id) throws IOException {
+        Document document = documentRepository.findById(id).orElse(null);
+        if (document == null) return ResponseEntity.notFound().build();
+        if (!currentUserId().equals(document.getUserId())) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        List<Invoice> invoices = invoiceRepository.findByDocumentId(id);
+        invoices.forEach(inv -> {
+            try {
+                aiBackendService.deleteEmbeddings(inv.getId());
+            } catch (Exception e) {
+                log.warn("Failed to delete embeddings for invoice {}: {}", inv.getId(), e.getMessage());
+            }
+        });
+        invoiceRepository.deleteAll(invoices);
+        documentStorageService.deleteFile(document.getStoragePath());
+        documentRepository.delete(document);
+        return ResponseEntity.noContent().build();
     }
 }

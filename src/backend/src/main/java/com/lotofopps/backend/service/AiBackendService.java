@@ -61,14 +61,13 @@ public class AiBackendService {
         }).toList();
 
         List<Invoice> saved = invoiceRepository.saveAll(invoices);
-        // TODO: re-enable once embedding pipeline is stable
-        // saved.forEach(inv -> {
-        //     try {
-        //         storeEmbeddings(inv);
-        //     } catch (Exception e) {
-        //         logger.warn("Failed to store embeddings for invoice {}: {}", inv.getId(), e.getMessage());
-        //     }
-        // });
+        saved.forEach(inv -> {
+            try {
+                storeEmbeddings(inv);
+            } catch (Exception e) {
+                logger.warn("Failed to store embeddings for invoice {}: {}", inv.getId(), e.getMessage());
+            }
+        });
         return saved;
     }
 
@@ -78,11 +77,38 @@ public class AiBackendService {
                 invoice.getInvoiceDate(), invoice.getCategory());
         String base = aiBackendUrl.endsWith("/") ? aiBackendUrl.substring(0, aiBackendUrl.length() - 1) : aiBackendUrl;
         String url = base + "/embed";
-        Map<String, Object> body = Map.of("invoice_id", invoice.getId(), "text", text);
+        Map<String, Object> body = Map.of("invoice_id", invoice.getId(), "text", text, "user_id", invoice.getUserId());
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(body, headers), Void.class);
         logger.info("Stored embeddings for invoice {}", invoice.getId());
+    }
+
+    public String getSuggestions(String userId, List<Invoice> invoices) {
+        String base = aiBackendUrl.endsWith("/") ? aiBackendUrl.substring(0, aiBackendUrl.length() - 1) : aiBackendUrl;
+        String url = base + "/suggestions";
+
+        List<Map<String, Object>> items = invoices.stream().map(inv -> {
+            Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("itemName", inv.getItemName());
+            item.put("company", inv.getCompany());
+            item.put("price", inv.getPrice());
+            item.put("invoiceDate", inv.getInvoiceDate() != null ? inv.getInvoiceDate().toString() : null);
+            item.put("category", inv.getCategory() != null ? inv.getCategory().name() : null);
+            return item;
+        }).toList();
+
+        Map<String, Object> body = Map.of("userId", userId, "items", items);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                url, HttpMethod.POST, new HttpEntity<>(body, headers),
+                new ParameterizedTypeReference<>() {});
+
+        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+            throw new RuntimeException("AI backend returned non-2xx or empty response for suggestions");
+        }
+        return (String) response.getBody().get("answer");
     }
 
     public void deleteEmbeddings(Long invoiceId) {
@@ -98,7 +124,7 @@ public class AiBackendService {
         body.add("file", new FileSystemResource(Paths.get(document.getStoragePath())));
 
         String base = aiBackendUrl.endsWith("/") ? aiBackendUrl.substring(0, aiBackendUrl.length() - 1) : aiBackendUrl;
-        String url = base + "/extract";
+        String url = base + "/extract/vision"; // TODO: Change back to /extract if vision doesnt work well enough
 
         logger.info("Sending extract request to {} for document {}", url, document.getStoragePath());
         HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);
