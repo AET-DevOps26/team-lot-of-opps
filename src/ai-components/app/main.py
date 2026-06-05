@@ -13,7 +13,7 @@ from app.database import AsyncSessionLocal, Suggestion, Base, engine
 from sqlalchemy import select
 from app.agent import run_agent_streaming
 from starlette.responses import StreamingResponse
-import ollama
+from openai import AsyncOpenAI
 import os
 import asyncio
 import json
@@ -24,9 +24,8 @@ logger = logging.getLogger(__name__)
 
 DB_URL = os.getenv("DATABASE_URL")
 
-LLM_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
-LLM_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:e2b")
-LLM_THINK = os.getenv("OLLAMA_THINK", "false").lower() == "true"
+LLM_URL = os.getenv("LLM_URL", "http://host.docker.internal:1234")
+LLM_MODEL = os.getenv("LLM_MODEL", "google/gemma-4-e2b")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -44,7 +43,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_client = ollama.AsyncClient(host=LLM_URL, timeout=120)
+_client = AsyncOpenAI(base_url=f"{LLM_URL}/v1", api_key="EMPTY", timeout=120)
 
 
 class InvoiceItem(BaseModel):
@@ -61,6 +60,12 @@ class EmbedRequest(BaseModel):
     invoice_id: int
     text: str
     user_id: str
+    item_name: str = "N/A"
+    company: str = "N/A"
+    price: Optional[float] = None
+    category: Optional[str] = None
+    invoice_date: Optional[str] = None
+    document_id: Optional[int] = None
 
 class QueryRequest(BaseModel):
     question: str
@@ -86,6 +91,12 @@ class UpdateRequest(BaseModel):
     invoice_id: int
     text: str
     user_id: str
+    item_name: str = "N/A"
+    company: str = "N/A"
+    price: Optional[float] = None
+    category: Optional[str] = None
+    invoice_date: Optional[str] = None
+    document_id: Optional[int] = None
 
 
 ITEM_FIELDS = """
@@ -122,14 +133,13 @@ Invoice text:
 {raw_text}"""
     for attempt in range(3):
         try:
-            logger.info("LLM attempt %d/3 model=%s think=%s", attempt + 1, LLM_MODEL, LLM_THINK)
-            response = await _client.chat(
+            logger.info("LLM attempt %d/3 model=%s", attempt + 1, LLM_MODEL)
+            response = await _client.chat.completions.create(
                 model=LLM_MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                format="json",
-                think=LLM_THINK,
+                response_format={"type": "json_schema", "json_schema": {"name": "InvoiceList", "schema": InvoiceList.model_json_schema()}},
             )
-            content = response.message.content
+            content = response.choices[0].message.content
             if not content:
                 logger.warning("LLM attempt %d returned empty content", attempt + 1)
                 if attempt == 2:
@@ -156,20 +166,18 @@ async def call_llm_vision(images: list[str]) -> list[InvoiceItem]:
 {ITEM_FIELDS}"""
     for attempt in range(3):
         try:
-            logger.info("Vision LLM attempt %d/3 model=%s images=%d think=%s", attempt + 1, LLM_MODEL, len(images), LLM_THINK)
-            response = await _client.chat(
+            logger.info("Vision LLM attempt %d/3 model=%s images=%d", attempt + 1, LLM_MODEL, len(images))
+            msg_content = [{"type": "text", "text": prompt}]
+            for img in images:
+                msg_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}})
+            response = await _client.chat.completions.create(
                 model=LLM_MODEL,
-                messages=[{
-                    "role": "user",
-                    "content": prompt,
-                    "images": images,
-                }],
-                format=InvoiceList.model_json_schema(),
-                think=False,
-                options={"temperature": 0}
+                messages=[{"role": "user", "content": msg_content}],
+                response_format={"type": "json_schema", "json_schema": {"name": "InvoiceList", "schema": InvoiceList.model_json_schema()}},
+                temperature=0,
             )
 
-            content = response.message.content
+            content = response.choices[0].message.content
             if not content:
                 logger.warning("Vision LLM attempt %d returned empty content", attempt + 1)
                 if attempt == 2:
@@ -201,7 +209,11 @@ async def extract_vision(file: UploadFile = File(...)):
 
 @app.put("/embed")
 async def update(request: UpdateRequest):
-    await update_embeddings(request.invoice_id, request.text, request.user_id)
+    await update_embeddings(
+        request.invoice_id, request.text, request.user_id,
+        item_name=request.item_name, company=request.company, price=request.price,
+        category=request.category, invoice_date=request.invoice_date, document_id=request.document_id,
+    )
     return {"status": "ok"}
 
 @app.delete("/embed/{invoice_id}")
@@ -211,7 +223,11 @@ async def delete_embed(invoice_id: int):
 
 @app.post("/embed")
 async def embed(request: EmbedRequest):
-    await store_embeddings(request.invoice_id, request.text, request.user_id)
+    await store_embeddings(
+        request.invoice_id, request.text, request.user_id,
+        item_name=request.item_name, company=request.company, price=request.price,
+        category=request.category, invoice_date=request.invoice_date, document_id=request.document_id,
+    )
     return {"status": "ok"}
 
 # @app.post("/api/chat")
@@ -239,7 +255,7 @@ async def suggestions(request: SuggestionRequest):
         for item in request.items
     )
 
-    response = await _client.chat(
+    response = await _client.chat.completions.create(
         model=LLM_MODEL,
         messages=[
             {"role": "system", "content": """You are a German tax expert helping students maximize their tax refund.
@@ -257,7 +273,7 @@ Give 2-4 specific, actionable suggestions. Reference actual items from the invoi
             {"role": "user", "content": f"Here are the user's uploaded invoices:\n{context}\n\nWhat tax documents are missing? Give specific suggestions."},
         ],
     )
-    suggestion_text = response.message.content
+    suggestion_text = response.choices[0].message.content
 
     async with AsyncSessionLocal() as db:
         db.add(Suggestion(user_id=user_id, suggestion=suggestion_text))
@@ -302,8 +318,8 @@ async def extract(file: UploadFile = File(...)):
 
 @app.get("/test-llm")
 async def test_llm():
-    response = await _client.chat(
+    response = await _client.chat.completions.create(
         model=LLM_MODEL,
         messages=[{"role": "user", "content": "say hello"}],
     )
-    return {"response": response.message.content}
+    return {"response": response.choices[0].message.content}

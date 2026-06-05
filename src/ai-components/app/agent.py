@@ -3,9 +3,10 @@ import logging
 from typing import AsyncIterator
 
 import asyncpg
-from langchain_ollama import ChatOllama
-from langchain_core.tools import Tool
+from langchain_openai import ChatOpenAI
+from langchain_core.tools import Tool, StructuredTool
 from langchain.agents import create_agent
+from pydantic import BaseModel
 
 from app.vector_store import search_embeddings
 from app.categories import InvoiceCategory
@@ -32,7 +33,7 @@ CATEGORY_SUGGESTIONS: dict[str, str] = {
     "SONSTIGE_AUSGABEN": "Sonstige berufsbedingte Ausgaben mit Belegen",
 }
 
-SYSTEM_PROMPT = """You are a helpful German tax document assistant for the app "TaxMind". Your job is to help users find their uploaded tax documents and discover what they should still upload to maximize their German income tax refund (Einkommensteuererklärung).
+SYSTEM_PROMPT = """You are a helpful German tax document assistant for the app "TaxForward". Your job is to help users find their uploaded tax documents and discover what they should still upload to maximize their German income tax refund (Einkommensteuererklärung).
 
 Always respond in the same language the user writes in. If the user writes in German, respond in German. If in English, respond in English.
 
@@ -43,22 +44,36 @@ When helping users:
 4. Always cite specific invoices (company, date, amount) when answering"""
 
 
-async def _search_documents_async(query: str, user_id: str) -> str:
-    chunks = await search_embeddings(query, user_id=user_id)
-    if not chunks:
+async def _search_documents_async(query: str, user_id: str, referenced: list[dict]) -> str:
+    docs = await search_embeddings(query, user_id=user_id)
+    if not docs:
         return "No matching documents found for that query."
-    return "\n---\n".join(f"Result {i + 1}:\n{chunk}" for i, chunk in enumerate(chunks))
+    for doc in docs:
+        meta = doc.metadata
+        invoice_id = meta.get("invoice_id")
+        if invoice_id is not None:
+            referenced.append({
+                "invoice_id": invoice_id,
+                "item_name": meta.get("item_name"),
+                "company": meta.get("company"),
+                "price": meta.get("price"),
+                "category": meta.get("category"),
+                "invoice_date": meta.get("invoice_date"),
+                "document_id": meta.get("document_id"),
+            })
+    return "\n---\n".join(f"Result {i + 1}:\n{doc.page_content}" for i, doc in enumerate(docs))
 
 
-async def _list_user_documents_async(user_id: str) -> str:
+async def _list_user_documents_async(user_id: str, referenced: list[dict]) -> str:
     conn = await asyncpg.connect(DB_URL)
     try:
         rows = await conn.fetch(
             """
-            SELECT id, item_name, company, price, category, invoice_date
-            FROM invoices
-            WHERE user_id = $1
-            ORDER BY invoice_date DESC NULLS LAST
+            SELECT i.id, i.item_name, i.company, i.price, i.category, i.invoice_date, d.id AS document_id
+            FROM invoices i
+            LEFT JOIN documents d ON d.id = i.document_id
+            WHERE i.user_id = $1
+            ORDER BY i.invoice_date DESC NULLS LAST
             """,
             user_id,
         )
@@ -67,6 +82,17 @@ async def _list_user_documents_async(user_id: str) -> str:
 
     if not rows:
         return "The user has no uploaded documents yet."
+
+    for row in rows:
+        referenced.append({
+            "invoice_id": row["id"],
+            "item_name": row["item_name"],
+            "company": row["company"],
+            "price": float(row["price"]) if row["price"] is not None else None,
+            "category": row["category"],
+            "invoice_date": str(row["invoice_date"]) if row["invoice_date"] else None,
+            "document_id": row["document_id"],
+        })
 
     lines = ["ID  | Item                          | Company              | Price   | Category                    | Date"]
     lines.append("-" * 105)
@@ -110,14 +136,18 @@ async def _suggest_missing_documents_async(user_id: str) -> str:
     return "\n".join(lines)
 
 
-def _make_tools(user_id: str) -> list[Tool]:
+class _EmptyInput(BaseModel):
+    pass
+
+
+def _make_tools(user_id: str, referenced: list[dict]) -> list[Tool]:
     async def _async_search(query: str) -> str:
-        return await _search_documents_async(query, user_id)
+        return await _search_documents_async(query, user_id, referenced)
 
-    async def _async_list(_: str = "") -> str:
-        return await _list_user_documents_async(user_id)
+    async def _async_list() -> str:
+        return await _list_user_documents_async(user_id, referenced)
 
-    async def _async_suggest(_: str = "") -> str:
+    async def _async_suggest() -> str:
         return await _suggest_missing_documents_async(user_id)
 
     return [
@@ -131,39 +161,45 @@ def _make_tools(user_id: str) -> list[Tool]:
             func=lambda _: "Async only — use coroutine path",
             coroutine=_async_search,
         ),
-        Tool(
+        StructuredTool(
             name="list_user_documents",
             description=(
                 "Lists all invoices the user has uploaded with ID, item, company, price, "
-                "category, and date. Use this first to get an overview. Input: empty string."
+                "category, and date. Use this first to get an overview. No input required."
             ),
-            func=lambda _="": "Async only — use coroutine path",
+            args_schema=_EmptyInput,
+            func=lambda: "Async only — use coroutine path",
             coroutine=_async_list,
         ),
-        Tool(
+        StructuredTool(
             name="suggest_missing_documents",
             description=(
                 "Analyzes which German tax document categories the user is missing and suggests "
-                "specific documents to upload to maximize their tax refund. Input: empty string."
+                "specific documents to upload to maximize their tax refund. No input required."
             ),
-            func=lambda _="": "Async only — use coroutine path",
+            args_schema=_EmptyInput,
+            func=lambda: "Async only — use coroutine path",
             coroutine=_async_suggest,
         ),
     ]
 
 
-def _build_agent(user_id: str):
-    llm = ChatOllama(
-        model=os.getenv("OLLAMA_MODEL", "gemma4:e2b"),
-        base_url=os.getenv("OLLAMA_URL", "http://host.docker.internal:11434"),
+def _build_agent(user_id: str, referenced: list[dict]):
+    vllm_url = os.getenv("LLM_URL", "http://host.docker.internal:1234")
+    llm = ChatOpenAI(
+        model=os.getenv("LLM_MODEL", "google/gemma-4-e2b"),
+        base_url=f"{vllm_url}/v1",
+        api_key="EMPTY",
         temperature=0.1,
+        timeout=120,
     )
-    tools = _make_tools(user_id)
+    tools = _make_tools(user_id, referenced)
     return create_agent(llm, tools, system_prompt=SYSTEM_PROMPT)
 
 
 async def run_agent_streaming(question: str, user_id: str) -> AsyncIterator[dict]:
-    agent = _build_agent(user_id)
+    referenced_invoices: list[dict] = []
+    agent = _build_agent(user_id, referenced_invoices)
     try:
         async for event in agent.astream_events(
             {"messages": [{"role": "user", "content": question}]},
@@ -196,6 +232,16 @@ async def run_agent_streaming(question: str, user_id: str) -> AsyncIterator[dict
                     "tool": event["name"],
                     "result": tool_output[:500] + ("..." if len(tool_output) > 500 else ""),
                 }
+
+        seen: set[int] = set()
+        unique: list[dict] = []
+        for inv in referenced_invoices:
+            iid = inv.get("invoice_id")
+            if iid is not None and iid not in seen:
+                seen.add(iid)
+                unique.append(inv)
+        if unique:
+            yield {"type": "references", "invoices": unique}
 
         yield {"type": "done"}
 
