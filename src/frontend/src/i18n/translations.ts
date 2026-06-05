@@ -111,6 +111,18 @@ export interface TranslationDict {
     deleteFailed: string
     viewFailed: string
   }
+  chat: {
+    title: string
+    open: string
+    close: string
+    placeholder: string
+    send: string
+    stop: string
+    emptyTitle: string
+    emptyBody: string
+    error: string
+    sources: { one: string; other: string }
+  }
 }
 
 const translations: Record<Language, TranslationDict> = {
@@ -251,6 +263,19 @@ const translations: Record<Language, TranslationDict> = {
       deleteFailed: 'Failed to delete invoice',
       viewFailed: 'Could not open invoice',
     },
+    chat: {
+      title: 'AI Assistant',
+      open: 'Open AI Assistant',
+      close: 'Close AI Assistant',
+      placeholder: 'Ask about your documents…',
+      send: 'Send message',
+      stop: 'Stop generating',
+      emptyTitle: 'Hi! How can I help?',
+      emptyBody:
+        'Ask me about your uploaded documents or what you should still upload for your tax return.',
+      error: 'Something went wrong.',
+      sources: { one: 'source', other: 'sources' },
+    },
   },
   de: {
     brand: 'TaxForward',
@@ -389,6 +414,19 @@ const translations: Record<Language, TranslationDict> = {
       confirmDelete: 'Diese Rechnung löschen?',
       deleteFailed: 'Rechnung konnte nicht gelöscht werden',
       viewFailed: 'Rechnung konnte nicht geöffnet werden',
+    },
+    chat: {
+      title: 'KI-Assistent',
+      open: 'KI-Assistent öffnen',
+      close: 'KI-Assistent schließen',
+      placeholder: 'Frag mich zu deinen Dokumenten…',
+      send: 'Nachricht senden',
+      stop: 'Generierung stoppen',
+      emptyTitle: 'Hallo! Wie kann ich helfen?',
+      emptyBody:
+        'Frag mich zu deinen hochgeladenen Dokumenten oder was du für deine Steuererklärung noch hochladen solltest.',
+      error: 'Etwas ist schiefgelaufen.',
+      sources: { one: 'Quelle', other: 'Quellen' },
     },
   },
 }
