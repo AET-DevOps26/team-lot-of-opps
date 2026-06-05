@@ -25,9 +25,7 @@ logger = logging.getLogger(__name__)
 DB_URL = os.getenv("DATABASE_URL")
 
 LLM_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
-LLM_URL_VISION = os.getenv("OLLAMA_URL_VISION", "http://host.docker.internal:11434")
-LLM_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
-LLM_MODEL_VISION = os.getenv("OLLAMA_MODEL_VISION", "qwen3.5:4b")
+LLM_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:e2b")
 LLM_THINK = os.getenv("OLLAMA_THINK", "false").lower() == "true"
 
 @asynccontextmanager
@@ -46,8 +44,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_client = ollama.AsyncClient(host=LLM_URL)
-_client_vision = ollama.AsyncClient(host=LLM_URL_VISION)
+_client = ollama.AsyncClient(host=LLM_URL, timeout=120)
 
 
 class InvoiceItem(BaseModel):
@@ -159,17 +156,19 @@ async def call_llm_vision(images: list[str]) -> list[InvoiceItem]:
 {ITEM_FIELDS}"""
     for attempt in range(3):
         try:
-            logger.info("Vision LLM attempt %d/3 model=%s images=%d think=%s", attempt + 1, LLM_MODEL_VISION, len(images), LLM_THINK)
-            response = await _client_vision.chat(
-                model=LLM_MODEL_VISION,
+            logger.info("Vision LLM attempt %d/3 model=%s images=%d think=%s", attempt + 1, LLM_MODEL, len(images), LLM_THINK)
+            response = await _client.chat(
+                model=LLM_MODEL,
                 messages=[{
                     "role": "user",
                     "content": prompt,
                     "images": images,
                 }],
-                format="json",
-                think=LLM_THINK,
+                format=InvoiceList.model_json_schema(),
+                think=False,
+                options={"temperature": 0}
             )
+
             content = response.message.content
             if not content:
                 logger.warning("Vision LLM attempt %d returned empty content", attempt + 1)

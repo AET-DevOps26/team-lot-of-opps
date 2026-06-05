@@ -124,7 +124,8 @@ public class AiBackendService {
         body.add("file", new FileSystemResource(Paths.get(document.getStoragePath())));
 
         String base = aiBackendUrl.endsWith("/") ? aiBackendUrl.substring(0, aiBackendUrl.length() - 1) : aiBackendUrl;
-        String url = base + "/extract/vision"; // TODO: Change back to /extract if vision doesnt work well enough
+        // String url = base + "/extract/vision"; // TODO: Change back to /extract if vision doesnt work well enough
+        String url = base + "/extract"; // TODO: Change back to /extract if vision doesnt work well enough
 
         logger.info("Sending extract request to {} for document {}", url, document.getStoragePath());
         HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);

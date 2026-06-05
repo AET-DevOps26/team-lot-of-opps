@@ -1,6 +1,8 @@
 services:
   ollama:
-    image: ollama/ollama:latest
+    build:
+      context: ./ollama
+      dockerfile: Dockerfile
     container_name: ollama
     ports:
       - "11434:11434"
@@ -10,14 +12,7 @@ services:
       - network
     restart: unless-stopped
     environment:
-      - OLLAMA_MODEL=llama3.2
-      - OLLAMA_MODEL_VISION=qwen3.5
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      "ollama serve &
-      until ollama list >/dev/null 2>&1; do sleep 1; done &&
-      ollama list | grep -q \"$${OLLAMA_MODEL}\" || ollama pull $${OLLAMA_MODEL} &&
-      wait"
+      - OLLAMA_MODEL=gemma4:e2b
 
   ai:
     platform: linux/amd64
@@ -29,9 +24,7 @@ services:
       - "8081:8081"
     environment:
       - OLLAMA_URL=http://ollama:11434
-      - OLLAMA_URL_VISION=http://ollama:11434
-      - OLLAMA_MODEL=llama3.2
-      - OLLAMA_MODEL_VISION=qwen3.5
+      - OLLAMA_MODEL=gemma4:e2b
       - LITELLM_SSL_VERIFY=False
       - DATABASE_URL=postgresql://appuser:password@db:5432/app_db
     volumes:
