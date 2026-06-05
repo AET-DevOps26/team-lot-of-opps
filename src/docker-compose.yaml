@@ -1,19 +1,4 @@
 services:
-  ollama:
-    build:
-      context: ./ollama
-      dockerfile: Dockerfile
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - network
-    restart: unless-stopped
-    environment:
-      - OLLAMA_MODEL=gemma4:e2b
-
   ai:
     platform: linux/amd64
     build:
@@ -23,17 +8,14 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - OLLAMA_URL=http://ollama:11434
-      - OLLAMA_MODEL=gemma4:e2b
-      - LITELLM_SSL_VERIFY=False
+      - LLM_URL=http://host.docker.internal:1234
+      - LLM_MODEL=google/gemma-4-e2b
       - DATABASE_URL=postgresql://appuser:password@db:5432/app_db
     volumes:
       - ./ai-components/app:/app/app
     networks:
       - network
     depends_on:
-      ollama:
-        condition: service_started
       db:
         condition: service_healthy
     healthcheck:
@@ -121,7 +103,6 @@ services:
 
 volumes:
   postgres_data:
-  ollama_data:
 
 networks:
   network:

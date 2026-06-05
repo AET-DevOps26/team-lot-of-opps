@@ -77,7 +77,16 @@ public class AiBackendService {
                 invoice.getInvoiceDate(), invoice.getCategory());
         String base = aiBackendUrl.endsWith("/") ? aiBackendUrl.substring(0, aiBackendUrl.length() - 1) : aiBackendUrl;
         String url = base + "/embed";
-        Map<String, Object> body = Map.of("invoice_id", invoice.getId(), "text", text, "user_id", invoice.getUserId());
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("invoice_id", invoice.getId());
+        body.put("text", text);
+        body.put("user_id", invoice.getUserId());
+        body.put("item_name", invoice.getItemName());
+        body.put("company", invoice.getCompany());
+        body.put("price", invoice.getPrice());
+        body.put("category", invoice.getCategory() != null ? invoice.getCategory().name() : null);
+        body.put("invoice_date", invoice.getInvoiceDate() != null ? invoice.getInvoiceDate().toString() : null);
+        body.put("document_id", invoice.getDocument() != null ? invoice.getDocument().getId() : null);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(body, headers), Void.class);
@@ -124,8 +133,7 @@ public class AiBackendService {
         body.add("file", new FileSystemResource(Paths.get(document.getStoragePath())));
 
         String base = aiBackendUrl.endsWith("/") ? aiBackendUrl.substring(0, aiBackendUrl.length() - 1) : aiBackendUrl;
-        // String url = base + "/extract/vision"; // TODO: Change back to /extract if vision doesnt work well enough
-        String url = base + "/extract"; // TODO: Change back to /extract if vision doesnt work well enough
+        String url = base + "/extract";
 
         logger.info("Sending extract request to {} for document {}", url, document.getStoragePath());
         HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);
