@@ -154,7 +154,7 @@ def _make_tools(user_id: str) -> list[Tool]:
 
 def _build_agent(user_id: str):
     llm = ChatOllama(
-        model=os.getenv("OLLAMA_MODEL", "llama3.2"),
+        model=os.getenv("OLLAMA_MODEL", "gemma4:e2b"),
         base_url=os.getenv("OLLAMA_URL", "http://host.docker.internal:11434"),
         temperature=0.1,
     )
