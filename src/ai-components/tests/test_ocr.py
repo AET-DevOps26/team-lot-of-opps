@@ -116,10 +116,10 @@ def test_extraction_accuracy():
             print(f"  {f['file']}: company={f['company']} | value={f['value']} | date={f['date']} | items={f['items_count']}")
 
     assert passed_value / total >= 0.8, f"Value accuracy too low: {passed_value}/{total}"
-    assert passed_company / total >= 0.7, f"Company accuracy too low: {passed_company}/{total}"
-    assert passed_date / total >= 0.7, f"Date accuracy too low: {passed_date}/{total}"
-    assert passed_items_count / total >= 0.7, f"Line item count accuracy too low: {passed_items_count}/{total}"
-    assert passed_items_value / total >= 0.6, f"Line item value accuracy too low: {passed_items_value}/{total}"
+    assert passed_company / total >= 0.8, f"Company accuracy too low: {passed_company}/{total}"
+    assert passed_date / total >= 0.8, f"Date accuracy too low: {passed_date}/{total}"
+    assert passed_items_count / total >= 0.8, f"Line item count accuracy too low: {passed_items_count}/{total}"
+    assert passed_items_value / total >= 0.8, f"Line item value accuracy too low: {passed_items_value}/{total}"
 
 
 def test_vision_vs_ocr_comparison():

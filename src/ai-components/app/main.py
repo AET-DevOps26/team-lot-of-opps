@@ -47,10 +47,10 @@ _client = AsyncOpenAI(base_url=f"{LLM_URL}/v1", api_key="EMPTY", timeout=120)
 
 
 class InvoiceItem(BaseModel):
-    product_name: str = Field(default="N/A", description="Name of the product or service from the invoice line item")
-    company: str = Field(default="N/A", description="Name of the seller/issuing company — NOT the buyer, NOT the bank, NOT an email or address")
+    product_name: str = Field(description="Name of the product or service from the invoice line item")
+    company: str = Field(description="Name of the seller/issuing company — NOT the buyer, NOT the bank, NOT an email or address")
     value: float = Field(description="Gross amount for this line item as a decimal number")
-    invoice_date: Optional[date] = Field(default=None, description="Invoice date in YYYY-MM-DD format")
+    invoice_date: Optional[date] = Field(description="Invoice date in YYYY-MM-DD format, or null if truly absent")
     category: InvoiceCategory = Field(description="Best matching German tax category")
 
 class InvoiceList(BaseModel):
@@ -102,13 +102,19 @@ class UpdateRequest(BaseModel):
 ITEM_FIELDS = """
 Return a JSON object with a single key "items" containing a list. Each element represents one line item and has:
 - product_name: name of the item or service
-- company: name of the SELLER who issued this invoice. The seller is the entity that sent the invoice. Return ONLY the business or person name — a short name like "DB Fernverkehr AG", "Schmidtke", "Trüb Becker GmbH". Rules: (1) never return email addresses, phone numbers, VAT/tax IDs, IBAN numbers (starting with 2 letters + digits), or street addresses; (2) never include the words INVOICE or RECHNUNG; (3) do NOT confuse the BUYER (TO/An/Empfänger section) with the SELLER. Use the same value for every item.
-- value: line item gross total as a decimal number. German invoices use comma as decimal separator — convert correctly: "418,93" → 418.93 (NOT 41893), "1.234,56" → 1234.56, "43,92" → 43.92. The comma is ALWAYS the decimal point, never strip it.
-- invoice_date: date of the invoice in YYYY-MM-DD format. Convert any format: "10.10.2025" → "2025-10-10", "11 Aug 2025" → "2025-08-11". Use null only if truly absent. Use the same value for every item.
+- company: name of the SELLER who issued this invoice — the business or person who will receive payment. THE SELLER'S NAME IS ALMOST ALWAYS THE VERY FIRST WORD(S) AT THE TOP OF THE DOCUMENT, directly attached to the heading, e.g. "Kraushaar INVOICE" → seller is "Kraushaar"; "Süßebier INVOICE" → seller is "Süßebier"; "Margraf Koch II e.G. INVOICE" → seller is "Margraf Koch II e.G.". Look there FIRST. Return ONLY that short name. Rules — do NOT return any of the following, even though they look like company names: (1) the name in the BILL TO / TO / An / Empfänger block — that is the BUYER, a different person; (2) the company name written next to the word "Bank" in the PAYMENT DETAILS / BANK / IBAN section near the bottom — that is the seller's BANK, not the seller, even if it has a suffix like GmbH/AG/e.G.; (3) email addresses, phone numbers, VAT/tax IDs, IBAN numbers (2 letters + digits), street addresses, or the words INVOICE/RECHNUNG. Use the same seller value for every item.
+- value: line item NET total as a decimal number — this is the rightmost "Subtotal" amount printed ON THAT SAME LINE ITEM ROW, i.e. Qty × Unit Price, NOT the unit price itself. Example row "2 Grocery Shopping 3 € 139.88 € 419.64" → Qty=3, Unit Price=139.88, and the value to return is 419.64 (the line's Subtotal/total column, last number on the row) — never the unit price. German invoices use comma as decimal separator — convert correctly: "418,93" → 418.93 (NOT 41893), "1.234,56" → 1234.56, "43,92" → 43.92. The comma is ALWAYS the decimal point, never strip it.
+- invoice_date: date of the invoice in YYYY-MM-DD format. Convert any format: "10.10.2025" → "2025-10-10", "11 Aug 2025" → "2025-08-11". If there is only 1 date on the invoice take that one as the invoice_date. If there is more than 1 take the one on the linw with invoice date. Return the date in this format: YYYY-MM-DD. For example: If the date on the invoice is: 11 Aug 2025. Convert to: 2025-08-11
 - category: best matching category for this specific item (use exact enum string, fall back to SONSTIGE_AUSGABEN if unsure)
 
 If the invoice has no individual line items, return a single item using the invoice's overall product/service description and grand total (Summe brutto / Gesamtbetrag).
-Do NOT create separate items for VAT rows, net subtotals, or tax breakdowns — only real product/service rows.
+
+Only extract rows that describe an actual product or service that was purchased. Do NOT create separate items for summary, fee, or metadata rows such as:
+- Subtotals and totals: Subtotal, Zwischensumme, Summe, Gesamtbetrag, Grand Total, Total, Total due, Net total, Nettobetrag
+- Taxes and charges: VAT, MwSt, USt, Tax, Government Tax, Service Charge, Bediengung
+- Tips, donations, fees: Tip, Trinkgeld, Donation, Spende, Processing Fee, Convenience Fee, Bearbeitungsgebühr
+- Payment metadata: Payment method, Zahlungsart, Paid via, or any row naming a payment provider (e.g. AIRWALLEX, Visa, PayPal, Mastercard) — these describe HOW the invoice was paid, not WHAT was purchased
+If every row on the invoice is one of the above (i.e. there are no real product/service rows), fall back to the rule above: return a single item using the invoice's overall description and grand total.
 
 Category values:
   KONTOFUEHRUNGSGEBUEHREN, WEGE_ZUR_ARBEIT, HOMEOFFICE_UND_ARBEITSZIMMER,
@@ -160,7 +166,7 @@ Invoice text:
             await asyncio.sleep(2)
 
 
-async def call_llm_vision(images: list[str]) -> list[InvoiceItem]:
+async def call_llm_vision(images: list[tuple[str, str]]) -> list[InvoiceItem]:
     prompt = f"""You are a German tax document classifier. Extract invoice line items from the images below and return valid JSON. The invoice may be in German or English.
 {VISION_LAYOUT_HINT}
 {ITEM_FIELDS}"""
@@ -168,8 +174,8 @@ async def call_llm_vision(images: list[str]) -> list[InvoiceItem]:
         try:
             logger.info("Vision LLM attempt %d/3 model=%s images=%d", attempt + 1, LLM_MODEL, len(images))
             msg_content = [{"type": "text", "text": prompt}]
-            for img in images:
-                msg_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}})
+            for mime, img in images:
+                msg_content.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{img}"}})
             response = await _client.chat.completions.create(
                 model=LLM_MODEL,
                 messages=[{"role": "user", "content": msg_content}],
@@ -202,7 +208,10 @@ async def call_llm_vision(images: list[str]) -> list[InvoiceItem]:
 async def extract_vision(file: UploadFile = File(...)):
     logger.info("POST /extract/vision filename=%s content_type=%s", file.filename, file.content_type)
     contents = await file.read()
-    images = pdf_to_base64_images(contents) if file.content_type == "application/pdf" else image_to_base64(contents)
+    filename = (file.filename or "").lower()
+    content_type = file.content_type or ""
+    is_pdf = content_type == "application/pdf" or filename.endswith(".pdf")
+    images = pdf_to_base64_images(contents) if is_pdf else image_to_base64(contents, content_type)
     logger.info("Extracted %d image(s) from %s", len(images), file.filename)
     return await call_llm_vision(images)
 
