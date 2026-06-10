@@ -3,3 +3,4 @@
 **/.env
 __pycache__/
 devops-*firebase*.json
+firebase-debug.log
