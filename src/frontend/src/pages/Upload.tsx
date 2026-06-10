@@ -45,6 +45,23 @@ interface InvoiceResponse {
 
 const CARD_SHADOW = 'shadow-[0_4px_20px_rgba(26,43,60,0.05)]'
 
+/**
+ * Turn an upload failure into a readable message. The api client throws errors
+ * shaped like `API POST /path failed: 500 <backend body>`, so we strip the
+ * request prefix and surface whatever the backend actually returned. On crashes
+ * (5xx / network errors with no body) we fall back to a generic message.
+ */
+function extractUploadError(err: unknown, t: Translator): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  const match = raw.match(/failed:\s*(\d{3})\s*([\s\S]*)$/)
+  if (match) {
+    const [, status, body] = match
+    const detail = body.trim()
+    return detail ? `${status}: ${detail}` : `${t('upload.meta.uploadFailed')} (${status})`
+  }
+  return raw.trim() || t('upload.meta.uploadFailed')
+}
+
 function invoiceToQueueItem(inv: InvoiceResponse, t: Translator): QueueItem {
   return {
     id: `invoice-${inv.id}`,
@@ -183,14 +200,14 @@ export default function Upload() {
               ),
             )
           })
-          .catch(() => {
+          .catch((err: unknown) => {
             setQueue((prev) =>
               prev.map((item) =>
                 item.id === tempId
                   ? {
                       ...item,
                       type: 'error',
-                      meta: t('upload.meta.missingVendor'),
+                      meta: extractUploadError(err, t),
                       metaClass: 'text-error',
                       status: t('upload.status.actionNeeded'),
                       statusClass: 'bg-tertiary-container text-on-tertiary-container',
