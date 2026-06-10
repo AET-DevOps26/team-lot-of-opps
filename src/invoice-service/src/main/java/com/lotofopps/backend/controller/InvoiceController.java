@@ -6,6 +6,7 @@ import com.lotofopps.backend.model.Invoice;
 import com.lotofopps.backend.repository.DocumentRepository;
 import com.lotofopps.backend.repository.InvoiceRepository;
 import com.lotofopps.backend.service.DocumentStorageService;
+import com.lotofopps.backend.service.LlmChatEmbeddingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,12 +33,15 @@ public class InvoiceController {
     private final InvoiceRepository invoiceRepository;
     private final DocumentRepository documentRepository;
     private final DocumentStorageService documentStorageService;
+    private final LlmChatEmbeddingService embeddingService;
 
     public InvoiceController(InvoiceRepository invoiceRepository, DocumentRepository documentRepository,
-                             DocumentStorageService documentStorageService) {
+                             DocumentStorageService documentStorageService,
+                             LlmChatEmbeddingService embeddingService) {
         this.invoiceRepository = invoiceRepository;
         this.documentRepository = documentRepository;
         this.documentStorageService = documentStorageService;
+        this.embeddingService = embeddingService;
     }
 
     private String currentUserId(HttpServletRequest request) {
@@ -75,8 +79,10 @@ public class InvoiceController {
         if (invoice == null) return ResponseEntity.notFound().build();
         if (!userId.equals(invoice.getUserId())) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
+        Long invoiceId = invoice.getId();
         Document doc = invoice.getDocument();
         invoiceRepository.delete(invoice);
+        embeddingService.deleteEmbedding(invoiceId);
         if (doc != null && invoiceRepository.findByDocumentId(doc.getId()).isEmpty()) {
             documentRepository.delete(doc);
             documentStorageService.deleteFile(doc.getStoragePath());

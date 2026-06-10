@@ -66,6 +66,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db-invoice:5432/invoice_db
       - LLM_URL=http://host.docker.internal:1234
       - LLM_MODEL=google/gemma-4-e2b
+      - LLM_CHAT_URL=http://llm-chat:8081
     volumes:
       - ./invoice-service/src:/app/src
     networks:
@@ -78,6 +79,8 @@ services:
       start_period: 40s
     depends_on:
       db-invoice:
+        condition: service_healthy
+      llm-chat:
         condition: service_healthy
     restart: unless-stopped
 

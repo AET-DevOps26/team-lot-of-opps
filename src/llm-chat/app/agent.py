@@ -2,7 +2,7 @@ import os
 import logging
 from typing import AsyncIterator
 
-import asyncpg
+import httpx
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import Tool, StructuredTool
 from langchain.agents import create_agent
@@ -13,7 +13,7 @@ from app.categories import InvoiceCategory
 
 logger = logging.getLogger(__name__)
 
-DB_URL = os.getenv("DATABASE_URL")
+INVOICE_SERVICE_URL = os.getenv("INVOICE_SERVICE_URL", "http://invoice-service:8080")
 
 CATEGORY_SUGGESTIONS: dict[str, str] = {
     "WEGE_ZUR_ARBEIT": "Tankquittungen, Bahntickets oder ÖPNV-Monatskarten für den Arbeitsweg",
@@ -64,46 +64,44 @@ async def _search_documents_async(query: str, user_id: str, referenced: list[dic
     return "\n---\n".join(f"Result {i + 1}:\n{doc.page_content}" for i, doc in enumerate(docs))
 
 
-async def _list_user_documents_async(user_id: str, referenced: list[dict]) -> str:
-    conn = await asyncpg.connect(DB_URL)
-    try:
-        rows = await conn.fetch(
-            """
-            SELECT i.id, i.item_name, i.company, i.price, i.category, i.invoice_date, d.id AS document_id
-            FROM invoices i
-            LEFT JOIN documents d ON d.id = i.document_id
-            WHERE i.user_id = $1
-            ORDER BY i.invoice_date DESC NULLS LAST
-            """,
-            user_id,
+async def _fetch_invoices(user_id: str) -> list[dict]:
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{INVOICE_SERVICE_URL}/internal/invoices/latest",
+            params={"userId": user_id, "limit": 1000},
+            timeout=10.0,
         )
-    finally:
-        await conn.close()
+        resp.raise_for_status()
+        return resp.json()
 
-    if not rows:
+
+async def _list_user_documents_async(user_id: str, referenced: list[dict]) -> str:
+    invoices = await _fetch_invoices(user_id)
+
+    if not invoices:
         return "The user has no uploaded documents yet."
 
-    for row in rows:
+    for inv in invoices:
         referenced.append({
-            "invoice_id": row["id"],
-            "item_name": row["item_name"],
-            "company": row["company"],
-            "price": float(row["price"]) if row["price"] is not None else None,
-            "category": row["category"],
-            "invoice_date": str(row["invoice_date"]) if row["invoice_date"] else None,
-            "document_id": row["document_id"],
+            "invoice_id": inv.get("id"),
+            "item_name": inv.get("itemName"),
+            "company": inv.get("company"),
+            "price": float(inv["price"]) if inv.get("price") is not None else None,
+            "category": inv.get("category"),
+            "invoice_date": inv.get("invoiceDate"),
+            "document_id": inv.get("documentId"),
         })
 
     lines = ["ID  | Item                          | Company              | Price   | Category                    | Date"]
     lines.append("-" * 105)
-    for row in rows:
-        inv_id = row["id"]
-        item = row["item_name"]
-        company = row["company"]
-        price = row["price"]
-        category = row["category"]
-        inv_date = row["invoice_date"]
-        price_str = f"{price:.2f}€" if price is not None else "N/A"
+    for inv in invoices:
+        inv_id = inv.get("id")
+        item = inv.get("itemName")
+        company = inv.get("company")
+        price = inv.get("price")
+        category = inv.get("category")
+        inv_date = inv.get("invoiceDate")
+        price_str = f"{float(price):.2f}€" if price is not None else "N/A"
         date_str = str(inv_date) if inv_date else "N/A"
         lines.append(
             f"{str(inv_id):<4}| {str(item or '')[:30]:<30} | {str(company or '')[:20]:<20} | {price_str:<7} | {str(category or '')[:27]:<27} | {date_str}"
@@ -112,16 +110,8 @@ async def _list_user_documents_async(user_id: str, referenced: list[dict]) -> st
 
 
 async def _suggest_missing_documents_async(user_id: str) -> str:
-    conn = await asyncpg.connect(DB_URL)
-    try:
-        rows = await conn.fetch(
-            "SELECT DISTINCT category FROM invoices WHERE user_id = $1 AND category IS NOT NULL",
-            user_id,
-        )
-    finally:
-        await conn.close()
-
-    present = {row["category"] for row in rows}
+    invoices = await _fetch_invoices(user_id)
+    present = {inv["category"] for inv in invoices if inv.get("category")}
     all_categories = [c.value for c in InvoiceCategory]
     missing = [c for c in all_categories if c not in present]
 

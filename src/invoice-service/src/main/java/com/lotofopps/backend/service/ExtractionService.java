@@ -93,16 +93,19 @@ Use the VISUAL LAYOUT to identify sections:
     private final String llmModel;
     private final InvoiceRepository invoiceRepository;
     private final RestTemplate restTemplate;
+    private final LlmChatEmbeddingService embeddingService;
 
     public ExtractionService(
             @Value("${llm.url}") String llmUrl,
             @Value("${llm.model}") String llmModel,
             InvoiceRepository invoiceRepository,
-            RestTemplate restTemplate) {
+            RestTemplate restTemplate,
+            LlmChatEmbeddingService embeddingService) {
         this.llmUrl = llmUrl.endsWith("/") ? llmUrl.substring(0, llmUrl.length() - 1) : llmUrl;
         this.llmModel = llmModel;
         this.invoiceRepository = invoiceRepository;
         this.restTemplate = restTemplate;
+        this.embeddingService = embeddingService;
     }
 
     public List<Invoice> extractAndStore(Document document) throws IOException {
@@ -128,7 +131,9 @@ Use the VISUAL LAYOUT to identify sections:
             return invoice;
         }).toList();
 
-        return invoiceRepository.saveAll(invoices);
+        List<Invoice> saved = invoiceRepository.saveAll(invoices);
+        saved.forEach(embeddingService::embedInvoice);
+        return saved;
     }
 
     private List<ExtractionItem> extractItems(byte[] fileBytes, String contentType, String filename) throws IOException {

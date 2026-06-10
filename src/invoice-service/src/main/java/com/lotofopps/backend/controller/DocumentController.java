@@ -9,6 +9,7 @@ import com.lotofopps.backend.repository.DocumentRepository;
 import com.lotofopps.backend.repository.InvoiceRepository;
 import com.lotofopps.backend.service.DocumentStorageService;
 import com.lotofopps.backend.service.ExtractionService;
+import com.lotofopps.backend.service.LlmChatEmbeddingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,6 +45,7 @@ public class DocumentController {
     private final DocumentRepository documentRepository;
     private final InvoiceRepository invoiceRepository;
     private final ExtractionService extractionService;
+    private final LlmChatEmbeddingService embeddingService;
     private final long maxSizeBytes;
 
     public DocumentController(
@@ -51,11 +53,13 @@ public class DocumentController {
             DocumentRepository documentRepository,
             InvoiceRepository invoiceRepository,
             ExtractionService extractionService,
+            LlmChatEmbeddingService embeddingService,
             @Value("${upload.max-size-bytes:10485760}") long maxSizeBytes) {
         this.documentStorageService = documentStorageService;
         this.documentRepository = documentRepository;
         this.invoiceRepository = invoiceRepository;
         this.extractionService = extractionService;
+        this.embeddingService = embeddingService;
         this.maxSizeBytes = maxSizeBytes;
     }
 
@@ -148,6 +152,7 @@ public class DocumentController {
         }
 
         List<Invoice> invoices = invoiceRepository.findByDocumentId(id);
+        invoices.forEach(inv -> embeddingService.deleteEmbedding(inv.getId()));
         invoiceRepository.deleteAll(invoices);
         documentStorageService.deleteFile(document.getStoragePath());
         documentRepository.delete(document);
