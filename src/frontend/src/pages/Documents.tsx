@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import useT from '../i18n/useT'
 import Icon from '../components/Icon'
 import { useAppSelector } from '../store/hooks'
@@ -86,12 +87,41 @@ export default function Invoices() {
   const [showMoreFilters, setShowMoreFilters] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [highlightId, setHighlightId] = useState<number | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
     apiGet<InvoiceResponse[]>('/api/invoices', token)
       .then(setInvoices)
       .catch(() => {})
   }, [token])
+
+  // When arriving from a chat source (?invoice=<id>), clear any active filters
+  // so the row is guaranteed visible, then mark it for highlight + scroll.
+  useEffect(() => {
+    const target = searchParams.get('invoice')
+    if (!target) return
+    const id = Number(target)
+    if (!Number.isFinite(id) || !invoices.some((inv) => inv.id === id)) return
+    setSearch('')
+    setYear('')
+    setCategory('')
+    setMinAmount('')
+    setMaxAmount('')
+    setHighlightId(id)
+    searchParams.delete('invoice')
+    setSearchParams(searchParams, { replace: true })
+  }, [invoices, searchParams, setSearchParams])
+
+  // Scroll the highlighted row into view and let the highlight fade out.
+  useEffect(() => {
+    if (highlightId == null) return
+    document
+      .getElementById(`invoice-${highlightId}`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const timer = setTimeout(() => setHighlightId(null), 2500)
+    return () => clearTimeout(timer)
+  }, [highlightId])
 
   // Years present in the data, newest first — drives the year dropdown.
   const years = useMemo(() => {
@@ -366,7 +396,12 @@ export default function Invoices() {
               {visibleInvoices.map((inv) => (
                 <tr
                   key={inv.id}
-                  className="hover:bg-surface transition-colors group"
+                  id={`invoice-${inv.id}`}
+                  className={`transition-colors group ${
+                    highlightId === inv.id
+                      ? 'bg-primary/10 ring-2 ring-inset ring-primary'
+                      : 'hover:bg-surface'
+                  }`}
                 >
                   <td className="py-4 px-6 font-data-mono text-data-mono text-on-surface">
                     {fmtDate(inv.invoiceDate)}

@@ -4,12 +4,15 @@ import { selectToken } from '../features/authSlice'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
-/** A single RAG source surfaced by the agent (e.g. a retrieved document chunk). */
+/** An invoice the agent referenced while answering, surfaced to the user as a source. */
 export interface ChatSource {
-  /** The tool that produced this source, e.g. "search_documents". */
-  tool: string
-  /** Human-readable content of the retrieved snippet. */
-  content: string
+  invoiceId: number
+  itemName: string | null
+  company: string | null
+  price: number | null
+  category: string | null
+  invoiceDate: string | null
+  documentId: number | null
 }
 
 export interface ChatMessage {
@@ -24,46 +27,32 @@ export interface ChatMessage {
 
 /** SSE event shapes emitted by the agent backend. */
 interface AgentEvent {
-  type: 'token' | 'tool_start' | 'tool_end' | 'sources' | 'done' | 'error'
+  type: 'token' | 'tool_start' | 'tool_end' | 'references' | 'done' | 'error'
   content?: string
   tool?: string
   input?: string
   result?: string
   message?: string
-  sources?: unknown
+  invoices?: unknown
 }
 
-/** Tools whose results we surface to the user as RAG sources. */
-function isSourceTool(tool: string | undefined): boolean {
-  if (!tool) return false
-  return /search|document|retriev/i.test(tool)
-}
-
-/** Split a search_documents tool result into individual source snippets. */
-function parseToolSources(tool: string, result: string): ChatSource[] {
-  const trimmed = result.trim()
-  if (!trimmed || /^no matching documents/i.test(trimmed)) return []
-  return trimmed
-    .split(/\n-{2,}\n/)
-    .map((part) => part.replace(/^Result\s*\d+:\s*/i, '').trim())
-    .filter(Boolean)
-    .map((content) => ({ tool, content }))
-}
-
-/** Normalize a structured `sources` event (defensive — backend may add this later). */
-function normalizeSourcesEvent(raw: unknown): ChatSource[] {
+/** Normalize the structured `references` event into invoice sources. */
+function normalizeReferences(raw: unknown): ChatSource[] {
   if (!Array.isArray(raw)) return []
   return raw
     .map((item): ChatSource | null => {
-      if (typeof item === 'string') return { tool: 'source', content: item }
-      if (item && typeof item === 'object') {
-        const obj = item as Record<string, unknown>
-        const content = obj.content ?? obj.text ?? obj.snippet ?? obj.page_content
-        if (typeof content === 'string') {
-          return { tool: String(obj.tool ?? obj.source ?? 'source'), content }
-        }
+      if (!item || typeof item !== 'object') return null
+      const obj = item as Record<string, unknown>
+      if (typeof obj.invoice_id !== 'number') return null
+      return {
+        invoiceId: obj.invoice_id,
+        itemName: typeof obj.item_name === 'string' ? obj.item_name : null,
+        company: typeof obj.company === 'string' ? obj.company : null,
+        price: typeof obj.price === 'number' ? obj.price : null,
+        category: typeof obj.category === 'string' ? obj.category : null,
+        invoiceDate: typeof obj.invoice_date === 'string' ? obj.invoice_date : null,
+        documentId: typeof obj.document_id === 'number' ? obj.document_id : null,
       }
-      return null
     })
     .filter((s): s is ChatSource => s !== null)
 }
@@ -143,12 +132,12 @@ export function useChat() {
         const decoder = new TextDecoder()
         let buffer = ''
 
-        // Dedupe sources so a tool that streams partial results doesn't repeat.
-        const seenSources = new Set<string>()
+        // Dedupe sources by invoice so the same document isn't listed twice.
+        const seenSources = new Set<number>()
         const addSources = (incoming: ChatSource[]) => {
           const fresh = incoming.filter((s) => {
-            if (seenSources.has(s.content)) return false
-            seenSources.add(s.content)
+            if (seenSources.has(s.invoiceId)) return false
+            seenSources.add(s.invoiceId)
             return true
           })
           if (fresh.length === 0) return
@@ -185,13 +174,8 @@ export function useChat() {
                   }))
                 }
                 break
-              case 'tool_end':
-                if (isSourceTool(evt.tool) && evt.result) {
-                  addSources(parseToolSources(evt.tool!, evt.result))
-                }
-                break
-              case 'sources':
-                addSources(normalizeSourcesEvent(evt.sources))
+              case 'references':
+                addSources(normalizeReferences(evt.invoices))
                 break
               case 'error':
                 updateAssistant(assistantId, (m) => ({

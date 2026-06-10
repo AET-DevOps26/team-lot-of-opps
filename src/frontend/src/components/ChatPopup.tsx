@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useChat, type ChatMessage } from '../hooks/useChat'
 import useT, { type Translator } from '../i18n/useT'
 import Icon from './Icon'
@@ -83,7 +84,9 @@ export default function ChatPopup({ open, onClose }: ChatPopupProps) {
         {messages.length === 0 ? (
           <EmptyState t={t} />
         ) : (
-          messages.map((msg) => <MessageBubble key={msg.id} message={msg} t={t} />)
+          messages.map((msg) => (
+            <MessageBubble key={msg.id} message={msg} t={t} onClose={onClose} />
+          ))
         )}
       </div>
 
@@ -137,7 +140,15 @@ function EmptyState({ t }: { t: Translator }) {
   )
 }
 
-function MessageBubble({ message, t }: { message: ChatMessage; t: Translator }) {
+function MessageBubble({
+  message,
+  t,
+  onClose,
+}: {
+  message: ChatMessage
+  t: Translator
+  onClose: () => void
+}) {
   const isUser = message.role === 'user'
 
   if (isUser) {
@@ -164,14 +175,39 @@ function MessageBubble({ message, t }: { message: ChatMessage; t: Translator }) 
           <p className="mt-1 font-body-sm text-body-sm text-red-600">{message.error}</p>
         )}
       </div>
-      {message.sources.length > 0 && <Sources sources={message.sources} t={t} />}
+      {message.sources.length > 0 && <Sources sources={message.sources} t={t} onClose={onClose} />}
     </div>
   )
 }
 
-function Sources({ sources, t }: { sources: ChatMessage['sources']; t: Translator }) {
+function fmtEur(n: number): string {
+  return `€ ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return ''
+  const [y, m, d] = iso.split('-')
+  if (!y || !m || !d) return iso
+  return `${d}.${m}.${y}`
+}
+
+function Sources({
+  sources,
+  t,
+  onClose,
+}: {
+  sources: ChatMessage['sources']
+  t: Translator
+  onClose: () => void
+}) {
+  const navigate = useNavigate()
   const [expanded, setExpanded] = useState(false)
   const label = sources.length === 1 ? t('chat.sources.one') : t('chat.sources.other')
+
+  const jumpToInvoice = (invoiceId: number) => {
+    navigate(`/invoices?invoice=${invoiceId}`)
+    onClose()
+  }
 
   return (
     <div className="w-full max-w-[85%] rounded-lg border border-outline-variant bg-surface px-3 py-2">
@@ -187,19 +223,42 @@ function Sources({ sources, t }: { sources: ChatMessage['sources']; t: Translato
       </button>
       {expanded && (
         <ul className="mt-2 space-y-2">
-          {sources.map((source, i) => (
-            <li
-              key={i}
-              className="rounded border-l-2 border-secondary bg-surface-container-lowest px-2.5 py-1.5"
-            >
-              <p className="mb-0.5 font-label-caps text-label-caps uppercase tracking-wide text-on-surface-variant">
-                {source.tool}
-              </p>
-              <p className="whitespace-pre-wrap break-words font-body-sm text-body-sm text-on-surface">
-                {source.content}
-              </p>
-            </li>
-          ))}
+          {sources.map((source) => {
+            const date = fmtDate(source.invoiceDate)
+            const title = source.itemName ?? source.company ?? `Invoice #${source.invoiceId}`
+            return (
+              <li key={source.invoiceId}>
+                <button
+                  type="button"
+                  onClick={() => jumpToInvoice(source.invoiceId)}
+                  title={t('chat.sources.jump')}
+                  className="block w-full rounded border-l-2 border-secondary bg-surface-container-lowest px-2.5 py-1.5 text-left transition-colors hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="break-words font-body-sm text-body-sm font-medium text-on-surface">
+                      {title}
+                    </p>
+                    {source.price !== null && (
+                      <p className="shrink-0 font-body-sm text-body-sm text-on-surface">
+                        {fmtEur(source.price)}
+                      </p>
+                    )}
+                  </div>
+                  {(source.company && source.itemName) || date || source.category ? (
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 font-body-sm text-body-sm text-on-surface-variant">
+                      {source.company && source.itemName && <span>{source.company}</span>}
+                      {date && <span>· {date}</span>}
+                      {source.category && (
+                        <span className="rounded-full bg-surface-container px-2 py-0.5 font-label-caps text-label-caps uppercase tracking-wide">
+                          {source.category}
+                        </span>
+                      )}
+                    </p>
+                  ) : null}
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>

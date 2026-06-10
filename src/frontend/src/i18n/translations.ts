@@ -10,6 +10,7 @@ export interface TranslationDict {
     upload: string
     settings: string
     signInRequired: string
+    menu: string
   }
   onboarding: {
     eyebrow: string
@@ -64,7 +65,7 @@ export interface TranslationDict {
     dropzone: { title: string; subtitle: string; maxSize: string }
     queue: { title: string; viewAll: string }
     status: { extracting: string; verified: string; actionNeeded: string }
-    meta: { uploadedToday: string; uploadedYesterday: string; missingVendor: string }
+    meta: { uploadedToday: string; uploadedYesterday: string; missingVendor: string; uploadFailed: string }
     fields: { vendor: string; amount: string }
     review: string
   }
@@ -121,7 +122,7 @@ export interface TranslationDict {
     emptyTitle: string
     emptyBody: string
     error: string
-    sources: { one: string; other: string }
+    sources: { one: string; other: string; jump: string }
   }
 }
 
@@ -138,6 +139,7 @@ const translations: Record<Language, TranslationDict> = {
       upload: 'Upload',
       settings: 'Settings',
       signInRequired: 'Sign in to access this section',
+      menu: 'Menu',
     },
     onboarding: {
       eyebrow: 'Welcome to TaxForward',
@@ -216,6 +218,7 @@ const translations: Record<Language, TranslationDict> = {
         uploadedToday: 'Uploaded Today, 10:42 AM',
         uploadedYesterday: 'Uploaded Yesterday',
         missingVendor: 'Missing vendor information',
+        uploadFailed: 'Upload failed',
       },
       fields: { vendor: 'Vendor', amount: 'Amount' },
       review: 'Review Document',
@@ -274,7 +277,7 @@ const translations: Record<Language, TranslationDict> = {
       emptyBody:
         'Ask me about your uploaded documents or what you should still upload for your tax return.',
       error: 'Something went wrong.',
-      sources: { one: 'source', other: 'sources' },
+      sources: { one: 'source', other: 'sources', jump: 'View this invoice' },
     },
   },
   de: {
@@ -289,6 +292,7 @@ const translations: Record<Language, TranslationDict> = {
       upload: 'Hochladen',
       settings: 'Einstellungen',
       signInRequired: 'Anmelden, um diesen Bereich zu nutzen',
+      menu: 'Menü',
     },
     onboarding: {
       eyebrow: 'Willkommen bei TaxForward',
@@ -368,6 +372,7 @@ const translations: Record<Language, TranslationDict> = {
         uploadedToday: 'Heute hochgeladen, 10:42 Uhr',
         uploadedYesterday: 'Gestern hochgeladen',
         missingVendor: 'Lieferanteninformation fehlt',
+        uploadFailed: 'Upload fehlgeschlagen',
       },
       fields: { vendor: 'Lieferant', amount: 'Betrag' },
       review: 'Dokument prüfen',
@@ -426,7 +431,7 @@ const translations: Record<Language, TranslationDict> = {
       emptyBody:
         'Frag mich zu deinen hochgeladenen Dokumenten oder was du für deine Steuererklärung noch hochladen solltest.',
       error: 'Etwas ist schiefgelaufen.',
-      sources: { one: 'Quelle', other: 'Quellen' },
+      sources: { one: 'Quelle', other: 'Quellen', jump: 'Rechnung anzeigen' },
     },
   },
 }

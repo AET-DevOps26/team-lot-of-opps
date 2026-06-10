@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { openSettings } from '../features/uiSlice'
+import { openSettings, closeMobileNav, selectMobileNavOpen } from '../features/uiSlice'
 import { selectIsAuthenticated } from '../features/authSlice'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import useT from '../i18n/useT'
@@ -34,9 +34,19 @@ export default function SideNav() {
   const t = useT()
   const dispatch = useAppDispatch()
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const mobileNavOpen = useAppSelector(selectMobileNavOpen)
+  const close = () => dispatch(closeMobileNav())
 
   return (
-    <aside className="hidden md:flex fixed left-0 top-16 h-[calc(100vh-64px)] w-64 p-4 flex-col justify-between bg-slate-50 border-r border-slate-200 z-40">
+    <aside
+      className={[
+        'fixed left-0 top-16 h-[calc(100vh-64px)] p-4 flex-col justify-between bg-slate-50 border-r border-slate-200 z-40',
+        // Desktop: always a fixed-width rail.
+        'md:flex md:w-64',
+        // Mobile: full-screen panel when opened, hidden otherwise.
+        mobileNavOpen ? 'flex w-full' : 'hidden',
+      ].join(' ')}
+    >
       <div>
         <div className="mb-8 px-3">
           <h2 className="text-lg font-extrabold text-slate-900 uppercase tracking-wide">
@@ -48,7 +58,7 @@ export default function SideNav() {
           {NAV_ITEMS.map((item) => (
             <li key={item.to}>
               {isAuthenticated ? (
-                <NavLink to={item.to} end={item.end} className={activeClass}>
+                <NavLink to={item.to} end={item.end} className={activeClass} onClick={close}>
                   {({ isActive }) => (
                     <>
                       <Icon name={item.icon} filled={isActive} />
@@ -84,7 +94,10 @@ export default function SideNav() {
       <ul className="space-y-2 border-t border-slate-200 pt-4">
         <li>
           <button
-            onClick={() => dispatch(openSettings())}
+            onClick={() => {
+              close()
+              dispatch(openSettings())
+            }}
             className="w-full flex items-center gap-3 text-slate-600 p-3 hover:bg-blue-50 hover:text-blue-700 rounded-lg transition-colors text-sm font-semibold tracking-wide"
           >
             <Icon name="settings" />
