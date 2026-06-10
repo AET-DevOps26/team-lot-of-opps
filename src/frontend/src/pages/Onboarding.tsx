@@ -1,9 +1,7 @@
 import GoogleSignInButton from '../components/GoogleSignInButton'
+import EmailPasswordForm from '../components/EmailPasswordForm'
 import Icon from '../components/Icon'
 import useT from '../i18n/useT'
-import { useAppDispatch } from '../store/hooks'
-import { signedIn } from '../features/authSlice'
-import type { AuthUser } from '../features/authSlice'
 import { useAppSelector } from '../store/hooks'
 import { selectAuthLoading } from '../features/authSlice'
 
@@ -22,30 +20,6 @@ function FeatureCard({ icon, title, body }: FeatureCardProps) {
       <h3 className="text-h3 font-semibold text-slate-900">{title}</h3>
       <p className="text-body-sm text-slate-600 mt-2">{body}</p>
     </div>
-  )
-}
-
-const IS_DEV = import.meta.env.VITE_DEV_AUTO_LOGIN === 'true'
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
-
-function DevLoginButton() {
-  const dispatch = useAppDispatch()
-
-  async function handleDevLogin() {
-    const res = await fetch(`${API_BASE}/api/auth/dev-login`)
-    if (!res.ok) return
-    const data = await res.json() as { token: string; sub: string; email: string; name: string; picture?: string }
-    const user: AuthUser = { sub: data.sub, email: data.email, name: data.name, picture: data.picture }
-    dispatch(signedIn({ user, token: data.token }))
-  }
-
-  return (
-    <button
-      onClick={handleDevLogin}
-      className="mt-2 text-xs text-slate-400 underline hover:text-slate-600"
-    >
-      Dev login (Alice)
-    </button>
   )
 }
 
@@ -71,11 +45,18 @@ export default function Onboarding() {
               <p className="mt-4 text-lg font-medium text-slate-900">{t('auth.signingIn')}</p>
             </div>
           ) : (
-            <GoogleSignInButton size="lg" />
+            <div className="flex flex-col items-center gap-4 w-full max-w-sm">
+              <GoogleSignInButton size="lg" className="w-full" />
+              <div className="flex items-center gap-3 w-full text-xs text-slate-400">
+                <hr className="flex-1 border-slate-200" />
+                <span>{t('auth.orContinueWith')}</span>
+                <hr className="flex-1 border-slate-200" />
+              </div>
+              <EmailPasswordForm />
+            </div>
           )}
         </div>
         <p className="text-xs text-slate-500 mt-3">{t('onboarding.signInHint')}</p>
-        {IS_DEV && <DevLoginButton />}
       </section>
 
       <section className="mt-xl grid gap-md md:grid-cols-3">

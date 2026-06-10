@@ -1,22 +1,50 @@
 services:
-  ai:
+  traefik:
+    image: traefik:v3.3
+    container_name: traefik
+    ports:
+      - "80:80"
+      - "8090:8080"
+    volumes:
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      - network
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ./auth-service
+    container_name: auth-service
+    environment:
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json
+      - FIREBASE_AUTH_EMULATOR_HOST=${FIREBASE_AUTH_EMULATOR_HOST:-}
+    volumes:
+      - ./auth-service/devops-25c9a-firebase-adminsdk-fbsvc-d15365a6ac.json:/app/firebase-service-account.json:ro
+    networks:
+      - network
+    restart: unless-stopped
+
+
+  llm-chat:
     platform: linux/amd64
     build:
-      context: ./ai-components
+      context: ./llm-chat
       dockerfile: Dockerfile.dev
-    container_name: ai
+    container_name: llm-chat
     ports:
-      - "8081:8081"
+      - "8082:8081"
     environment:
       - LLM_URL=http://host.docker.internal:1234
       - LLM_MODEL=google/gemma-4-e2b
-      - DATABASE_URL=postgresql://appuser:password@db:5432/app_db
+      - DATABASE_URL=postgresql://appuser:password@db-llm-chat:5432/llm_db
     volumes:
-      - ./ai-components/app:/app/app
+      - ./llm-chat/app:/app/app
     networks:
       - network
     depends_on:
-      db:
+      db-llm-chat:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
@@ -26,21 +54,20 @@ services:
       start_period: 120s
     restart: unless-stopped
 
-  backend:
+  invoice-service:
     platform: linux/amd64
     build:
-      context: ./backend
+      context: ./invoice-service
       dockerfile: Dockerfile.dev
-    container_name: backend
+    container_name: invoice-service
     ports:
       - "8080:8080"
     environment:
-      - SPRING_PROFILES_ACTIVE=dev
-      - SPRING_APPLICATION_NAME=backend
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/app_db
-      - AI_BACKEND_URL=http://ai:8081
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db-invoice:5432/invoice_db
+      - LLM_URL=http://host.docker.internal:1234
+      - LLM_MODEL=google/gemma-4-e2b
     volumes:
-      - ./backend/src:/app/src
+      - ./invoice-service/src:/app/src
     networks:
       - network
     healthcheck:
@@ -50,29 +77,43 @@ services:
       retries: 3
       start_period: 40s
     depends_on:
-      db:
-        condition: service_healthy
-      ai:
+      db-invoice:
         condition: service_healthy
     restart: unless-stopped
 
-  db:
+  db-invoice:
     platform: linux/amd64
-    image: pgvector/pgvector:pg16
-    container_name: postgres_db
-    ports:
-      - "5432:5432"
+    image: postgres:16
+    container_name: db-invoice
     environment:
       - POSTGRES_USER=appuser
       - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=app_db
+      - POSTGRES_DB=invoice_db
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_invoice:/var/lib/postgresql/data
     networks:
       - network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U appuser -d app_db"]
+      test: ["CMD-SHELL", "pg_isready -U appuser -d invoice_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  db-llm-chat:
+    platform: linux/amd64
+    image: pgvector/pgvector:pg16
+    container_name: db-llm-chat
+    environment:
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=llm_db
+    volumes:
+      - postgres_llm_chat:/var/lib/postgresql/data
+    networks:
+      - network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d llm_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -88,21 +129,26 @@ services:
       - "5173:5173"
     environment:
       - VITE_API_BASE_URL=
-      - VITE_API_TARGET=http://backend:8080
-      - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
-      - VITE_DEV_AUTO_LOGIN=true
+      - VITE_API_TARGET=http://traefik:80
+      - VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}
+      - VITE_FIREBASE_AUTH_DOMAIN=${VITE_FIREBASE_AUTH_DOMAIN}
+      - VITE_FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID}
+      - VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET}
+      - VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID}
+      - VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID}
     volumes:
       - ./frontend:/app
       - /app/node_modules
     networks:
       - network
     depends_on:
-      backend:
+      invoice-service:
         condition: service_healthy
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  postgres_invoice:
+  postgres_llm_chat:
 
 networks:
   network:

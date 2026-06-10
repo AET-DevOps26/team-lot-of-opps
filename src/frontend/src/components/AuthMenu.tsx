@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { googleLogout } from '@react-oauth/google'
-import { signedOut, selectUser } from '../features/authSlice'
-import { useAppDispatch, useAppSelector } from '../store/hooks'
+import { signOut } from 'firebase/auth'
+import { auth } from '../firebase'
+import { selectUser } from '../features/authSlice'
+import { useAppSelector } from '../store/hooks'
 import useT from '../i18n/useT'
 import GoogleSignInButton from './GoogleSignInButton'
 
 export default function AuthMenu() {
   const t = useT()
-  const dispatch = useAppDispatch()
   const user = useAppSelector(selectUser)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -28,15 +28,15 @@ export default function AuthMenu() {
     }
   }, [menuOpen])
 
-  const handleSignOut = () => {
-    googleLogout()
-    dispatch(signedOut())
+  const handleSignOut = async () => {
+    await signOut(auth)
+    // onAuthStateChanged in App.tsx dispatches signedOut automatically
     setMenuOpen(false)
   }
 
   if (!user) return <GoogleSignInButton />
 
-  const initials = user.name
+  const initials = user.displayName
     .split(' ')
     .map((part) => part[0])
     .filter(Boolean)
@@ -54,9 +54,9 @@ export default function AuthMenu() {
         aria-label={t('auth.accountMenu')}
         className="flex items-center gap-2 rounded-full border border-slate-200 hover:bg-slate-50 transition-colors p-1 pr-3"
       >
-        {user.picture ? (
+        {user.photoURL ? (
           <img
-            src={user.picture}
+            src={user.photoURL}
             alt=""
             referrerPolicy="no-referrer"
             className="w-8 h-8 rounded-full"
@@ -67,7 +67,7 @@ export default function AuthMenu() {
           </span>
         )}
         <span className="text-sm font-medium text-slate-700 max-w-[10rem] truncate">
-          {user.name}
+          {user.displayName}
         </span>
       </button>
       {menuOpen ? (
@@ -76,7 +76,7 @@ export default function AuthMenu() {
           className="absolute right-0 mt-2 w-64 rounded-lg border border-slate-200 bg-white shadow-lg p-2"
         >
           <div className="px-3 py-2 border-b border-slate-100">
-            <p className="text-sm font-medium text-slate-900 truncate">{user.name}</p>
+            <p className="text-sm font-medium text-slate-900 truncate">{user.displayName}</p>
             <p className="text-xs text-slate-500 truncate">{user.email}</p>
           </div>
           <button

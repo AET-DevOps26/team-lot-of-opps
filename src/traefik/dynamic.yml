@@ -1,0 +1,35 @@
+http:
+  middlewares:
+    firebase-auth:
+      forwardAuth:
+        address: "http://auth-service:8000/verify"
+        authResponseHeaders:
+          - "X-User-Sub"
+
+  routers:
+    invoice-router:
+      rule: "PathPrefix(`/api/documents`) || PathPrefix(`/api/invoices`)"
+      entryPoints:
+        - web
+      middlewares:
+        - firebase-auth
+      service: invoice-svc
+
+    llm-chat-router:
+      rule: "PathPrefix(`/api/chat`)"
+      entryPoints:
+        - web
+      middlewares:
+        - firebase-auth
+      service: llm-chat-svc
+
+  services:
+    invoice-svc:
+      loadBalancer:
+        servers:
+          - url: "http://invoice-service:8080"
+
+    llm-chat-svc:
+      loadBalancer:
+        servers:
+          - url: "http://llm-chat:8081"

@@ -1,0 +1,10 @@
+images:
+  backend:
+    pullPolicy: Never
+  ai:
+    pullPolicy: Never
+  frontend:
+    pullPolicy: Never
+
+backend:
+  devMode: "true"
