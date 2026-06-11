@@ -16,12 +16,20 @@ http:
       service: invoice-svc
 
     llm-chat-router:
-      rule: "PathPrefix(`/api/chat`)"
+      rule: "PathPrefix(`/api/agent`)"
       entryPoints:
         - web
       middlewares:
         - firebase-auth
       service: llm-chat-svc
+
+    suggestions-router:
+      rule: "PathPrefix(`/api/suggestions`)"
+      entryPoints:
+        - web
+      middlewares:
+        - firebase-auth
+      service: suggestions-svc
 
   services:
     invoice-svc:
@@ -33,3 +41,9 @@ http:
       loadBalancer:
         servers:
           - url: "http://llm-chat:8081"
+
+    suggestions-svc:
+      loadBalancer:
+        servers:
+          - url: "http://suggestions:XXXX"
+
