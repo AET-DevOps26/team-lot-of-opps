@@ -1,37 +1,46 @@
 import { useEffect } from 'react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { onAuthStateChanged } from 'firebase/auth'
+import { auth } from './firebase'
 import Layout from './components/Layout'
 import { useAppDispatch, useAppSelector } from './store/hooks'
-import { signedIn, selectIsAuthenticated } from './features/authSlice'
+import { signedIn, signedOut, selectIsAuthenticated, selectAuthLoading } from './features/authSlice'
 import Dashboard from './pages/Dashboard'
 import Documents from './pages/Documents'
 import Onboarding from './pages/Onboarding'
 import Upload from './pages/Upload'
 
-const IS_DEV = import.meta.env.VITE_DEV_AUTO_LOGIN === 'true'
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
-
 function RequireAuth() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const loading = useAppSelector(selectAuthLoading)
+  if (loading) return null
   return isAuthenticated ? <Outlet /> : <Navigate to="/welcome" replace />
 }
 
 function RedirectIfAuthenticated({ children }: { children: JSX.Element }) {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const loading = useAppSelector(selectAuthLoading)
+  if (loading) return null
   return isAuthenticated ? <Navigate to="/" replace /> : children
 }
 
 export default function App() {
   const dispatch = useAppDispatch()
+
   useEffect(() => {
-    if (!IS_DEV) return
-    fetch(`${API_BASE}/api/auth/dev-login`)
-      .then(r => r.ok ? r.json() : null)
-      .then((data: { token: string; sub: string; email: string; name: string; picture?: string } | null) => {
-        if (data) dispatch(signedIn({ user: { sub: data.sub, email: data.email, name: data.name, picture: data.picture }, token: data.token }))
-      })
-      .catch(() => {})
-  }, [])
+    return onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        dispatch(signedIn({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email ?? '',
+          displayName: firebaseUser.displayName ?? '',
+          photoURL: firebaseUser.photoURL ?? undefined,
+        }))
+      } else {
+        dispatch(signedOut())
+      }
+    })
+  }, [dispatch])
 
   return (
     <Routes>

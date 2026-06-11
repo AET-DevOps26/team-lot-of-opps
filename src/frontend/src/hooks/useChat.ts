@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { useAppSelector } from '../store/hooks'
-import { selectToken } from '../features/authSlice'
+import { auth } from '../firebase'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
@@ -62,7 +61,6 @@ function randomId(): string {
 }
 
 export function useChat() {
-  const token = useAppSelector(selectToken)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
@@ -111,6 +109,7 @@ export function useChat() {
       abortRef.current = controller
 
       try {
+        const token = await auth.currentUser?.getIdToken()
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
           Accept: 'text/event-stream',
@@ -207,7 +206,7 @@ export function useChat() {
         setIsStreaming(false)
       }
     },
-    [token, isStreaming, updateAssistant],
+    [isStreaming, updateAssistant],
   )
 
   return { messages, isStreaming, sendMessage, stop, reset }

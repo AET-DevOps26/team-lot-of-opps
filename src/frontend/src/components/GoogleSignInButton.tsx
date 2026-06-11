@@ -1,17 +1,9 @@
 import { useState } from 'react'
-import { useGoogleLogin } from '@react-oauth/google'
-import { signingIn, signedIn, signedOut, type AuthUser } from '../features/authSlice'
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
+import { auth } from '../firebase'
+import { signingIn } from '../features/authSlice'
 import { useAppDispatch } from '../store/hooks'
-import { apiPost } from '../api/client'
 import useT from '../i18n/useT'
-
-interface BackendAuthResponse {
-  token: string
-  sub: string
-  email: string
-  name: string
-  picture?: string
-}
 
 interface Props {
   size?: 'sm' | 'lg'
@@ -23,51 +15,27 @@ export default function GoogleSignInButton({ size = 'sm', className = '' }: Prop
   const dispatch = useAppDispatch()
   const [busy, setBusy] = useState(false)
 
-  const login = useGoogleLogin({
-    flow: 'implicit',
-    scope: 'openid email profile',
-    onSuccess: async (tokenResponse) => {
-      try {
-        const response = await apiPost<BackendAuthResponse>(
-          '/api/auth/google',
-          { accessToken: tokenResponse.access_token },
-        )
-        const profile: AuthUser = {
-          sub: response.sub,
-          email: response.email,
-          name: response.name,
-          picture: response.picture,
-        }
-        dispatch(signedIn({ user: profile, token: response.token }))
-      } catch (err) {
-        console.error('Failed to sign in', err)
-      } finally {
-        setBusy(false)
-      }
-    },
-    onError: () => {
-      setBusy(false)
-      dispatch(signedOut())
-    },
-    onNonOAuthError: () => {
-      setBusy(false)
-      dispatch(signedOut())
-    },
-  })
-
   const sizeClasses =
     size === 'lg' ? 'px-6 py-3 text-base gap-3' : 'px-4 py-2 text-sm gap-2'
-
   const iconSize = size === 'lg' ? 22 : 18
+
+  async function handleSignIn() {
+    dispatch(signingIn())
+    setBusy(true)
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider())
+      // onAuthStateChanged in App.tsx dispatches signedIn automatically
+    } catch (err) {
+      console.error('Sign-in failed', err)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <button
       type="button"
-      onClick={() => {
-        dispatch(signingIn())
-        setBusy(true)
-        login()
-      }}
+      onClick={handleSignIn}
       disabled={busy}
       aria-busy={busy}
       className={`inline-flex items-center justify-center rounded-full border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors font-medium text-slate-700 shadow-sm ${sizeClasses} ${className}`}

@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom'
 import useT from '../i18n/useT'
 import Icon from '../components/Icon'
 import { apiGet } from '../api/client'
-import { useAppSelector } from '../store/hooks'
-import { selectToken } from '../features/authSlice'
 import { usePersistentState } from '../hooks/usePersistentState'
 
 const TAX_RATE_STORAGE_KEY = 'dashboard.taxRatePercent'
@@ -91,7 +89,6 @@ function SummaryCard({ label, value, icon, hint, hintIcon, hintColor, highlight 
 
 export default function Dashboard() {
   const t = useT()
-  const token = useAppSelector(selectToken)
   const [reversed, setReversed] = useState(false)
   const [taxRatePercent, setTaxRatePercent] = usePersistentState(
     TAX_RATE_STORAGE_KEY,
@@ -113,16 +110,16 @@ export default function Dashboard() {
   const [suggestionsError, setSuggestionsError] = useState(false)
 
   useEffect(() => {
-    apiGet<typeof invoices>('/api/invoices', token)
+    apiGet<typeof invoices>('/api/invoices')
       .then((data) => setInvoices(data || []))
       .catch(() => setInvoices([]))
-  }, [token])
+  }, [])
 
   useEffect(() => {
     let cancelled = false
     setSuggestionsLoading(true)
     setSuggestionsError(false)
-    apiGet<Suggestion[]>('/api/suggestions', token)
+    apiGet<Suggestion[]>('/api/suggestions')
       .then((data) => {
         if (cancelled) return
         setSuggestions(data || [])
@@ -138,7 +135,7 @@ export default function Dashboard() {
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [])
 
   const totalExpenses = invoices.reduce((s, inv) => s + Number(inv.price || 0), 0)
   const carryforward = totalExpenses // placeholder: same as recorded expenses

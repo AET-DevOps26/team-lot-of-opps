@@ -1,0 +1,37 @@
+package com.lotofopps.backend.controller;
+
+import com.lotofopps.backend.dto.InvoiceResponse;
+import com.lotofopps.backend.repository.InvoiceRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/internal/invoices")
+public class InternalInvoiceController {
+
+    private final InvoiceRepository invoiceRepository;
+
+    public InternalInvoiceController(InvoiceRepository invoiceRepository) {
+        this.invoiceRepository = invoiceRepository;
+    }
+
+    @GetMapping("/latest")
+    public ResponseEntity<List<InvoiceResponse>> getLatestInvoices(
+            @RequestParam String userId,
+            @RequestParam(defaultValue = "10") int limit) {
+        Pageable pageable = PageRequest.of(0, limit,
+                Sort.by(Sort.Direction.DESC, "createdAt"));
+        List<InvoiceResponse> results = invoiceRepository
+                .findByUserId(userId, pageable)
+                .stream().map(InvoiceResponse::from).toList();
+        return ResponseEntity.ok(results);
+    }
+}

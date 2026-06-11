@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import useT, { type Translator } from '../i18n/useT'
 import Icon from '../components/Icon'
-import { useAppSelector } from '../store/hooks'
-import { selectToken } from '../features/authSlice'
 import { apiGet, apiPostFormData } from '../api/client'
 
 type QueueItemType = 'processing' | 'verified' | 'error'
@@ -152,14 +150,13 @@ function QueueItemCard({ item, t }: { item: QueueItem; t: Translator }) {
 
 export default function Upload() {
   const t = useT()
-  const token = useAppSelector(selectToken)
   const [queue, setQueue] = useState<QueueItem[]>([])
 
   useEffect(() => {
-    apiGet<InvoiceResponse[]>('/api/invoices?limit=5', token)
+    apiGet<InvoiceResponse[]>('/api/invoices?limit=5')
       .then((invoices) => setQueue(invoices.map((inv) => invoiceToQueueItem(inv, t))))
       .catch(() => {})
-  }, [token])
+  }, [t])
 
   const handleFiles = useCallback(
     (files: FileList | null) => {
@@ -181,7 +178,7 @@ export default function Upload() {
         const form = new FormData()
         form.append('file', file)
 
-        apiPostFormData<UploadResponse>('/api/documents/upload', form, token)
+        apiPostFormData<UploadResponse>('/api/documents/upload', form)
           .then((res) => {
             setQueue((prev) =>
               prev.map((item) =>
@@ -221,7 +218,7 @@ export default function Upload() {
           })
       })
     },
-    [token, t],
+    [t],
   )
 
   return (

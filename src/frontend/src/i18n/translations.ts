@@ -24,7 +24,27 @@ export interface TranslationDict {
     }
   }
   topbar: { logIn: string }
-  auth: { signIn: string; signOut: string; accountMenu: string }
+  auth: {
+    signIn: string
+    signOut: string
+    accountMenu: string
+    signingIn: string
+    orContinueWith: string
+    emailLabel: string
+    passwordLabel: string
+    confirmPasswordLabel: string
+    signInWithEmail: string
+    createAccount: string
+    switchToSignUp: string
+    switchToSignIn: string
+    forgotPassword: string
+    sendResetEmail: string
+    resetEmailSent: string
+    passwordMismatch: string
+    weakPassword: string
+    emailInUse: string
+    invalidCredentials: string
+  }
   settings: {
     title: string
     language: string
@@ -163,7 +183,27 @@ const translations: Record<Language, TranslationDict> = {
       },
     },
     topbar: { logIn: 'Log In' },
-    auth: { signIn: 'Sign in with Google', signOut: 'Sign out', accountMenu: 'Account menu' },
+    auth: {
+      signIn: 'Sign in with Google',
+      signOut: 'Sign out',
+      accountMenu: 'Account menu',
+      signingIn: 'Signing in…',
+      orContinueWith: 'or continue with email',
+      emailLabel: 'Email',
+      passwordLabel: 'Password',
+      confirmPasswordLabel: 'Confirm password',
+      signInWithEmail: 'Sign in',
+      createAccount: 'Create account',
+      switchToSignUp: "Don't have an account? Sign up",
+      switchToSignIn: 'Already have an account? Sign in',
+      forgotPassword: 'Forgot password?',
+      sendResetEmail: 'Send reset email',
+      resetEmailSent: 'Check your inbox — reset link sent.',
+      passwordMismatch: 'Passwords do not match.',
+      weakPassword: 'Password must be at least 6 characters.',
+      emailInUse: 'An account with this email already exists.',
+      invalidCredentials: 'Incorrect email or password.',
+    },
     settings: {
       title: 'Settings',
       language: 'Language',
@@ -317,7 +357,27 @@ const translations: Record<Language, TranslationDict> = {
       },
     },
     topbar: { logIn: 'Anmelden' },
-    auth: { signIn: 'Mit Google anmelden', signOut: 'Abmelden', accountMenu: 'Kontomenü' },
+    auth: {
+      signIn: 'Mit Google anmelden',
+      signOut: 'Abmelden',
+      accountMenu: 'Kontomenü',
+      signingIn: 'Anmelden…',
+      orContinueWith: 'oder mit E-Mail fortfahren',
+      emailLabel: 'E-Mail',
+      passwordLabel: 'Passwort',
+      confirmPasswordLabel: 'Passwort bestätigen',
+      signInWithEmail: 'Anmelden',
+      createAccount: 'Konto erstellen',
+      switchToSignUp: 'Noch kein Konto? Registrieren',
+      switchToSignIn: 'Bereits ein Konto? Anmelden',
+      forgotPassword: 'Passwort vergessen?',
+      sendResetEmail: 'Reset-E-Mail senden',
+      resetEmailSent: 'Postfach prüfen — Reset-Link wurde gesendet.',
+      passwordMismatch: 'Passwörter stimmen nicht überein.',
+      weakPassword: 'Passwort muss mindestens 6 Zeichen haben.',
+      emailInUse: 'Ein Konto mit dieser E-Mail existiert bereits.',
+      invalidCredentials: 'Falsche E-Mail oder falsches Passwort.',
+    },
     settings: {
       title: 'Einstellungen',
       language: 'Sprache',

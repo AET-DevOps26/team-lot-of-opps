@@ -2,8 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import useT from '../i18n/useT'
 import Icon from '../components/Icon'
-import { useAppSelector } from '../store/hooks'
-import { selectToken } from '../features/authSlice'
+import { auth } from '../firebase'
 import { apiGet, apiDelete } from '../api/client'
 
 interface InvoiceResponse {
@@ -77,7 +76,6 @@ function fmtEur(n: number): string {
 
 export default function Invoices() {
   const t = useT()
-  const token = useAppSelector(selectToken)
   const [invoices, setInvoices] = useState<InvoiceResponse[]>([])
   const [search, setSearch] = useState('')
   const [year, setYear] = useState('')
@@ -91,10 +89,10 @@ export default function Invoices() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
-    apiGet<InvoiceResponse[]>('/api/invoices', token)
+    apiGet<InvoiceResponse[]>('/api/invoices')
       .then(setInvoices)
       .catch(() => {})
-  }, [token])
+  }, [])
 
   // When arriving from a chat source (?invoice=<id>), clear any active filters
   // so the row is guaranteed visible, then mark it for highlight + scroll.
@@ -184,7 +182,7 @@ export default function Invoices() {
   async function handleDelete(id: number) {
     if (!confirm(t('invoices.confirmDelete') ?? 'Delete invoice?')) return
     try {
-      await apiDelete<void>(`/api/invoices/${id}`, token)
+      await apiDelete<void>(`/api/invoices/${id}`)
       setInvoices((prev) => prev.filter((i) => i.id !== id))
     } catch (e) {
       // eslint-disable-next-line no-alert
@@ -196,8 +194,11 @@ export default function Invoices() {
     if (!documentId) return
     try {
       const headers: Record<string, string> = {}
+      const token = await auth.currentUser?.getIdToken()
+      const uid = auth.currentUser?.uid
       if (token) headers.Authorization = `Bearer ${token}`
-      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+      if (uid) headers['X-User-Sub'] = uid
+      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
       const response = await fetch(`${baseUrl}/api/documents/${documentId}/content`, { headers })
       if (!response.ok) throw new Error(`Failed to load document: ${response.status}`)
       const blob = await response.blob()
