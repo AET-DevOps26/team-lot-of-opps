@@ -45,5 +45,5 @@ http:
     suggestions-svc:
       loadBalancer:
         servers:
-          - url: "http://suggestions:XXXX"
+          - url: "http://suggestions-service:8083"
 
