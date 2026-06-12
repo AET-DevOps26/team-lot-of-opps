@@ -1,3 +1,6 @@
 fastapi
 uvicorn[standard]
 firebase-admin
+# Pin away from cryptography 48.x: its bundled OpenSSL crashes (SIGILL)
+# inside the Docker Desktop VM on Apple Silicon. 44.x ships a compatible wheel.
+cryptography==44.0.2
