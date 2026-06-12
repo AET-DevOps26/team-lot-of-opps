@@ -8,7 +8,8 @@ TaxForward is a full-stack application that helps German students and trainees t
 src/
 ├── frontend/            # React + Vite + Redux + TypeScript SPA
 ├── invoice-service/     # Spring Boot REST API — document upload, OCR, invoice persistence
-├── llm-chat/            # FastAPI — conversational RAG agent + suggestions (pgvector)
+├── llm-chat/            # FastAPI — conversational RAG agent (pgvector)
+├── suggestions-service/ # Spring Boot REST API — proactive tax suggestions (LLM-generated)
 ├── auth-service/        # FastAPI — Firebase token verification (Traefik forward-auth)
 ├── traefik/             # Reverse proxy config — routing + auth middleware
 ├── scripts/             # Utility/seed scripts
@@ -20,7 +21,8 @@ All API traffic flows through **Traefik**, which enforces Firebase authenticatio
 ```
 Browser → Traefik ──► auth-service (/verify)   [validates Firebase ID token]
                   └──► invoice-service          [/api/documents, /api/invoices]
-                  └──► llm-chat                 [/api/chat]
+                  └──► llm-chat                 [/api/agent]
+                  └──► suggestions-service      [/api/suggestions]
 ```
 
 An external OpenAI-compatible LLM endpoint (e.g. LM Studio or Ollama on the host, reachable via `host.docker.internal`) is used for OCR extraction, vision, and chat completions.
@@ -32,10 +34,12 @@ An external OpenAI-compatible LLM endpoint (e.g. LM Studio or Ollama on the host
 | `frontend`        | React + Vite + TypeScript         | `5173`        | `frontend`        |
 | `invoice-service` | Spring Boot (Java, JPA)           | `8080`        | `invoice-service` |
 | `llm-chat`        | FastAPI (Python, LangChain)       | `8081`        | `llm-chat`        |
+| `suggestions-service` | Spring Boot (Java, JPA)       | `8083`        | `suggestions-service` |
 | `auth-service`    | FastAPI (Python, Firebase Admin)  | `8000`        | `auth-service`    |
 | `traefik`         | Traefik v3                        | `80` / `8090` | `traefik`         |
 | `db-invoice`      | PostgreSQL 16                     | `5432`        | `db-invoice`      |
 | `db-llm-chat`     | PostgreSQL 16 + pgvector          | `5432`        | `db-llm-chat`     |
+| `db-suggestions`  | PostgreSQL 16                     | `5432`        | `db-suggestions`  |
 
 ## Setup
 

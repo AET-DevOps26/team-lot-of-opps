@@ -84,6 +84,36 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  suggestions-service:
+    platform: linux/amd64
+    build:
+      context: ./suggestions-service
+      dockerfile: Dockerfile.dev
+    container_name: suggestions-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db-suggestions:5432/suggestions_db
+      - LLM_URL=http://host.docker.internal:1234
+      - LLM_MODEL=google/gemma-4-e2b
+      - INVOICE_SERVICE_URL=http://invoice-service:8080
+    volumes:
+      - ./suggestions-service/src:/app/src
+    networks:
+      - network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      db-suggestions:
+        condition: service_healthy
+      invoice-service:
+        condition: service_healthy
+    restart: unless-stopped
+
   db-invoice:
     platform: linux/amd64
     image: postgres:16
@@ -122,6 +152,25 @@ services:
       retries: 5
     restart: unless-stopped
 
+  db-suggestions:
+    platform: linux/amd64
+    image: postgres:16
+    container_name: db-suggestions
+    environment:
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=suggestions_db
+    volumes:
+      - postgres_suggestions:/var/lib/postgresql/data
+    networks:
+      - network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d suggestions_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   frontend:
     platform: linux/amd64
     build:
@@ -152,6 +201,7 @@ services:
 volumes:
   postgres_invoice:
   postgres_llm_chat:
+  postgres_suggestions:
 
 networks:
   network:

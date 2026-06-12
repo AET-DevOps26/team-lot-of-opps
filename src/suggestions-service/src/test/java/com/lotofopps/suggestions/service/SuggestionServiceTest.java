@@ -1,0 +1,143 @@
+package com.lotofopps.suggestions.service;
+
+import com.lotofopps.suggestions.dto.InvoiceItem;
+import com.lotofopps.suggestions.dto.SuggestionResponse;
+import com.lotofopps.suggestions.model.Suggestion;
+import com.lotofopps.suggestions.repository.SuggestionRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.RestTemplate;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class SuggestionServiceTest {
+
+    private static final String USER_ID = "test-user";
+    private static final String LLM_RESPONSE = """
+            {"choices": [{"message": {"content": "Upload your train ticket for the Berlin hotel."}}]}""";
+
+    @Mock
+    private SuggestionRepository suggestionRepository;
+
+    @Mock
+    private InvoiceClient invoiceClient;
+
+    @Mock
+    private RestTemplate restTemplate;
+
+    private SuggestionService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new SuggestionService("http://localhost:9999", "test-model", 5,
+                suggestionRepository, invoiceClient, restTemplate);
+    }
+
+    private InvoiceItem invoice(LocalDateTime createdAt) {
+        return new InvoiceItem(1L, "Hotel Berlin", "Ibis", new BigDecimal("200.00"),
+                "REISEKOSTEN", LocalDate.of(2026, 5, 1), createdAt);
+    }
+
+    private Suggestion storedSuggestion(LocalDateTime createdAt) {
+        Suggestion s = new Suggestion(USER_ID, "Stored suggestion");
+        ReflectionTestUtils.setField(s, "createdAt", createdAt);
+        return s;
+    }
+
+    @Test
+    void returnsEmptyListWhenUserHasNoInvoices() {
+        when(invoiceClient.fetchLatestInvoices(USER_ID, 5)).thenReturn(List.of());
+
+        assertThat(service.getSuggestions(USER_ID)).isEmpty();
+        verify(suggestionRepository, never()).save(any());
+    }
+
+    @Test
+    void generatesAndStoresSuggestionWhenNoneExists() {
+        when(invoiceClient.fetchLatestInvoices(USER_ID, 5))
+                .thenReturn(List.of(invoice(LocalDateTime.now())));
+        when(suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID))
+                .thenReturn(Optional.empty());
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(LLM_RESPONSE));
+        when(suggestionRepository.findTop5ByUserIdOrderByCreatedAtDesc(USER_ID))
+                .thenReturn(List.of(storedSuggestion(LocalDateTime.now())));
+
+        List<SuggestionResponse> result = service.getSuggestions(USER_ID);
+
+        assertThat(result).hasSize(1);
+        verify(suggestionRepository).save(any(Suggestion.class));
+    }
+
+    @Test
+    void skipsGenerationWhenSuggestionNewerThanInvoices() {
+        LocalDateTime invoiceTime = LocalDateTime.now().minusDays(1);
+        when(invoiceClient.fetchLatestInvoices(USER_ID, 5))
+                .thenReturn(List.of(invoice(invoiceTime)));
+        when(suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID))
+                .thenReturn(Optional.of(storedSuggestion(LocalDateTime.now())));
+        when(suggestionRepository.findTop5ByUserIdOrderByCreatedAtDesc(USER_ID))
+                .thenReturn(List.of(storedSuggestion(LocalDateTime.now())));
+
+        List<SuggestionResponse> result = service.getSuggestions(USER_ID);
+
+        assertThat(result).hasSize(1);
+        verify(restTemplate, never()).exchange(anyString(), any(HttpMethod.class), any(), eq(String.class));
+        verify(suggestionRepository, never()).save(any());
+    }
+
+    @Test
+    void regeneratesWhenInvoicesNewerThanSuggestion() {
+        when(invoiceClient.fetchLatestInvoices(USER_ID, 5))
+                .thenReturn(List.of(invoice(LocalDateTime.now())));
+        when(suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID))
+                .thenReturn(Optional.of(storedSuggestion(LocalDateTime.now().minusDays(1))));
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(LLM_RESPONSE));
+        when(suggestionRepository.findTop5ByUserIdOrderByCreatedAtDesc(USER_ID))
+                .thenReturn(List.of(storedSuggestion(LocalDateTime.now())));
+
+        service.getSuggestions(USER_ID);
+
+        verify(suggestionRepository).save(any(Suggestion.class));
+    }
+
+    @Test
+    void fallsBackToStoredSuggestionsWhenLlmFails() {
+        when(invoiceClient.fetchLatestInvoices(USER_ID, 5))
+                .thenReturn(List.of(invoice(LocalDateTime.now())));
+        when(suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID))
+                .thenReturn(Optional.of(storedSuggestion(LocalDateTime.now().minusDays(1))));
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+                .thenThrow(new RuntimeException("LLM down"));
+        when(suggestionRepository.findTop5ByUserIdOrderByCreatedAtDesc(USER_ID))
+                .thenReturn(List.of(storedSuggestion(LocalDateTime.now().minusDays(1))));
+
+        List<SuggestionResponse> result = service.getSuggestions(USER_ID);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getSuggestion()).isEqualTo("Stored suggestion");
+        verify(suggestionRepository, never()).save(any());
+    }
+}
