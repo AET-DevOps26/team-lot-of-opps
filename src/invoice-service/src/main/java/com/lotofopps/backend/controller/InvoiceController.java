@@ -1,5 +1,6 @@
 package com.lotofopps.backend.controller;
 
+import com.lotofopps.backend.dto.InvoiceRequest;
 import com.lotofopps.backend.dto.InvoiceResponse;
 import com.lotofopps.backend.model.Document;
 import com.lotofopps.backend.model.Invoice;
@@ -65,6 +66,43 @@ public class InvoiceController {
                 ? invoiceRepository.findByUserIdAndInvoiceDateYear(userId, invoiceYear, pageable).stream().map(InvoiceResponse::from).toList()
                 : invoiceRepository.findByUserId(userId, pageable).stream().map(InvoiceResponse::from).toList();
         return ResponseEntity.ok(results);
+    }
+
+    @PostMapping
+    @Operation(summary = "Manually create a new invoice", responses = {
+        @ApiResponse(responseCode = "201", description = "Created"),
+        @ApiResponse(responseCode = "400", description = "Bad request")
+    })
+    public ResponseEntity<InvoiceResponse> createInvoice(@RequestBody InvoiceRequest req, HttpServletRequest request) {
+        String userId = currentUserId(request);
+        Invoice invoice = new Invoice(req.getItemName(), req.getCompany(), req.getPrice());
+        invoice.setUserId(userId);
+        invoice.setCategory(req.getCategory());
+        invoice.setInvoiceDate(req.getInvoiceDate());
+        Invoice saved = invoiceRepository.save(invoice);
+        embeddingService.embedInvoice(saved);
+        return ResponseEntity.status(HttpStatus.CREATED).body(InvoiceResponse.from(saved));
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Update an existing invoice", responses = {
+        @ApiResponse(responseCode = "200", description = "Updated"),
+        @ApiResponse(responseCode = "403", description = "Forbidden"),
+        @ApiResponse(responseCode = "404", description = "Not found")
+    })
+    public ResponseEntity<InvoiceResponse> updateInvoice(@PathVariable Long id, @RequestBody InvoiceRequest req, HttpServletRequest request) {
+        String userId = currentUserId(request);
+        Invoice invoice = invoiceRepository.findById(id).orElse(null);
+        if (invoice == null) return ResponseEntity.notFound().build();
+        if (!userId.equals(invoice.getUserId())) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        invoice.setItemName(req.getItemName());
+        invoice.setCompany(req.getCompany());
+        invoice.setPrice(req.getPrice());
+        invoice.setCategory(req.getCategory());
+        invoice.setInvoiceDate(req.getInvoiceDate());
+        Invoice saved = invoiceRepository.save(invoice);
+        embeddingService.embedInvoice(saved);
+        return ResponseEntity.ok(InvoiceResponse.from(saved));
     }
 
     @DeleteMapping("/{id}")

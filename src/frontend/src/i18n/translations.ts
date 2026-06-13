@@ -118,6 +118,19 @@ export interface TranslationDict {
     minAmount: string
     maxAmount: string
     clearAmount: string
+    addInvoice: string
+    editInvoice: string
+    form: {
+      itemName: string
+      company: string
+      price: string
+      category: string
+      date: string
+      noCategory: string
+      save: string
+      cancel: string
+      saveFailed: string
+    }
     table: {
       date: string
       vendor: string
@@ -125,6 +138,7 @@ export interface TranslationDict {
       amount: string
       action: string
       viewReceipt: string
+      edit: string
       delete: string
     }
     pagination: string
@@ -292,6 +306,19 @@ const translations: Record<Language, TranslationDict> = {
       minAmount: 'Min Amount (€)',
       maxAmount: 'Max Amount (€)',
       clearAmount: 'Clear',
+      addInvoice: 'Add Invoice',
+      editInvoice: 'Edit Invoice',
+      form: {
+        itemName: 'Item Name',
+        company: 'Vendor',
+        price: 'Amount (€)',
+        category: 'Category',
+        date: 'Invoice Date',
+        noCategory: 'No category',
+        save: 'Save',
+        cancel: 'Cancel',
+        saveFailed: 'Failed to save invoice',
+      },
       table: {
         date: 'Date',
         vendor: 'Vendor',
@@ -299,6 +326,7 @@ const translations: Record<Language, TranslationDict> = {
         amount: 'Amount',
         action: 'Action',
         viewReceipt: 'View Receipt',
+        edit: 'Edit',
         delete: 'Delete',
       },
       pagination: 'Showing 1-5 of 24 invoices',
@@ -466,6 +494,19 @@ const translations: Record<Language, TranslationDict> = {
       minAmount: 'Min. Betrag (€)',
       maxAmount: 'Max. Betrag (€)',
       clearAmount: 'Zurücksetzen',
+      addInvoice: 'Rechnung hinzufügen',
+      editInvoice: 'Rechnung bearbeiten',
+      form: {
+        itemName: 'Bezeichnung',
+        company: 'Lieferant',
+        price: 'Betrag (€)',
+        category: 'Kategorie',
+        date: 'Rechnungsdatum',
+        noCategory: 'Keine Kategorie',
+        save: 'Speichern',
+        cancel: 'Abbrechen',
+        saveFailed: 'Rechnung konnte nicht gespeichert werden',
+      },
       table: {
         date: 'Datum',
         vendor: 'Lieferant',
@@ -473,6 +514,7 @@ const translations: Record<Language, TranslationDict> = {
         amount: 'Betrag',
         action: 'Aktion',
         viewReceipt: 'Beleg ansehen',
+        edit: 'Bearbeiten',
         delete: 'Löschen',
       },
       pagination: '1–5 von 24 Rechnungen',
