@@ -14,6 +14,7 @@ from app.categories import InvoiceCategory
 logger = logging.getLogger(__name__)
 
 INVOICE_SERVICE_URL = os.getenv("INVOICE_SERVICE_URL", "http://invoice-service:8080")
+LLM_API_KEY = os.getenv("LLM_API_KEY", "EMPTY")
 
 CATEGORY_SUGGESTIONS: dict[str, str] = {
     "WEGE_ZUR_ARBEIT": "Tankquittungen, Bahntickets oder ÖPNV-Monatskarten für den Arbeitsweg",
@@ -179,7 +180,7 @@ def _build_agent(user_id: str, referenced: list[dict]):
     llm = ChatOpenAI(
         model=os.getenv("LLM_MODEL", "google/gemma-4-e2b"),
         base_url=f"{vllm_url}/v1",
-        api_key="EMPTY",
+        api_key=LLM_API_KEY,
         temperature=0.1,
         timeout=120,
     )

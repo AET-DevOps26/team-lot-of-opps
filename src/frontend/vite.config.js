@@ -9,11 +9,17 @@ var __assign = (this && this.__assign) || function () {
     };
     return __assign.apply(this, arguments);
 };
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 var apiTarget = process.env.VITE_API_TARGET;
 export default defineConfig({
     plugins: [react()],
+    test: {
+        environment: 'jsdom',
+        globals: true,
+        setupFiles: ['./tests/setup.ts'],
+        include: ['tests/**/*.test.{ts,tsx}'],
+    },
     server: __assign({ port: 5173, open: true }, (apiTarget && {
         proxy: {
             '/api': {

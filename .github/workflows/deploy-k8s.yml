@@ -1,0 +1,155 @@
+name: Build and Deploy to Kubernetes
+
+# On merge to main: build & push every service image, then (only if all builds
+# succeed) deploy the new images to the AET cluster with Helm.
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  ORG: aet-devops26/taxforward
+
+jobs:
+  build:
+    name: Build ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - service: frontend
+            context: ./src/frontend
+            dockerfile: ./src/frontend/Dockerfile
+          - service: auth-service
+            context: ./src/auth-service
+            dockerfile: ./src/auth-service/Dockerfile
+          - service: invoice-service
+            context: ./src/invoice-service
+            dockerfile: ./src/invoice-service/Dockerfile
+          - service: llm-chat
+            context: ./src/llm-chat
+            dockerfile: ./src/llm-chat/Dockerfile
+          - service: suggestions-service
+            context: ./src/suggestions-service
+            dockerfile: ./src/suggestions-service/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ORG }}/${{ matrix.service }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest
+
+      # Vite bakes env vars into the bundle at build time, so the frontend
+      # image needs the Firebase config as build args.
+      - name: Set frontend build args
+        id: build_args
+        run: |
+          if [ "${{ matrix.service }}" = "frontend" ]; then
+            {
+              echo 'args<<EOF'
+              echo 'VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }}'
+              echo 'VITE_FIREBASE_AUTH_DOMAIN=${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}'
+              echo 'VITE_FIREBASE_PROJECT_ID=${{ secrets.VITE_FIREBASE_PROJECT_ID }}'
+              echo 'VITE_FIREBASE_STORAGE_BUCKET=${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}'
+              echo 'VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}'
+              echo 'VITE_FIREBASE_APP_ID=${{ secrets.VITE_FIREBASE_APP_ID }}'
+              echo 'EOF'
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo 'args=' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: ${{ steps.build_args.outputs.args }}
+
+  deploy:
+    name: Helm deploy to AET cluster
+    runs-on: ubuntu-latest
+    # Wait for every image in the build matrix; deploy only if they all pushed.
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v3
+        with:
+          version: v3.14.0
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Create namespace
+        run: kubectl create namespace taxforward --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create GHCR image pull secret
+        run: |
+          kubectl create secret docker-registry ghcr-pull-secret \
+            --namespace taxforward \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.GITHUB_TOKEN }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Write Firebase service account file
+        run: echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" | base64 -d > firebase-sa.json
+
+      - name: Helm upgrade --install
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | head -c 7)
+          REGISTRY=ghcr.io/aet-devops26/taxforward
+
+          helm upgrade --install taxforward ./deployment/helm \
+            --namespace taxforward \
+            --atomic \
+            --timeout 10m \
+            -f deployment/helm/values.yaml \
+            --set llm.url="${{ vars.LLM_URL }}" \
+            --set llm.model="${{ vars.LLM_MODEL }}" \
+            --set llm.apiKey="${{ secrets.LLM_API_KEY }}" \
+            --set firebase.projectId="${{ secrets.FIREBASE_PROJECT_ID }}" \
+            --set dbInvoice.password="${{ secrets.DB_INVOICE_PASSWORD }}" \
+            --set dbLlmChat.password="${{ secrets.DB_LLM_CHAT_PASSWORD }}" \
+            --set dbSuggestions.password="${{ secrets.DB_SUGGESTIONS_PASSWORD }}" \
+            --set images.authService.repository="${REGISTRY}/auth-service" \
+            --set images.authService.tag="sha-${SHORT_SHA}" \
+            --set images.invoiceService.repository="${REGISTRY}/invoice-service" \
+            --set images.invoiceService.tag="sha-${SHORT_SHA}" \
+            --set images.llmChat.repository="${REGISTRY}/llm-chat" \
+            --set images.llmChat.tag="sha-${SHORT_SHA}" \
+            --set images.frontend.repository="${REGISTRY}/frontend" \
+            --set images.frontend.tag="sha-${SHORT_SHA}" \
+            --set images.suggestionsService.repository="${REGISTRY}/suggestions-service" \
+            --set images.suggestionsService.tag="sha-${SHORT_SHA}" \
+            --set-file firebase.serviceAccountJson=firebase-sa.json
+
+      - name: Clean up Firebase service account
+        if: always()
+        run: rm -f firebase-sa.json

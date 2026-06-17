@@ -1,0 +1,16 @@
+apiVersion: v2
+name: tax-forward
+description: Full-stack AI invoice processing application (microservices behind Traefik with Firebase auth)
+type: application
+version: 0.2.0
+appVersion: "latest"
+keywords:
+  - ai
+  - invoice
+  - spring-boot
+  - fastapi
+  - react
+  - traefik
+  - firebase
+maintainers:
+  - name: AET-DevOps26

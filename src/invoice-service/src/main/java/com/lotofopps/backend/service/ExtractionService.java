@@ -10,6 +10,7 @@ import com.lotofopps.backend.repository.InvoiceRepository;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -91,6 +92,7 @@ Use the VISUAL LAYOUT to identify sections:
 
     private final String llmUrl;
     private final String llmModel;
+    private final String llmApiKey;
     private final InvoiceRepository invoiceRepository;
     private final RestTemplate restTemplate;
     private final LlmChatEmbeddingService embeddingService;
@@ -98,11 +100,13 @@ Use the VISUAL LAYOUT to identify sections:
     public ExtractionService(
             @Value("${llm.url}") String llmUrl,
             @Value("${llm.model}") String llmModel,
+            @Value("${llm.api-key}") String llmApiKey,
             InvoiceRepository invoiceRepository,
             RestTemplate restTemplate,
             LlmChatEmbeddingService embeddingService) {
         this.llmUrl = llmUrl.endsWith("/") ? llmUrl.substring(0, llmUrl.length() - 1) : llmUrl;
         this.llmModel = llmModel;
+        this.llmApiKey = llmApiKey;
         this.invoiceRepository = invoiceRepository;
         this.restTemplate = restTemplate;
         this.embeddingService = embeddingService;
@@ -140,14 +144,37 @@ Use the VISUAL LAYOUT to identify sections:
         boolean isPdf = "application/pdf".equals(contentType)
                 || (filename != null && filename.toLowerCase().endsWith(".pdf"));
 
-        List<String[]> images;
         if (isPdf) {
-            images = pdfToBase64Images(fileBytes);
+            String text = pdfToText(fileBytes);
+            if (text != null && text.length() > 50) {
+                log.info("Extracted {} chars of text from PDF, using text prompt", text.length());
+                return callLlmText(text);
+            }
+            log.info("PDF has no extractable text, falling back to vision");
+            return callLlmVision(pdfToBase64Images(fileBytes));
         } else {
             String mime = (contentType != null && contentType.startsWith("image/")) ? contentType : "image/png";
-            images = Collections.singletonList(new String[]{mime, Base64.getEncoder().encodeToString(fileBytes)});
+            List<String[]> images = Collections.singletonList(new String[]{mime, Base64.getEncoder().encodeToString(fileBytes)});
+            return callLlmVision(images);
         }
-        return callLlmVision(images);
+    }
+
+    private String pdfToText(byte[] pdfBytes) {
+        try (PDDocument doc = Loader.loadPDF(pdfBytes)) {
+            return new PDFTextStripper().getText(doc);
+        } catch (Exception e) {
+            log.warn("PDF text extraction failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private List<ExtractionItem> callLlmText(String text) {
+        String prompt = "You are a German tax document classifier. Extract invoice line items from the text below and return valid JSON. The invoice may be in German or English.\n"
+                + ITEM_FIELDS;
+
+        List<Map<String, Object>> messageContent = List.of(
+                Map.of("type", "text", "text", prompt + "\n\nINVOICE TEXT:\n" + text));
+        return callLlm(messageContent);
     }
 
     private List<String[]> pdfToBase64Images(byte[] pdfBytes) throws IOException {
@@ -200,7 +227,7 @@ Use the VISUAL LAYOUT to identify sections:
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Authorization", "Bearer EMPTY");
+        headers.set("Authorization", "Bearer " + llmApiKey);
 
         for (int attempt = 0; attempt < 3; attempt++) {
             try {
@@ -225,7 +252,8 @@ Use the VISUAL LAYOUT to identify sections:
                     continue;
                 }
 
-                log.info("LLM returned {} chars", responseText.length());
+                log.info("LLM returned {} chars: {}", responseText.length(),
+                        responseText.length() <= 200 ? responseText : responseText.substring(0, 200) + "...");
                 JsonNode itemsNode = MAPPER.readTree(responseText).path("items");
                 List<ExtractionItem> result = new ArrayList<>();
                 for (JsonNode node : itemsNode) {

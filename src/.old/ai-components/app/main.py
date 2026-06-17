@@ -290,7 +290,7 @@ Give 2-4 specific, actionable suggestions. Reference actual items from the invoi
 
     return {"answer": suggestion_text}
 
-@app.get("/api/suggestions")
+@app.get("/suggestions")
 async def get_suggestions(user_id: str):
     async with AsyncSessionLocal() as db:
         result = await db.execute(
