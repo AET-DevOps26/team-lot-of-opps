@@ -18,12 +18,21 @@ spec:
         app.kubernetes.io/name: frontend
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       imagePullSecrets:
         - name: ghcr-pull-secret
       containers:
         - name: frontend
           image: "{{ .Values.images.frontend.repository }}:{{ .Values.images.frontend.tag }}"
           imagePullPolicy: {{ .Values.images.frontend.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE"]
           ports:
             - name: http
               containerPort: 80

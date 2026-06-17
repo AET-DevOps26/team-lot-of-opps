@@ -125,7 +125,6 @@ jobs:
 
           helm upgrade --install taxforward ./deployment/helm \
             --namespace taxforward \
-            --atomic \
             --timeout 10m \
             -f deployment/helm/values.yaml \
             --set llm.url="${{ vars.LLM_URL }}" \
@@ -146,6 +145,15 @@ jobs:
             --set images.suggestionsService.repository="${REGISTRY}/suggestions-service" \
             --set images.suggestionsService.tag="sha-${SHORT_SHA}" \
             --set-file firebase.serviceAccountJson=firebase-sa.json
+
+      - name: Print application URL
+        run: |
+          NODE_PORT=$(kubectl get svc taxforward-tax-forward-traefik \
+            --namespace taxforward \
+            -o jsonpath='{.spec.ports[0].nodePort}')
+          NODE_IP=$(kubectl get nodes \
+            -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
+          echo "App reachable at: http://${NODE_IP}:${NODE_PORT}"
 
       - name: Clean up Firebase service account
         if: always()
