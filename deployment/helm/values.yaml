@@ -26,7 +26,7 @@ traefik:
   logLevel: INFO
   service:
     type: NodePort
-    nodePort: 30080
+    nodePort: ""
 
 llm:
   url: ""
@@ -67,72 +67,81 @@ persistence:
   dbSuggestions:
     size: "5Gi"
 
+# ─── TLS / Ingress ───────────────────────────────────────────────────────────
+# Cluster uses nginx ingress class + cert-manager with letsencrypt-prod.
+# Confirm hostname with tutor before first deploy.
+tls:
+  host: "taxforward-devops-ss26.stud.k8s.aet.cit.tum.de"
+  clusterIssuer: "letsencrypt-prod"
+
 # ─── Resource limits / requests ──────────────────────────────────────────────
+# Total limits must stay within the Rancher project quota: 4 vCPU / 6 Gi.
+# Current totals: CPU 3900m, memory 5248Mi.
 resources:
   traefik:
     requests:
       cpu: "50m"
       memory: "64Mi"
     limits:
-      cpu: "200m"
+      cpu: "150m"
       memory: "128Mi"
   authService:
     requests:
       cpu: "50m"
       memory: "128Mi"
     limits:
-      cpu: "250m"
+      cpu: "200m"
       memory: "256Mi"
   invoiceService:
     requests:
       cpu: "250m"
       memory: "512Mi"
     limits:
-      cpu: "1000m"
-      memory: "1Gi"
+      cpu: "700m"
+      memory: "768Mi"
   # llm-chat loads a sentence-transformers embedding model into memory.
   llmChat:
     requests:
       cpu: "250m"
       memory: "1Gi"
     limits:
-      cpu: "1000m"
+      cpu: "800m"
       memory: "2Gi"
   suggestionsService:
     requests:
       cpu: "250m"
       memory: "512Mi"
     limits:
-      cpu: "1000m"
-      memory: "1Gi"
+      cpu: "700m"
+      memory: "768Mi"
   frontend:
     requests:
       cpu: "50m"
       memory: "64Mi"
     limits:
-      cpu: "200m"
+      cpu: "150m"
       memory: "128Mi"
   dbInvoice:
     requests:
       cpu: "100m"
       memory: "256Mi"
     limits:
-      cpu: "500m"
-      memory: "512Mi"
+      cpu: "400m"
+      memory: "384Mi"
   dbLlmChat:
     requests:
       cpu: "100m"
       memory: "256Mi"
     limits:
-      cpu: "500m"
-      memory: "512Mi"
+      cpu: "400m"
+      memory: "384Mi"
   dbSuggestions:
     requests:
       cpu: "100m"
       memory: "256Mi"
     limits:
-      cpu: "500m"
-      memory: "512Mi"
+      cpu: "400m"
+      memory: "384Mi"
 
 # ─── Replica counts ──────────────────────────────────────────────────────────
 replicaCount:

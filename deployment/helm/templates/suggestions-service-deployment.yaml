@@ -18,12 +18,20 @@ spec:
         app.kubernetes.io/name: suggestions-service
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       imagePullSecrets:
         - name: ghcr-pull-secret
       containers:
         - name: suggestions-service
           image: "{{ .Values.images.suggestionsService.repository }}:{{ .Values.images.suggestionsService.tag }}"
           imagePullPolicy: {{ .Values.images.suggestionsService.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: http
               containerPort: 8083

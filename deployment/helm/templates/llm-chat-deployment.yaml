@@ -18,12 +18,20 @@ spec:
         app.kubernetes.io/name: llm-chat
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       imagePullSecrets:
         - name: ghcr-pull-secret
       containers:
         - name: llm-chat
           image: "{{ .Values.images.llmChat.repository }}:{{ .Values.images.llmChat.tag }}"
           imagePullPolicy: {{ .Values.images.llmChat.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: http
               containerPort: 8081
