@@ -1,10 +1,9 @@
 name: Build and Deploy to Kubernetes
 
-# On merge to main: build & push every service image, then (only if all builds
-# succeed) deploy the new images to the AET cluster with Helm.
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -125,6 +124,7 @@ jobs:
 
           helm upgrade --install taxforward ./deployment/helm \
             --namespace taxforward \
+            --wait \
             --timeout 10m \
             -f deployment/helm/values.yaml \
             --set llm.url="${{ vars.LLM_URL }}" \
@@ -145,6 +145,16 @@ jobs:
             --set images.suggestionsService.repository="${REGISTRY}/suggestions-service" \
             --set images.suggestionsService.tag="sha-${SHORT_SHA}" \
             --set-file firebase.serviceAccountJson=firebase-sa.json
+
+      - name: Diagnose on failure
+        if: failure()
+        run: |
+          echo "===== PVC ====="; kubectl get pvc -n taxforward -o wide || true
+          kubectl describe pvc -n taxforward || true
+          echo "===== PODS ====="; kubectl get pods -n taxforward -o wide || true
+          kubectl describe pods -n taxforward || true
+          echo "===== EVENTS ====="; kubectl get events -n taxforward --sort-by=.lastTimestamp || true
+          echo "===== HELM ====="; helm status taxforward -n taxforward || true
 
       - name: Print application URL
         run: |

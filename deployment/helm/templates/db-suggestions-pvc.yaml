@@ -6,6 +6,9 @@ metadata:
     {{- include "taxforward.labels" . | nindent 4 }}
     app.kubernetes.io/name: db-suggestions
 spec:
+  {{- with .Values.persistence.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
   accessModes:
     - ReadWriteOnce
   resources:
