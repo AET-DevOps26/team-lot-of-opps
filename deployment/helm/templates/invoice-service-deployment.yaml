@@ -18,12 +18,20 @@ spec:
         app.kubernetes.io/name: invoice-service
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       imagePullSecrets:
         - name: ghcr-pull-secret
       containers:
         - name: invoice-service
           image: "{{ .Values.images.invoiceService.repository }}:{{ .Values.images.invoiceService.tag }}"
           imagePullPolicy: {{ .Values.images.invoiceService.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: http
               containerPort: 8080
