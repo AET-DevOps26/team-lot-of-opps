@@ -4,7 +4,6 @@ services:
     container_name: traefik
     ports:
       - "80:80"
-      - "8090:8080"
     volumes:
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
@@ -13,55 +12,22 @@ services:
     restart: unless-stopped
 
   auth-service:
-    build:
-      context: ./auth-service
+    image: ${REGISTRY}/auth-service:${IMAGE_TAG}
+    platform: linux/amd64
     container_name: auth-service
     environment:
       - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json
     volumes:
-      - ./auth-service/devops-25c9a-firebase-adminsdk-fbsvc-d15365a6ac.json:/app/firebase-service-account.json:ro
+      - ./firebase-sa.json:/app/firebase-service-account.json:ro
     networks:
       - network
-    restart: unless-stopped
-
-
-  llm-chat:
-    platform: linux/amd64
-    build:
-      context: ./llm-chat
-      dockerfile: Dockerfile.dev
-    container_name: llm-chat
-    ports:
-      - "8082:8081"
-    environment:
-      - LLM_URL=${LLM_URL}
-      - LLM_MODEL=${LLM_MODEL}
-      - LLM_API_KEY=${LLM_API_KEY}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${DB_LLM_CHAT_PASSWORD}@db-llm-chat:5432/llm_db
-    volumes:
-      - ./llm-chat/app:/app/app
-    networks:
-      - network
-    depends_on:
-      db-llm-chat:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 120s
     restart: unless-stopped
 
   invoice-service:
+    image: ${REGISTRY}/invoice-service:${IMAGE_TAG}
     platform: linux/amd64
-    build:
-      context: ./invoice-service
-      dockerfile: Dockerfile.dev
     container_name: invoice-service
-    ports:
-      - "8080:8080"
     environment:
       # SPRING_DATASOURCE_URL is per-service topology (points at this service's
       # own DB), so it stays a literal rather than a shared ${SPRING_DATASOURCE_URL}.
@@ -74,8 +40,6 @@ services:
       - LLM_MODEL=${LLM_MODEL}
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_CHAT_URL=${LLM_CHAT_URL}
-    volumes:
-      - ./invoice-service/src:/app/src
     networks:
       - network
     healthcheck:
@@ -91,14 +55,32 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  suggestions-service:
+  llm-chat:
+    image: ${REGISTRY}/llm-chat:${IMAGE_TAG}
     platform: linux/amd64
-    build:
-      context: ./suggestions-service
-      dockerfile: Dockerfile.dev
+    container_name: llm-chat
+    environment:
+      - LLM_URL=${LLM_URL}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${DB_LLM_CHAT_PASSWORD}@db-llm-chat:5432/llm_db
+    networks:
+      - network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    depends_on:
+      db-llm-chat:
+        condition: service_healthy
+    restart: unless-stopped
+
+  suggestions-service:
+    image: ${REGISTRY}/suggestions-service:${IMAGE_TAG}
+    platform: linux/amd64
     container_name: suggestions-service
-    ports:
-      - "8083:8083"
     environment:
       # SPRING_DATASOURCE_URL is per-service topology (points at this service's
       # own DB), so it stays a literal rather than a shared ${SPRING_DATASOURCE_URL}.
@@ -110,8 +92,6 @@ services:
       - LLM_API_KEY=${LLM_API_KEY}
       - INVOICE_SERVICE_URL=${INVOICE_SERVICE_URL}
       - SUGGESTIONS_INVOICE_LIMIT=${SUGGESTIONS_INVOICE_LIMIT}
-    volumes:
-      - ./suggestions-service/src:/app/src
     networks:
       - network
     healthcheck:
@@ -125,6 +105,16 @@ services:
         condition: service_healthy
       invoice-service:
         condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: ${REGISTRY}/frontend:${IMAGE_TAG}
+    platform: linux/amd64
+    container_name: frontend
+    networks:
+      - network
+    depends_on:
+      - traefik
     restart: unless-stopped
 
   db-invoice:
@@ -182,33 +172,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
-
-  frontend:
-    platform: linux/amd64
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.dev
-    container_name: frontend
-    ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
-      - VITE_API_TARGET=${VITE_API_TARGET}
-      - VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}
-      - VITE_FIREBASE_AUTH_DOMAIN=${VITE_FIREBASE_AUTH_DOMAIN}
-      - VITE_FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID}
-      - VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET}
-      - VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID}
-      - VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID}
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    networks:
-      - network
-    depends_on:
-      invoice-service:
-        condition: service_healthy
     restart: unless-stopped
 
 volumes:

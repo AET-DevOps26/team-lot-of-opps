@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "taxforward.fullname" . }}-traefik
+  labels:
+    {{- include "taxforward.labels" . | nindent 4 }}
+    app.kubernetes.io/name: traefik
+spec:
+  replicas: {{ .Values.replicaCount.traefik }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        checksum/traefik-config: {{ include (print $.Template.BasePath "/traefik-configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "taxforward.labels" . | nindent 8 }}
+        app.kubernetes.io/name: traefik
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: traefik
+          image: "traefik:{{ .Values.traefik.imageTag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            {{- if .Values.traefik.dashboard }}
+            - name: dashboard
+              containerPort: 8080
+              protocol: TCP
+            {{- end }}
+          volumeMounts:
+            - name: traefik-config
+              mountPath: /etc/traefik/traefik.yml
+              subPath: traefik.yml
+              readOnly: true
+            - name: traefik-config
+              mountPath: /etc/traefik/dynamic.yml
+              subPath: dynamic.yml
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources.traefik | nindent 12 }}
+      volumes:
+        - name: traefik-config
+          configMap:
+            name: {{ include "taxforward.fullname" . }}-traefik-config

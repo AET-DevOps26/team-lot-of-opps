@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "taxforward.fullname" . }}-traefik-config
+  labels:
+    {{- include "taxforward.labels" . | nindent 4 }}
+    app.kubernetes.io/name: traefik
+data:
+  traefik.yml: |
+    entryPoints:
+      web:
+        address: ":80"
+
+    ping:
+      entryPoint: web
+
+    providers:
+      file:
+        filename: /etc/traefik/dynamic.yml
+        watch: true
+
+    {{- if .Values.traefik.dashboard }}
+    api:
+      dashboard: true
+      insecure: true
+    {{- end }}
+
+    log:
+      level: {{ .Values.traefik.logLevel }}
+
+  dynamic.yml: |
+    http:
+      middlewares:
+        firebase-auth:
+          forwardAuth:
+            address: "http://{{ include "taxforward.fullname" . }}-auth-service:8000/verify"
+            authResponseHeaders:
+              - "X-User-Sub"
+
+      routers:
+        invoice-router:
+          rule: "PathPrefix(`/api/documents`) || PathPrefix(`/api/invoices`)"
+          entryPoints:
+            - web
+          middlewares:
+            - firebase-auth
+          service: invoice-svc
+
+        llm-chat-router:
+          rule: "PathPrefix(`/api/agent`)"
+          entryPoints:
+            - web
+          middlewares:
+            - firebase-auth
+          service: llm-chat-svc
+
+        suggestions-router:
+          rule: "PathPrefix(`/api/suggestions`)"
+          entryPoints:
+            - web
+          middlewares:
+            - firebase-auth
+          service: suggestions-svc
+
+        # Catch-all: serves the SPA. Default rule-length priority keeps the
+        # /api/* routers winning over this one. No auth middleware — the
+        # frontend is public; auth happens client-side via Firebase.
+        frontend-router:
+          rule: "PathPrefix(`/`)"
+          entryPoints:
+            - web
+          service: frontend-svc
+
+      services:
+        invoice-svc:
+          loadBalancer:
+            servers:
+              - url: "http://{{ include "taxforward.fullname" . }}-invoice-service:8080"
+
+        llm-chat-svc:
+          loadBalancer:
+            servers:
+              - url: "http://{{ include "taxforward.fullname" . }}-llm-chat:8081"
+
+        suggestions-svc:
+          loadBalancer:
+            servers:
+              - url: "http://{{ include "taxforward.fullname" . }}-suggestions-service:8083"
+
+        frontend-svc:
+          loadBalancer:
+            servers:
+              - url: "http://{{ include "taxforward.fullname" . }}-frontend:80"

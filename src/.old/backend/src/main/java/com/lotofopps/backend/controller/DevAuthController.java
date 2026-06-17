@@ -4,7 +4,7 @@ import com.lotofopps.backend.dto.AuthResponse;
 import com.lotofopps.backend.model.User;
 import com.lotofopps.backend.repository.UserRepository;
 import com.lotofopps.backend.service.JwtService;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
-@Profile("dev")
+@ConditionalOnProperty(name = "DEV_MODE", havingValue = "true")
 public class DevAuthController {
 
     private static final String DEV_SUB = "mock-sub-001";

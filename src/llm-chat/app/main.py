@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 LLM_URL = os.getenv("LLM_URL", "http://host.docker.internal:1234")
 LLM_MODEL = os.getenv("LLM_MODEL", "google/gemma-4-e2b")
+LLM_API_KEY = os.getenv("LLM_API_KEY", "EMPTY")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,7 +32,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_client = AsyncOpenAI(base_url=f"{LLM_URL}/v1", api_key="EMPTY", timeout=120)
+_client = AsyncOpenAI(base_url=f"{LLM_URL}/v1", api_key=LLM_API_KEY, timeout=120)
 
 
 class EmbedRequest(BaseModel):

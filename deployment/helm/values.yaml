@@ -1,0 +1,144 @@
+images:
+  authService:
+    repository: "ghcr.io/aet-devops26/team-lot-of-opps/auth-service"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  invoiceService:
+    repository: "ghcr.io/aet-devops26/team-lot-of-opps/invoice-service"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  llmChat:
+    repository: "ghcr.io/aet-devops26/team-lot-of-opps/llm-chat"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: "ghcr.io/aet-devops26/team-lot-of-opps/frontend"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  suggestionsService:
+    repository: "ghcr.io/aet-devops26/team-lot-of-opps/suggestions-service"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+traefik:
+  imageTag: "v3.3"
+  dashboard: false
+  logLevel: INFO
+  service:
+    type: NodePort
+    nodePort: 30080
+
+llm:
+  url: ""
+  model: ""
+  apiKey: ""
+
+firebase:
+  projectId: ""
+  serviceAccountJson: ""
+
+invoice:
+  storageLocation: "/app/uploads"
+  uploadMaxSizeBytes: "10485760"
+suggestions:
+  invoiceLimit: "5"
+
+# ─── Database configuration ─────────────────────────────────────────────────
+# Passwords are injected from the environment at deploy time (see llm note).
+dbInvoice:
+  name: invoice_db
+  user: appuser
+  password: ""
+dbLlmChat:
+  name: llm_db
+  user: appuser
+  password: ""
+dbSuggestions:
+  name: suggestions_db
+  user: appuser
+  password: ""
+
+# ─── Persistent storage ──────────────────────────────────────────────────────
+persistence:
+  dbInvoice:
+    size: "5Gi"
+  dbLlmChat:
+    size: "5Gi"
+  dbSuggestions:
+    size: "5Gi"
+
+# ─── Resource limits / requests ──────────────────────────────────────────────
+resources:
+  traefik:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+  authService:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+  invoiceService:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  # llm-chat loads a sentence-transformers embedding model into memory.
+  llmChat:
+    requests:
+      cpu: "250m"
+      memory: "1Gi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+  suggestionsService:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  frontend:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+  dbInvoice:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  dbLlmChat:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  dbSuggestions:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# ─── Replica counts ──────────────────────────────────────────────────────────
+replicaCount:
+  traefik: 1
+  authService: 1
+  invoiceService: 1
+  llmChat: 1
+  suggestionsService: 1
+  frontend: 1

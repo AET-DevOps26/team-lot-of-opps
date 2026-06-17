@@ -5,13 +5,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 project_id = os.environ['FIREBASE_PROJECT_ID']
-emulator_host = os.environ.get('FIREBASE_AUTH_EMULATOR_HOST')
-
-if emulator_host:
-    app_fb = firebase_admin.initialize_app(options={'projectId': project_id})
-else:
-    cred = credentials.Certificate(os.environ['GOOGLE_APPLICATION_CREDENTIALS'])
-    app_fb = firebase_admin.initialize_app(cred, options={'projectId': project_id})
+cred = credentials.Certificate(os.environ['GOOGLE_APPLICATION_CREDENTIALS'])
+app_fb = firebase_admin.initialize_app(cred, options={'projectId': project_id})
 
 app = FastAPI()
 

@@ -49,6 +49,7 @@ Give 2-4 specific, actionable suggestions. Reference actual items from the invoi
 
     private final String llmUrl;
     private final String llmModel;
+    private final String llmApiKey;
     private final int invoiceLimit;
     private final SuggestionRepository suggestionRepository;
     private final InvoiceClient invoiceClient;
@@ -57,12 +58,14 @@ Give 2-4 specific, actionable suggestions. Reference actual items from the invoi
     public SuggestionService(
             @Value("${llm.url}") String llmUrl,
             @Value("${llm.model}") String llmModel,
+            @Value("${llm.api-key}") String llmApiKey,
             @Value("${suggestions.invoice-limit:5}") int invoiceLimit,
             SuggestionRepository suggestionRepository,
             InvoiceClient invoiceClient,
             RestTemplate restTemplate) {
         this.llmUrl = llmUrl.endsWith("/") ? llmUrl.substring(0, llmUrl.length() - 1) : llmUrl;
         this.llmModel = llmModel;
+        this.llmApiKey = llmApiKey;
         this.invoiceLimit = invoiceLimit;
         this.suggestionRepository = suggestionRepository;
         this.invoiceClient = invoiceClient;
@@ -136,7 +139,7 @@ Give 2-4 specific, actionable suggestions. Reference actual items from the invoi
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Authorization", "Bearer EMPTY");
+        headers.set("Authorization", "Bearer " + llmApiKey);
 
         ResponseEntity<String> response = restTemplate.exchange(
                 llmUrl + "/v1/chat/completions", HttpMethod.POST,

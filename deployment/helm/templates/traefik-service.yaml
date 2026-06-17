@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "taxforward.fullname" . }}-traefik
+  labels:
+    {{- include "taxforward.labels" . | nindent 4 }}
+    app.kubernetes.io/name: traefik
+spec:
+  type: {{ .Values.traefik.service.type }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+      {{- if and (eq .Values.traefik.service.type "NodePort") .Values.traefik.service.nodePort }}
+      nodePort: {{ .Values.traefik.service.nodePort }}
+      {{- end }}
+  selector:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: {{ .Release.Name }}
