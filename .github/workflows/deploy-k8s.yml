@@ -106,9 +106,6 @@ jobs:
           echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
 
-      - name: Create namespace
-        run: kubectl create namespace taxforward --dry-run=client -o yaml | kubectl apply -f -
-
       - name: Create GHCR image pull secret
         run: |
           kubectl create secret docker-registry ghcr-pull-secret \
