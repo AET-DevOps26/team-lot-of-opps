@@ -45,7 +45,7 @@ Analyze the uploaded invoices and identify missing documents based on these Germ
 - Conference registration → travel + hotel receipts
 - Business meal → names of attendees and business purpose
 
-Give 2-4 specific, actionable suggestions. Reference actual items from the invoices where possible (e.g., "You uploaded a hotel in Berlin — do you have the train or flight receipt?"). Be concise.""";
+Give exactly 2 specific, actionable suggestions. Keep each suggestion to a single short sentence (max ~20 words). Reference an actual item from the invoices where possible (e.g., "You uploaded a hotel in Berlin — do you have the train or flight receipt?"). Return them as a short list, nothing else.""";
 
     private final String llmUrl;
     private final String llmModel;
@@ -135,7 +135,7 @@ Give 2-4 specific, actionable suggestions. Reference actual items from the invoi
                 Map.of("role", "system", "content", SYSTEM_PROMPT),
                 Map.of("role", "user", "content",
                         "Here are the user's uploaded invoices:\n" + context
-                                + "\n\nWhat tax documents are missing? Give specific suggestions.")));
+                                + "\n\nWhat tax documents are missing? Give exactly 2 short suggestions.")));
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
