@@ -1,11 +1,15 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+
+ENV HF_HOME=/opt/hf
+
 COPY requirements.txt .
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir -r requirements.txt
-RUN python -c "from langchain_huggingface import HuggingFaceEmbeddings; HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')"
+RUN python -c "from langchain_huggingface import HuggingFaceEmbeddings; HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')" \
+    && chmod -R a+rX /opt/hf
 
 COPY app/ ./app/
 EXPOSE 8081

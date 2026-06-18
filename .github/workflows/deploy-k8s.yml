@@ -124,7 +124,7 @@ jobs:
 
           helm upgrade --install taxforward ./deployment/helm \
             --namespace taxforward \
-            --wait \
+            --atomic \
             --timeout 10m \
             -f deployment/helm/values.yaml \
             --set llm.url="${{ vars.LLM_URL }}" \
