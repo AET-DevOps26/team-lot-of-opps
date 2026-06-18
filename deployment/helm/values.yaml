@@ -60,6 +60,7 @@ dbSuggestions:
 
 # ─── Persistent storage ──────────────────────────────────────────────────────
 persistence:
+  storageClassName: "csi-rbd-sc"   # cluster default; set explicitly to avoid ambiguity
   dbInvoice:
     size: "5Gi"
   dbLlmChat:
