@@ -2,7 +2,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-ENV HF_HOME=/opt/hf
+ENV HF_HOME=/opt/hf \
+    HOME=/opt/hf \
+    USER=appuser
 
 COPY requirements.txt .
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
