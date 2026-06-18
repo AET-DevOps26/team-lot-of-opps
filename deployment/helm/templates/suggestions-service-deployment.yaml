@@ -11,6 +11,8 @@ spec:
     matchLabels:
       app.kubernetes.io/name: suggestions-service
       app.kubernetes.io/instance: {{ .Release.Name }}
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
