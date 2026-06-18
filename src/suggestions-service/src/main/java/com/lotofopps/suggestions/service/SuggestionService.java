@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,7 +46,7 @@ Analyze the uploaded invoices and identify missing documents based on these Germ
 - Conference registration → travel + hotel receipts
 - Business meal → names of attendees and business purpose
 
-Give exactly 2 specific, actionable suggestions. Keep each suggestion to a single short sentence (max ~20 words). Reference an actual item from the invoices where possible (e.g., "You uploaded a hotel in Berlin — do you have the train or flight receipt?"). Return them as a short list, nothing else.""";
+Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<first>", "<second>"]}. Each suggestion must be a single short sentence (max ~20 words) that references an actual item from the invoices where possible (e.g., "You uploaded a hotel in Berlin — do you have the train or flight receipt?"). Output only the JSON object.""";
 
     private final String llmUrl;
     private final String llmModel;
@@ -82,7 +83,7 @@ Give exactly 2 specific, actionable suggestions. Keep each suggestion to a singl
             generateAndStore(userId, invoices);
         }
 
-        return suggestionRepository.findTop5ByUserIdOrderByCreatedAtDesc(userId)
+        return suggestionRepository.findByUserIdOrderByIdAsc(userId)
                 .stream().map(SuggestionResponse::from).toList();
     }
 
@@ -105,9 +106,12 @@ Give exactly 2 specific, actionable suggestions. Keep each suggestion to a singl
 
     private void generateAndStore(String userId, List<InvoiceItem> invoices) {
         try {
-            String text = callLlm(invoices);
-            if (text != null && !text.isBlank()) {
-                suggestionRepository.save(new Suggestion(userId, text.strip()));
+            List<String> suggestions = callLlm(invoices);
+            if (!suggestions.isEmpty()) {
+                // Replace the previous set so each suggestion is its own row and
+                // stale suggestions don't accumulate.
+                suggestionRepository.deleteByUserId(userId);
+                suggestions.forEach(text -> suggestionRepository.save(new Suggestion(userId, text)));
             }
         } catch (Exception e) {
             // Fall back to previously stored suggestions; fail only if there are none.
@@ -119,7 +123,8 @@ Give exactly 2 specific, actionable suggestions. Keep each suggestion to a singl
         }
     }
 
-    private String callLlm(List<InvoiceItem> invoices) throws Exception {
+    /** Ask the LLM for a structured {"suggestions": [...]} object and return at most two entries. */
+    private List<String> callLlm(List<InvoiceItem> invoices) throws Exception {
         String context = invoices.stream()
                 .map(inv -> String.format("- %s | %s | %s EUR | %s | %s",
                         Objects.toString(inv.itemName(), ""),
@@ -135,7 +140,8 @@ Give exactly 2 specific, actionable suggestions. Keep each suggestion to a singl
                 Map.of("role", "system", "content", SYSTEM_PROMPT),
                 Map.of("role", "user", "content",
                         "Here are the user's uploaded invoices:\n" + context
-                                + "\n\nWhat tax documents are missing? Give exactly 2 short suggestions.")));
+                                + "\n\nWhat tax documents are missing?")));
+        body.put("response_format", SUGGESTIONS_SCHEMA);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -145,7 +151,39 @@ Give exactly 2 specific, actionable suggestions. Keep each suggestion to a singl
                 llmUrl + "/v1/chat/completions", HttpMethod.POST,
                 new HttpEntity<>(body, headers), String.class);
 
-        JsonNode root = MAPPER.readTree(response.getBody());
-        return root.path("choices").get(0).path("message").path("content").asText();
+        String content = MAPPER.readTree(response.getBody())
+                .path("choices").get(0).path("message").path("content").asText();
+
+        List<String> suggestions = new ArrayList<>();
+        for (JsonNode node : MAPPER.readTree(content).path("suggestions")) {
+            String text = node.asText().strip();
+            if (!text.isBlank()) {
+                suggestions.add(text);
+            }
+            if (suggestions.size() == MAX_SUGGESTIONS) {
+                break;
+            }
+        }
+        return suggestions;
     }
+
+    private static final int MAX_SUGGESTIONS = 2;
+
+    // OpenAI-compatible structured-output request that constrains the model to
+    // {"suggestions": ["...", "..."]} so we never have to parse free-form text.
+    private static final Map<String, Object> SUGGESTIONS_SCHEMA = Map.of(
+            "type", "json_schema",
+            "json_schema", Map.of(
+                    "name", "tax_suggestions",
+                    "strict", true,
+                    "schema", Map.of(
+                            "type", "object",
+                            "additionalProperties", false,
+                            "required", List.of("suggestions"),
+                            "properties", Map.of(
+                                    "suggestions", Map.of(
+                                            "type", "array",
+                                            "minItems", MAX_SUGGESTIONS,
+                                            "maxItems", MAX_SUGGESTIONS,
+                                            "items", Map.of("type", "string"))))));
 }
