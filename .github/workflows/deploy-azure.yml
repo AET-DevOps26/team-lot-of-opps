@@ -1,0 +1,62 @@
+name: Deploy to Azure VM
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Docker Compose deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy prod compose and traefik config to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          source: "infra/docker-compose.prod.yaml,infra/traefik"
+          target: "~/app/"
+          strip_components: 1
+
+      - name: Deploy
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/app
+
+            SHORT_SHA=$(echo "${{ github.sha }}" | head -c 7)
+
+            echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" | base64 -d > firebase-sa.json
+            chmod 600 firebase-sa.json
+
+            cat > .env.prod <<EOF
+            IMAGE_TAG=sha-${SHORT_SHA}
+            REGISTRY=ghcr.io/aet-devops26/team-lot-of-opps
+            DB_INVOICE_PASSWORD=${{ secrets.DB_INVOICE_PASSWORD }}
+            DB_LLM_CHAT_PASSWORD=${{ secrets.DB_LLM_CHAT_PASSWORD }}
+            DB_SUGGESTIONS_PASSWORD=${{ secrets.DB_SUGGESTIONS_PASSWORD }}
+            FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+            LLM_URL=${{ vars.LLM_URL }}
+            LLM_MODEL=${{ vars.LLM_MODEL }}
+            EOF
+
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+              -u ${{ github.actor }} --password-stdin
+
+            docker compose --env-file .env.prod -f docker-compose.prod.yaml pull
+            docker compose --env-file .env.prod -f docker-compose.prod.yaml up -d
+
+      - name: Clean up Firebase service account file
+        if: always()
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          script: rm -f ~/app/firebase-sa.json

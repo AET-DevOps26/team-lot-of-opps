@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "taxforward.fullname" . }}-llm-chat
+  labels:
+    {{- include "taxforward.labels" . | nindent 4 }}
+    app.kubernetes.io/name: llm-chat
+spec:
+  replicas: {{ .Values.replicaCount.llmChat }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llm-chat
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "taxforward.labels" . | nindent 8 }}
+        app.kubernetes.io/name: llm-chat
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: llm-chat
+          image: "{{ .Values.images.llmChat.repository }}:{{ .Values.images.llmChat.tag }}"
+          imagePullPolicy: {{ .Values.images.llmChat.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+          # Shared non-secret config (LLM_URL, LLM_MODEL, ...) — mirrors infra/.env.
+          envFrom:
+            - configMapRef:
+                name: {{ include "taxforward.fullname" . }}-config
+          # Per-service topology + secrets (can't go through envFrom).
+          # DB_PASSWORD must precede DATABASE_URL so the $(DB_PASSWORD) reference resolves.
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "taxforward.fullname" . }}-secret
+                  key: dbLlmChatPassword
+            - name: DATABASE_URL
+              value: "postgresql://{{ .Values.dbLlmChat.user }}:$(DB_PASSWORD)@{{ include "taxforward.fullname" . }}-db-llm-chat:5432/{{ .Values.dbLlmChat.name }}"
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "taxforward.fullname" . }}-secret
+                  key: llmApiKey
+            - name: INVOICE_SERVICE_URL
+              value: "http://{{ include "taxforward.fullname" . }}-invoice-service:8080"
+            - name: HF_HUB_OFFLINE
+              value: "1"
+            - name: TRANSFORMERS_OFFLINE
+              value: "1"
+          # The embedding model download/load can take a while on first start
+          # (compose uses start_period: 120s), hence the startup probe.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 18
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources.llmChat | nindent 12 }}

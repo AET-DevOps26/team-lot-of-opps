@@ -5,15 +5,21 @@ TaxForward is a full-stack application that helps German students and trainees t
 ## Architecture
 
 ```
-src/
-├── frontend/            # React + Vite + Redux + TypeScript SPA
-├── invoice-service/     # Spring Boot REST API — document upload, OCR, invoice persistence
-├── llm-chat/            # FastAPI — conversational RAG agent (pgvector)
-├── suggestions-service/ # Spring Boot REST API — proactive tax suggestions (LLM-generated)
-├── auth-service/        # FastAPI — Firebase token verification (Traefik forward-auth)
-├── traefik/             # Reverse proxy config — routing + auth middleware
-├── scripts/             # Utility/seed scripts
-└── docker-compose.yaml
+├── api/                       # OpenAPI single source of truth (codegen target — WIP)
+├── client/                    # React + Vite + Redux + TypeScript SPA
+├── services/
+│   ├── invoice-service/       # Spring Boot REST API — document upload, OCR, invoice persistence
+│   ├── llm-chat/              # FastAPI — conversational RAG agent (pgvector)
+│   ├── suggestions-service/   # Spring Boot REST API — proactive tax suggestions (LLM-generated)
+│   └── auth-service/          # FastAPI — Firebase token verification (Traefik forward-auth)
+└── infra/
+    ├── traefik/               # Reverse proxy config — routing + auth middleware
+    ├── helm/                  # Kubernetes Helm chart
+    ├── terraform/             # Azure VM provisioning
+    ├── ansible/               # VM configuration
+    ├── scripts/               # Utility/seed scripts
+    ├── docker-compose.yaml    # Local dev stack
+    └── docker-compose.prod.yaml
 ```
 
 All API traffic flows through **Traefik**, which enforces Firebase authentication via a forward-auth middleware before proxying to the relevant service:
@@ -31,7 +37,7 @@ An external OpenAI-compatible LLM endpoint (e.g. LM Studio or Ollama on the host
 
 | Service           | Tech                              | Internal port | Container         |
 |-------------------|-----------------------------------|---------------|-------------------|
-| `frontend`        | React + Vite + TypeScript         | `5173`        | `frontend`        |
+| `client`          | React + Vite + TypeScript         | `5173`        | `client`          |
 | `invoice-service` | Spring Boot (Java, JPA)           | `8080`        | `invoice-service` |
 | `llm-chat`        | FastAPI (Python, LangChain)       | `8081`        | `llm-chat`        |
 | `suggestions-service` | Spring Boot (Java, JPA)       | `8083`        | `suggestions-service` |
@@ -52,7 +58,7 @@ An external OpenAI-compatible LLM endpoint (e.g. LM Studio or Ollama on the host
 ### 1. Configure environment
 
 ```bash
-cp src/.env.example src/.env
+cp infra/.env.example infra/.env
 ```
 
 Fill in the Firebase values from your Firebase project settings:
@@ -67,7 +73,7 @@ VITE_FIREBASE_APP_ID=...
 FIREBASE_PROJECT_ID=...
 ```
 
-For local dev, use the Firebase Auth Emulator (see below) — no service account needed. For production, place your Firebase service account JSON at `src/auth-service/` and update `GOOGLE_APPLICATION_CREDENTIALS` in `docker-compose.yaml` to point to it.
+For local dev, use the Firebase Auth Emulator (see below) — no service account needed. For production, place your Firebase service account JSON at `services/auth-service/` and update `GOOGLE_APPLICATION_CREDENTIALS` in `infra/docker-compose.yaml` to point to it.
 
 ### Firebase Auth Emulator (local dev)
 
@@ -86,20 +92,20 @@ firebase login
 firebase emulators:start
 ```
 
-**Enable emulator mode in `src/.env`:**
+**Enable emulator mode in `infra/.env`:**
 ```
 VITE_USE_FIREBASE_EMULATOR=true
 FIREBASE_AUTH_EMULATOR_HOST=host.docker.internal:9099
 ```
 
-The defaults in `src/.env.example` have both flags set to `false`/empty (production mode).
+The defaults in `infra/.env.example` have both flags set to `false`/empty (production mode).
 
 Emulator UI: `http://127.0.0.1:4000/auth` — new sign-ups appear here instead of the Firebase console.
 
 ### 2. Start the stack
 
 ```bash
-cd src
+cd infra
 docker compose up -d
 ```
 
