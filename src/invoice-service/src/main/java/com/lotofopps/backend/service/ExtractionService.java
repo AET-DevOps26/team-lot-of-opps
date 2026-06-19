@@ -6,6 +6,7 @@ import com.lotofopps.backend.dto.ExtractionItem;
 import com.lotofopps.backend.model.Document;
 import com.lotofopps.backend.model.Invoice;
 import com.lotofopps.backend.model.InvoiceCategory;
+import com.lotofopps.backend.model.InvoiceStatus;
 import com.lotofopps.backend.repository.InvoiceRepository;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -95,21 +96,18 @@ Use the VISUAL LAYOUT to identify sections:
     private final String llmApiKey;
     private final InvoiceRepository invoiceRepository;
     private final RestTemplate restTemplate;
-    private final LlmChatEmbeddingService embeddingService;
 
     public ExtractionService(
             @Value("${llm.url}") String llmUrl,
             @Value("${llm.model}") String llmModel,
             @Value("${llm.api-key}") String llmApiKey,
             InvoiceRepository invoiceRepository,
-            RestTemplate restTemplate,
-            LlmChatEmbeddingService embeddingService) {
+            RestTemplate restTemplate) {
         this.llmUrl = llmUrl.endsWith("/") ? llmUrl.substring(0, llmUrl.length() - 1) : llmUrl;
         this.llmModel = llmModel;
         this.llmApiKey = llmApiKey;
         this.invoiceRepository = invoiceRepository;
         this.restTemplate = restTemplate;
-        this.embeddingService = embeddingService;
     }
 
     public List<Invoice> extractAndStore(Document document) throws IOException {
@@ -132,12 +130,13 @@ Use the VISUAL LAYOUT to identify sections:
             invoice.setCategory(parseCategory(item.category()));
             invoice.setUserId(document.getUserId());
             invoice.setDocument(document);
+            // Extracted invoices start under review — they are not embedded for chat RAG
+            // or counted until the user keeps (accepts) them via the review flow.
+            invoice.setStatus(InvoiceStatus.PENDING);
             return invoice;
         }).toList();
 
-        List<Invoice> saved = invoiceRepository.saveAll(invoices);
-        saved.forEach(embeddingService::embedInvoice);
-        return saved;
+        return invoiceRepository.saveAll(invoices);
     }
 
     private List<ExtractionItem> extractItems(byte[] fileBytes, String contentType, String filename) throws IOException {

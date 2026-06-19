@@ -1,6 +1,7 @@
 package com.lotofopps.backend.controller;
 
 import com.lotofopps.backend.dto.InvoiceResponse;
+import com.lotofopps.backend.model.InvoiceStatus;
 import com.lotofopps.backend.repository.InvoiceRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,8 +30,10 @@ public class InternalInvoiceController {
             @RequestParam(defaultValue = "10") int limit) {
         Pageable pageable = PageRequest.of(0, limit,
                 Sort.by(Sort.Direction.DESC, "createdAt"));
+        // Only accepted invoices feed chat context and tax suggestions — invoices still
+        // under review must not influence downstream services.
         List<InvoiceResponse> results = invoiceRepository
-                .findByUserId(userId, pageable)
+                .findByUserIdAndStatus(userId, InvoiceStatus.ACCEPTED, pageable)
                 .stream().map(InvoiceResponse::from).toList();
         return ResponseEntity.ok(results);
     }

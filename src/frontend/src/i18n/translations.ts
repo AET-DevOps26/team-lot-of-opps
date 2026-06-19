@@ -84,9 +84,10 @@ export interface TranslationDict {
     subtitle: string
     dropzone: { title: string; subtitle: string; maxSize: string }
     queue: { title: string; viewAll: string }
-    status: { extracting: string; verified: string; actionNeeded: string }
-    meta: { uploadedToday: string; uploadedYesterday: string; missingVendor: string; uploadFailed: string }
+    status: { extracting: string; verified: string; actionNeeded: string; review: string; accepted: string }
+    meta: { uploadedToday: string; uploadedYesterday: string; missingVendor: string; uploadFailed: string; reviewNeeded: string }
     fields: { vendor: string; amount: string }
+    actions: { keep: string; edit: string; undo: string }
     review: string
   }
   documents: {
@@ -267,14 +268,18 @@ const translations: Record<Language, TranslationDict> = {
         extracting: 'AI Extracting',
         verified: 'Verified',
         actionNeeded: 'Action Needed',
+        review: 'Needs Review',
+        accepted: 'Kept',
       },
       meta: {
         uploadedToday: 'Uploaded Today, 10:42 AM',
         uploadedYesterday: 'Uploaded Yesterday',
         missingVendor: 'Missing vendor information',
         uploadFailed: 'Upload failed',
+        reviewNeeded: 'Review the extracted data, then keep or undo it',
       },
       fields: { vendor: 'Vendor', amount: 'Amount' },
+      actions: { keep: 'Keep', edit: 'Edit', undo: 'Undo' },
       review: 'Review Document',
     },
     documents: {
@@ -455,14 +460,18 @@ const translations: Record<Language, TranslationDict> = {
         extracting: 'KI extrahiert',
         verified: 'Geprüft',
         actionNeeded: 'Aktion erforderlich',
+        review: 'Zu prüfen',
+        accepted: 'Übernommen',
       },
       meta: {
         uploadedToday: 'Heute hochgeladen, 10:42 Uhr',
         uploadedYesterday: 'Gestern hochgeladen',
         missingVendor: 'Lieferanteninformation fehlt',
         uploadFailed: 'Upload fehlgeschlagen',
+        reviewNeeded: 'Prüfe die extrahierten Daten, dann übernehmen oder verwerfen',
       },
       fields: { vendor: 'Lieferant', amount: 'Betrag' },
+      actions: { keep: 'Übernehmen', edit: 'Bearbeiten', undo: 'Verwerfen' },
       review: 'Dokument prüfen',
     },
     documents: {

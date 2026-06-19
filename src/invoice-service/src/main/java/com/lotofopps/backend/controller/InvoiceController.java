@@ -4,6 +4,7 @@ import com.lotofopps.backend.dto.InvoiceRequest;
 import com.lotofopps.backend.dto.InvoiceResponse;
 import com.lotofopps.backend.model.Document;
 import com.lotofopps.backend.model.Invoice;
+import com.lotofopps.backend.model.InvoiceStatus;
 import com.lotofopps.backend.repository.DocumentRepository;
 import com.lotofopps.backend.repository.InvoiceRepository;
 import com.lotofopps.backend.service.DocumentStorageService;
@@ -50,21 +51,23 @@ public class InvoiceController {
     }
 
     @GetMapping
-    @Operation(summary = "List invoices for the authenticated user, optionally filtered by year and/or limited to the most recent N results", responses = {
+    @Operation(summary = "List invoices for the authenticated user, optionally filtered by review status and/or year and/or limited to the most recent N results. Defaults to ACCEPTED invoices so documents still under review stay hidden.", responses = {
         @ApiResponse(responseCode = "200", description = "List of invoices")
     })
     public ResponseEntity<List<InvoiceResponse>> listInvoices(
             @RequestParam(required = false) Integer invoiceYear,
             @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) InvoiceStatus status,
             HttpServletRequest request) {
         String userId = currentUserId(request);
+        InvoiceStatus effectiveStatus = (status != null) ? status : InvoiceStatus.ACCEPTED;
         Sort sort = Sort.by(Sort.Direction.DESC, "invoiceDate", "createdAt");
         Pageable pageable = (limit != null)
                 ? PageRequest.of(0, limit, sort)
                 : Pageable.unpaged(sort);
         List<InvoiceResponse> results = (invoiceYear != null)
-                ? invoiceRepository.findByUserIdAndInvoiceDateYear(userId, invoiceYear, pageable).stream().map(InvoiceResponse::from).toList()
-                : invoiceRepository.findByUserId(userId, pageable).stream().map(InvoiceResponse::from).toList();
+                ? invoiceRepository.findByUserIdAndStatusAndInvoiceDateYear(userId, effectiveStatus, invoiceYear, pageable).stream().map(InvoiceResponse::from).toList()
+                : invoiceRepository.findByUserIdAndStatus(userId, effectiveStatus, pageable).stream().map(InvoiceResponse::from).toList();
         return ResponseEntity.ok(results);
     }
 
@@ -79,6 +82,8 @@ public class InvoiceController {
         invoice.setUserId(userId);
         invoice.setCategory(req.getCategory());
         invoice.setInvoiceDate(req.getInvoiceDate());
+        // Manually entered invoices need no review — they are accepted (and embedded) directly.
+        invoice.setStatus(InvoiceStatus.ACCEPTED);
         Invoice saved = invoiceRepository.save(invoice);
         embeddingService.embedInvoice(saved);
         return ResponseEntity.status(HttpStatus.CREATED).body(InvoiceResponse.from(saved));
@@ -100,6 +105,27 @@ public class InvoiceController {
         invoice.setPrice(req.getPrice());
         invoice.setCategory(req.getCategory());
         invoice.setInvoiceDate(req.getInvoiceDate());
+        Invoice saved = invoiceRepository.save(invoice);
+        // Only accepted invoices belong in the chat vector store. Editing a still-pending
+        // invoice (during review) must not embed it early — it is embedded on accept.
+        if (saved.getStatus() == InvoiceStatus.ACCEPTED) {
+            embeddingService.embedInvoice(saved);
+        }
+        return ResponseEntity.ok(InvoiceResponse.from(saved));
+    }
+
+    @PostMapping("/{id}/accept")
+    @Operation(summary = "Keep (accept) an invoice that is under review. Makes it visible in the list and embeds it for chat.", responses = {
+        @ApiResponse(responseCode = "200", description = "Accepted"),
+        @ApiResponse(responseCode = "403", description = "Forbidden"),
+        @ApiResponse(responseCode = "404", description = "Not found")
+    })
+    public ResponseEntity<InvoiceResponse> acceptInvoice(@PathVariable Long id, HttpServletRequest request) {
+        String userId = currentUserId(request);
+        Invoice invoice = invoiceRepository.findById(id).orElse(null);
+        if (invoice == null) return ResponseEntity.notFound().build();
+        if (!userId.equals(invoice.getUserId())) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        invoice.setStatus(InvoiceStatus.ACCEPTED);
         Invoice saved = invoiceRepository.save(invoice);
         embeddingService.embedInvoice(saved);
         return ResponseEntity.ok(InvoiceResponse.from(saved));

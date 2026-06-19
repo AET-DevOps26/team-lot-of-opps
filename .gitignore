@@ -5,3 +5,4 @@ __pycache__/
 devops-*firebase*.json
 firebase-debug.log
 values.local.yaml
+stud.yaml
