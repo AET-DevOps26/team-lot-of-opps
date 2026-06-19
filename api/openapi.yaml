@@ -490,6 +490,7 @@ components:
 
     DocumentResponse:
       type: object
+      required: [id, filename, contentType, sizeBytes, uploadedAt, userId]
       properties:
         id:
           type: integer
@@ -509,6 +510,7 @@ components:
 
     UploadResponse:
       type: object
+      required: [message, filename, documentId, invoiceIds]
       properties:
         message:
           type: string
@@ -525,6 +527,7 @@ components:
 
     InvoiceRequest:
       type: object
+      required: [itemName, company, price]
       properties:
         itemName:
           type: string
@@ -533,7 +536,10 @@ components:
         price:
           type: number
         category:
-          $ref: "#/components/schemas/InvoiceCategory"
+          type: string
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/InvoiceCategory"
         invoiceDate:
           type: string
           format: date
@@ -541,6 +547,8 @@ components:
 
     InvoiceResponse:
       type: object
+      required:
+        [id, itemName, company, price, category, userId, invoiceDate, createdAt, documentId, status]
       properties:
         id:
           type: integer
@@ -552,7 +560,10 @@ components:
         price:
           type: number
         category:
-          $ref: "#/components/schemas/InvoiceCategory"
+          type: string
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/InvoiceCategory"
         userId:
           type: string
         invoiceDate:
@@ -571,6 +582,7 @@ components:
 
     SuggestionResponse:
       type: object
+      required: [suggestion, createdAt]
       properties:
         suggestion:
           type: string

@@ -5,6 +5,7 @@ import Icon from '../components/Icon'
 import InvoiceFormModal from '../components/InvoiceFormModal'
 import { apiGet, apiPost, apiDelete, apiPostFormData } from '../api/client'
 import type { InvoiceResponse } from '../lib/invoices'
+import type { UploadResponse } from '../api/types'
 
 type QueueItemType = 'processing' | 'review' | 'verified' | 'error'
 
@@ -28,13 +29,6 @@ interface QueueItem {
   extracted?: readonly ExtractedField[]
   // The underlying invoice for items still under review — drives the Keep/Edit/Undo actions.
   invoice?: InvoiceResponse
-}
-
-interface UploadResponse {
-  message: string
-  filename: string
-  documentId: number
-  invoiceIds: number[]
 }
 
 const CARD_SHADOW = 'shadow-[0_4px_20px_rgba(26,43,60,0.05)]'

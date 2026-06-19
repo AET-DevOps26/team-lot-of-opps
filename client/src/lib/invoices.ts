@@ -1,18 +1,9 @@
 // Shared invoice domain types and helpers used across the Invoices and Upload pages.
+//
+// Types are generated from api/openapi.yaml (see client/src/api/schema.ts) and
+// re-exported here so existing import sites keep working unchanged.
 
-export type InvoiceStatus = 'PENDING' | 'ACCEPTED'
-
-export interface InvoiceResponse {
-  id: number
-  itemName: string
-  company: string
-  price: number
-  category: string | null
-  invoiceDate: string | null
-  documentId: number | null
-  // Present since the review feature; absent on responses from older endpoints.
-  status?: InvoiceStatus
-}
+export type { InvoiceResponse, InvoiceStatus } from '../api/types'
 
 // Maps the backend `InvoiceCategory` enum values (sent verbatim by the API)
 // to the human-readable labels shown in the UI. Keep keys in sync with

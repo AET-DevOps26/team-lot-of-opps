@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import useT from '../i18n/useT'
 import Icon from '../components/Icon'
 import { apiGet } from '../api/client'
+import type { SuggestionResponse } from '../api/types'
 import { usePersistentState } from '../hooks/usePersistentState'
 
 const TAX_RATE_STORAGE_KEY = 'dashboard.taxRatePercent'
@@ -20,10 +21,6 @@ interface ExpenseBar {
   bar: string
 }
 
-interface Suggestion {
-  suggestion: string
-  createdAt: string
-}
 
 function formatSuggestionDate(value: string): string {
   const date = new Date(value)
@@ -147,7 +144,7 @@ export default function Dashboard() {
     }[]
   >([])
 
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [suggestions, setSuggestions] = useState<SuggestionResponse[]>([])
   const [suggestionsLoading, setSuggestionsLoading] = useState(true)
   const [suggestionsError, setSuggestionsError] = useState(false)
 
@@ -161,7 +158,7 @@ export default function Dashboard() {
     let cancelled = false
     setSuggestionsLoading(true)
     setSuggestionsError(false)
-    apiGet<Suggestion[]>('/api/suggestions')
+    apiGet<SuggestionResponse[]>('/api/suggestions')
       .then((data) => {
         if (cancelled) return
         setSuggestions(data || [])

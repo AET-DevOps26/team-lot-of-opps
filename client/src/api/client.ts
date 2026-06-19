@@ -24,7 +24,7 @@ export function apiGet<T>(path: string): Promise<T> {
   return request<T>(path, { method: 'GET' })
 }
 
-export function apiPost<T>(path: string, body: unknown): Promise<T> {
+export function apiPost<T, B = unknown>(path: string, body: B): Promise<T> {
   return request<T>(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -36,7 +36,7 @@ export function apiPostFormData<T>(path: string, body: FormData): Promise<T> {
   return request<T>(path, { method: 'POST', body })
 }
 
-export function apiPut<T>(path: string, body: unknown): Promise<T> {
+export function apiPut<T, B = unknown>(path: string, body: B): Promise<T> {
   return request<T>(path, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },

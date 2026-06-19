@@ -3,6 +3,7 @@ import useT from '../i18n/useT'
 import Icon from './Icon'
 import { apiPost, apiPut } from '../api/client'
 import { CATEGORY_LABELS, type InvoiceResponse } from '../lib/invoices'
+import type { InvoiceRequest, InvoiceCategory } from '../api/types'
 
 interface InvoiceFormModalProps {
   mode: 'create' | 'edit'
@@ -17,7 +18,7 @@ export default function InvoiceFormModal({ mode, initial, onSave, onClose }: Inv
   const [itemName, setItemName] = useState(initial?.itemName ?? '')
   const [company, setCompany] = useState(initial?.company ?? '')
   const [price, setPrice] = useState(initial?.price != null ? String(initial.price) : '')
-  const [category, setCategory] = useState(initial?.category ?? '')
+  const [category, setCategory] = useState<InvoiceCategory | ''>(initial?.category ?? '')
   const [invoiceDate, setInvoiceDate] = useState(initial?.invoiceDate ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -30,7 +31,7 @@ export default function InvoiceFormModal({ mode, initial, onSave, onClose }: Inv
     e.preventDefault()
     setSaving(true)
     setError(null)
-    const body = {
+    const body: InvoiceRequest = {
       itemName,
       company,
       price: parseFloat(price),
@@ -40,9 +41,9 @@ export default function InvoiceFormModal({ mode, initial, onSave, onClose }: Inv
     try {
       let saved: InvoiceResponse
       if (mode === 'create') {
-        saved = await apiPost<InvoiceResponse>('/api/invoices', body)
+        saved = await apiPost<InvoiceResponse, InvoiceRequest>('/api/invoices', body)
       } else {
-        saved = await apiPut<InvoiceResponse>(`/api/invoices/${initial!.id}`, body)
+        saved = await apiPut<InvoiceResponse, InvoiceRequest>(`/api/invoices/${initial!.id}`, body)
       }
       onSave(saved)
     } catch {
@@ -129,7 +130,7 @@ export default function InvoiceFormModal({ mode, initial, onSave, onClose }: Inv
               <select
                 className={`${fieldInputClass} appearance-none pr-10 cursor-pointer`}
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) => setCategory(e.target.value as InvoiceCategory | '')}
               >
                 <option value="">{t('invoices.form.noCategory')}</option>
                 {Object.entries(CATEGORY_LABELS).map(([key, label]) => (

@@ -70,8 +70,12 @@ spec. Each generator is optional and skipped (with a hint) if its CLI is missing
 The TypeScript SDK can also be regenerated from the client with
 `npm run openapi:types`.
 
-Generated output is **git-ignored** (`api/generated/` and
-`client/src/api/schema.ts`) and regenerated on demand — do not edit it by hand.
+`client/src/api/schema.ts` is **committed** — the client imports it (via the
+friendly aliases in [`../client/src/api/types.ts`](../client/src/api/types.ts)),
+and the `check-types-drift` CI job regenerates it and fails the build if it no
+longer matches the spec. Never edit it by hand; change `openapi.yaml` and
+regenerate. The language-specific stubs under `api/generated/` are git-ignored
+and regenerated on demand.
 
 ## Preview & mock
 
