@@ -1,0 +1,43 @@
+name: Lint OpenAPI spec
+
+# Enforces the OpenAPI single source of truth on every PR (and push to main)
+# that touches the spec or its lint config. This is the authoritative gate —
+# the local pre-commit hook is only a convenience and can be bypassed.
+#
+# Runs the exact same `openapi-lint` pre-commit hook used locally, so CI and
+# local linting always agree on rules and Redocly CLI version.
+
+on:
+  pull_request:
+    paths:
+      - "api/openapi.yaml"
+      - ".redocly.yaml"
+      - ".pre-commit-config.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "api/openapi.yaml"
+      - ".redocly.yaml"
+      - ".pre-commit-config.yaml"
+  workflow_dispatch:
+
+jobs:
+  lint-spec:
+    name: Redocly lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pre-commit
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint OpenAPI spec
+        run: pre-commit run openapi-lint --all-files --show-diff-on-failure

@@ -35,18 +35,21 @@ The spec is linted with [Redocly CLI](https://redocly.com/docs/cli/) against the
 `recommended` ruleset (configured in [`../.redocly.yaml`](../.redocly.yaml)).
 **Never merge a spec change without a passing lint.**
 
+The authoritative gate is CI: [`openapi-lint.yml`](../.github/workflows/openapi-lint.yml)
+runs on every PR that touches the spec and must pass before merge. Locally, the
+same check runs via the `openapi-lint` pre-commit hook
+([`../.pre-commit-config.yaml`](../.pre-commit-config.yaml)) — the Redocly CLI
+version is pinned there (single source of truth) and installed in pre-commit's
+own isolated environment, so no global install or `npm ci` is needed.
+
 ```bash
-npx @redocly/cli lint api/openapi.yaml
+pip install -r requirements-dev.txt   # installs pre-commit (pinned)
+pre-commit install                    # activate the git hook (one-time)
+pre-commit run openapi-lint -a        # run the lint on demand
 ```
 
-This runs automatically on commit via the `openapi-lint` pre-commit hook (see
-[`../.pre-commit-config.yaml`](../.pre-commit-config.yaml)). Install it once:
-
-```bash
-pip install pre-commit   # or: brew install pre-commit
-pre-commit install
-pre-commit run -a        # run against all files
-```
+CI runs this exact hook (`pre-commit run openapi-lint --all-files`), so local
+and CI always agree on rules and CLI version.
 
 ## Code generation
 
@@ -60,9 +63,12 @@ spec. Each generator is optional and skipped (with a hint) if its CLI is missing
 
 | Target   | Tool                                   | Output                              |
 |----------|----------------------------------------|-------------------------------------|
-| `ts`     | `openapi-typescript` (via `npx`)       | `client/src/api/schema.ts`          |
+| `ts`     | `openapi-typescript` (client devDep)   | `client/src/api/schema.ts`          |
 | `python` | `openapi-python-client`                | `api/generated/python-client/`      |
 | `java`   | `@openapitools/openapi-generator-cli`  | `api/generated/java/`               |
+
+The TypeScript SDK can also be regenerated from the client with
+`npm run openapi:types`.
 
 Generated output is **git-ignored** (`api/generated/` and
 `client/src/api/schema.ts`) and regenerated on demand — do not edit it by hand.

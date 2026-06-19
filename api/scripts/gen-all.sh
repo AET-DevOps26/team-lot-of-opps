@@ -25,7 +25,12 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 gen_ts() {
   log "TypeScript types → client/src/api/schema.ts"
-  npx --yes openapi-typescript "$SPEC" -o "$REPO_ROOT/client/src/api/schema.ts"
+  local bin="$REPO_ROOT/client/node_modules/.bin/openapi-typescript"
+  if [ ! -x "$bin" ]; then
+    warn "openapi-typescript not installed — run: (cd client && npm ci)"
+    return 0
+  fi
+  "$bin" "$SPEC" -o "$REPO_ROOT/client/src/api/schema.ts"
 }
 
 gen_python() {
