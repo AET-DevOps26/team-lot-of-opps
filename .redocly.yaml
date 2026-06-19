@@ -1,0 +1,10 @@
+# Redocly CLI styleguide for the OpenAPI single source of truth.
+# Applied to api/openapi.yaml by:  npx @redocly/cli lint api/openapi.yaml
+# See https://redocly.com/docs/cli/configuration/
+extends:
+  - recommended
+
+rules:
+  # Fail (not just warn) if a placeholder/local server (example.com, localhost)
+  # is left in the contract — the public server URL must be relative or real.
+  no-server-example.com: error

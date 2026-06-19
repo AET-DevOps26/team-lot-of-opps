@@ -6,3 +6,7 @@ devops-*firebase*.json
 firebase-debug.log
 values.local.yaml
 stud.yaml
+
+# Generated from api/openapi.yaml (see api/scripts/gen-all.sh)
+api/generated/
+client/src/api/schema.ts

@@ -1,0 +1,18 @@
+# Pre-commit hooks for the TaxForward repo.
+#   Install once:   pre-commit install
+#   Run on demand:  pre-commit run -a
+#
+# Lints the OpenAPI single source of truth (api/openapi.yaml) on every commit
+# that touches the spec or its Redocly config. Never merge spec changes without
+# a passing lint. See https://pre-commit.com and https://redocly.com/docs/cli/
+repos:
+  - repo: local
+    hooks:
+      - id: openapi-lint
+        name: Lint OpenAPI spec (Redocly)
+        entry: redocly lint api/openapi.yaml
+        language: node
+        additional_dependencies:
+          - "@redocly/cli@1"
+        files: ^(api/openapi\.yaml|\.redocly\.yaml)$
+        pass_filenames: false
