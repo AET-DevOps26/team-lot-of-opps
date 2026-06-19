@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import useT, { type Translator } from '../i18n/useT'
 import Icon from '../components/Icon'
-import { apiGet, apiPostFormData } from '../api/client'
+import InvoiceFormModal from '../components/InvoiceFormModal'
+import { apiGet, apiPost, apiDelete, apiPostFormData } from '../api/client'
+import type { InvoiceResponse } from '../lib/invoices'
 
-type QueueItemType = 'processing' | 'verified' | 'error'
+type QueueItemType = 'processing' | 'review' | 'verified' | 'error'
 
 interface ExtractedField {
   label: string
@@ -24,6 +26,8 @@ interface QueueItem {
   iconWrap: string
   borderClass?: string
   extracted?: readonly ExtractedField[]
+  // The underlying invoice for items still under review — drives the Keep/Edit/Undo actions.
+  invoice?: InvoiceResponse
 }
 
 interface UploadResponse {
@@ -31,14 +35,6 @@ interface UploadResponse {
   filename: string
   documentId: number
   invoiceIds: number[]
-}
-
-interface InvoiceResponse {
-  id: number
-  itemName: string
-  company: string
-  price: number
-  invoiceDate: string | null
 }
 
 const CARD_SHADOW = 'shadow-[0_4px_20px_rgba(26,43,60,0.05)]'
@@ -60,7 +56,15 @@ function extractUploadError(err: unknown, t: Translator): string {
   return raw.trim() || t('upload.meta.uploadFailed')
 }
 
-function invoiceToQueueItem(inv: InvoiceResponse, t: Translator): QueueItem {
+function extractedFields(inv: InvoiceResponse, t: Translator): readonly ExtractedField[] {
+  return [
+    { label: t('upload.fields.vendor'), value: inv.company || '—' },
+    { label: t('upload.fields.amount'), value: `€ ${Number(inv.price).toFixed(2)}`, mono: true },
+  ]
+}
+
+// An accepted ("kept") invoice — shown as a verified card with no actions.
+function verifiedQueueItem(inv: InvoiceResponse, t: Translator): QueueItem {
   return {
     id: `invoice-${inv.id}`,
     type: 'verified',
@@ -70,14 +74,41 @@ function invoiceToQueueItem(inv: InvoiceResponse, t: Translator): QueueItem {
     statusClass: 'bg-secondary-container text-on-secondary-container',
     icon: 'check_circle',
     iconWrap: 'bg-[#ECFDF5] text-secondary',
-    extracted: [
-      { label: t('upload.fields.vendor'), value: inv.company || '—' },
-      { label: t('upload.fields.amount'), value: `€ ${Number(inv.price).toFixed(2)}`, mono: true },
-    ],
+    extracted: extractedFields(inv, t),
   }
 }
 
-function QueueItemCard({ item, t }: { item: QueueItem; t: Translator }) {
+// A pending invoice awaiting the user's decision — shown as a review card with actions.
+function reviewQueueItem(inv: InvoiceResponse, t: Translator): QueueItem {
+  return {
+    id: `review-${inv.id}`,
+    type: 'review',
+    name: inv.itemName || inv.company || String(inv.id),
+    meta: t('upload.meta.reviewNeeded'),
+    status: t('upload.status.review'),
+    statusClass: 'bg-tertiary-container text-on-tertiary-container',
+    icon: 'rate_review',
+    iconWrap: 'bg-tertiary-container text-on-tertiary-container',
+    borderClass: 'border-tertiary',
+    extracted: extractedFields(inv, t),
+    invoice: inv,
+  }
+}
+
+// Pick the right card style for an invoice based on its review status.
+function invoiceToQueueItem(inv: InvoiceResponse, t: Translator): QueueItem {
+  return inv.status === 'PENDING' ? reviewQueueItem(inv, t) : verifiedQueueItem(inv, t)
+}
+
+interface QueueItemCardProps {
+  item: QueueItem
+  t: Translator
+  onKeep: (item: QueueItem) => void
+  onEdit: (item: QueueItem) => void
+  onUndo: (item: QueueItem) => void
+}
+
+function QueueItemCard({ item, t, onKeep, onEdit, onUndo }: QueueItemCardProps) {
   return (
     <article
       className={`bg-surface-container-lowest rounded-lg border ${CARD_SHADOW} overflow-hidden flex flex-col sm:flex-row items-start sm:items-center p-sm gap-md relative ${
@@ -117,7 +148,7 @@ function QueueItemCard({ item, t }: { item: QueueItem; t: Translator }) {
           </div>
         </div>
       )}
-      {item.extracted && (
+      {item.extracted && item.type !== 'processing' && (
         <div className="hidden md:flex items-center gap-xl pr-md text-right">
           {item.extracted.map((field) => (
             <div key={field.label} className="flex flex-col">
@@ -137,6 +168,34 @@ function QueueItemCard({ item, t }: { item: QueueItem; t: Translator }) {
           ))}
         </div>
       )}
+      {item.type === 'review' && (
+        <div className="flex items-center gap-2 pr-md flex-wrap">
+          <button
+            type="button"
+            onClick={() => onKeep(item)}
+            className="flex items-center gap-1 px-4 py-2 rounded-full font-label-caps text-label-caps uppercase bg-primary text-on-primary hover:bg-primary/90 transition-colors"
+          >
+            <Icon name="check" size={16} />
+            {t('upload.actions.keep')}
+          </button>
+          <button
+            type="button"
+            onClick={() => onEdit(item)}
+            className="flex items-center gap-1 px-4 py-2 rounded-full font-label-caps text-label-caps uppercase text-primary hover:bg-primary/10 transition-colors"
+          >
+            <Icon name="edit" size={16} />
+            {t('upload.actions.edit')}
+          </button>
+          <button
+            type="button"
+            onClick={() => onUndo(item)}
+            className="flex items-center gap-1 px-4 py-2 rounded-full font-label-caps text-label-caps uppercase text-error hover:bg-error-container transition-colors"
+          >
+            <Icon name="undo" size={16} />
+            {t('upload.actions.undo')}
+          </button>
+        </div>
+      )}
       {item.type === 'error' && (
         <div className="hidden md:flex items-center pr-md">
           <button className="font-body-sm text-body-sm text-primary font-medium hover:underline flex items-center gap-1">
@@ -151,11 +210,20 @@ function QueueItemCard({ item, t }: { item: QueueItem; t: Translator }) {
 export default function Upload() {
   const t = useT()
   const [queue, setQueue] = useState<QueueItem[]>([])
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceResponse | null>(null)
 
+  // On mount, surface any invoices still awaiting review (e.g. from a prior session)
+  // followed by the most recent kept invoices.
   useEffect(() => {
-    apiGet<InvoiceResponse[]>('/api/invoices?limit=5')
-      .then((invoices) => setQueue(invoices.map((inv) => invoiceToQueueItem(inv, t))))
-      .catch(() => {})
+    Promise.all([
+      apiGet<InvoiceResponse[]>('/api/invoices?status=PENDING').catch(() => []),
+      apiGet<InvoiceResponse[]>('/api/invoices?limit=5').catch(() => []),
+    ]).then(([pending, recent]) => {
+      setQueue([
+        ...pending.map((inv) => reviewQueueItem(inv, t)),
+        ...recent.map((inv) => verifiedQueueItem(inv, t)),
+      ])
+    })
   }, [t])
 
   const handleFiles = useCallback(
@@ -179,23 +247,24 @@ export default function Upload() {
         form.append('file', file)
 
         apiPostFormData<UploadResponse>('/api/documents/upload', form)
-          .then((res) => {
-            setQueue((prev) =>
-              prev.map((item) =>
-                item.id === tempId
-                  ? {
-                      id: `invoice-doc-${res.documentId}`,
-                      type: 'verified',
-                      name: res.filename,
-                      meta: t('upload.meta.uploadedToday'),
-                      status: t('upload.status.verified'),
-                      statusClass: 'bg-secondary-container text-on-secondary-container',
-                      icon: 'check_circle',
-                      iconWrap: 'bg-[#ECFDF5] text-secondary',
-                    }
-                  : item,
-              ),
-            )
+          .then(async (res) => {
+            // Extraction creates the invoices as PENDING. Pull them back so the user can
+            // review the extracted data before it counts.
+            const pending = await apiGet<InvoiceResponse[]>('/api/invoices?status=PENDING').catch(() => [])
+            const created = pending.filter((inv) => res.invoiceIds.includes(inv.id))
+            const reviewItems: QueueItem[] = created.length > 0
+              ? created.map((inv) => reviewQueueItem(inv, t))
+              : [{
+                  id: `upload-doc-${res.documentId}`,
+                  type: 'verified',
+                  name: res.filename,
+                  meta: t('upload.meta.uploadedToday'),
+                  status: t('upload.status.verified'),
+                  statusClass: 'bg-secondary-container text-on-secondary-container',
+                  icon: 'check_circle',
+                  iconWrap: 'bg-[#ECFDF5] text-secondary',
+                }]
+            setQueue((prev) => prev.flatMap((item) => (item.id === tempId ? reviewItems : [item])))
           })
           .catch((err: unknown) => {
             setQueue((prev) =>
@@ -221,8 +290,51 @@ export default function Upload() {
     [t],
   )
 
+  // Keep: accept the invoice — it now counts and is embedded for chat. Card flips to verified.
+  const handleKeep = useCallback(
+    (item: QueueItem) => {
+      if (!item.invoice) return
+      apiPost<InvoiceResponse>(`/api/invoices/${item.invoice.id}/accept`, {})
+        .then((saved) =>
+          setQueue((prev) => prev.map((q) => (q.id === item.id ? verifiedQueueItem(saved, t) : q))),
+        )
+        .catch(() => {})
+    },
+    [t],
+  )
+
+  // Undo: discard the extracted invoice (and its document if it has no other invoices).
+  const handleUndo = useCallback((item: QueueItem) => {
+    if (!item.invoice) return
+    apiDelete<void>(`/api/invoices/${item.invoice.id}`)
+      .then(() => setQueue((prev) => prev.filter((q) => q.id !== item.id)))
+      .catch(() => {})
+  }, [])
+
+  const handleEdit = useCallback((item: QueueItem) => {
+    if (item.invoice) setEditingInvoice(item.invoice)
+  }, [])
+
+  const handleModalSave = useCallback(
+    (saved: InvoiceResponse) => {
+      setQueue((prev) =>
+        prev.map((q) => (q.invoice?.id === saved.id ? invoiceToQueueItem(saved, t) : q)),
+      )
+      setEditingInvoice(null)
+    },
+    [t],
+  )
+
   return (
     <div className="flex flex-col gap-lg">
+      {editingInvoice && (
+        <InvoiceFormModal
+          mode="edit"
+          initial={editingInvoice}
+          onSave={handleModalSave}
+          onClose={() => setEditingInvoice(null)}
+        />
+      )}
       <header className="flex flex-col gap-base">
         <h1 className="font-h1 text-h1 text-on-surface">{t('upload.title')}</h1>
         <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">
@@ -269,7 +381,14 @@ export default function Upload() {
         </div>
         <div className="grid grid-cols-1 gap-sm">
           {queue.map((item) => (
-            <QueueItemCard key={item.id} item={item} t={t} />
+            <QueueItemCard
+              key={item.id}
+              item={item}
+              t={t}
+              onKeep={handleKeep}
+              onEdit={handleEdit}
+              onUndo={handleUndo}
+            />
           ))}
         </div>
       </section>

@@ -25,6 +25,12 @@ public class Invoice {
     @Enumerated(EnumType.STRING)
     private InvoiceCategory category;
 
+    // Nullable at the DB level so the column can be added to an existing table; the
+    // default below applies to new rows and a startup backfill fixes legacy null rows
+    // (see InvoiceRepository#markNullStatusAccepted).
+    @Enumerated(EnumType.STRING)
+    private InvoiceStatus status = InvoiceStatus.PENDING;
+
     @Column
     private String userId;
 
@@ -58,6 +64,8 @@ public class Invoice {
     public void setPrice(BigDecimal price) { this.price = price; }
     public InvoiceCategory getCategory() { return category; }
     public void setCategory(InvoiceCategory category) { this.category = category; }
+    public InvoiceStatus getStatus() { return status; }
+    public void setStatus(InvoiceStatus status) { this.status = status; }
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
     public Document getDocument() { return document; }
