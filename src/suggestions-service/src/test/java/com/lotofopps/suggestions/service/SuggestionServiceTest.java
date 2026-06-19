@@ -1,5 +1,6 @@
 package com.lotofopps.suggestions.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lotofopps.suggestions.dto.InvoiceItem;
 import com.lotofopps.suggestions.dto.SuggestionResponse;
 import com.lotofopps.suggestions.model.Suggestion;
@@ -7,6 +8,7 @@ import com.lotofopps.suggestions.repository.SuggestionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpEntity;
@@ -27,15 +29,17 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SuggestionServiceTest {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String USER_ID = "test-user";
     private static final String LLM_RESPONSE = """
-            {"choices": [{"message": {"content": "Upload your train ticket for the Berlin hotel."}}]}""";
+            {"choices": [{"message": {"content": "{\\"suggestions\\": [\\"Upload your train ticket for the Berlin hotel.\\"]}"}}]}""";
 
     @Mock
     private SuggestionRepository suggestionRepository;
@@ -81,7 +85,7 @@ class SuggestionServiceTest {
                 .thenReturn(Optional.empty());
         when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(LLM_RESPONSE));
-        when(suggestionRepository.findTop5ByUserIdOrderByCreatedAtDesc(USER_ID))
+        when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID))
                 .thenReturn(List.of(storedSuggestion(LocalDateTime.now())));
 
         List<SuggestionResponse> result = service.getSuggestions(USER_ID);
@@ -91,13 +95,39 @@ class SuggestionServiceTest {
     }
 
     @Test
+    void storesEachStructuredSuggestionAsSeparateRowAndReplacesOldSet() {
+        String content = "{\"suggestions\": ["
+                + "\"Upload your train ticket for the Berlin hotel.\","
+                + "\"Add the internet bill for your home office claim.\"]}";
+        String twoSuggestions = MAPPER.createObjectNode().set("choices",
+                MAPPER.createArrayNode().add(MAPPER.createObjectNode().set("message",
+                        MAPPER.createObjectNode().put("content", content)))).toString();
+        when(invoiceClient.fetchLatestInvoices(USER_ID, 5))
+                .thenReturn(List.of(invoice(LocalDateTime.now())));
+        when(suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID))
+                .thenReturn(Optional.empty());
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(twoSuggestions));
+        when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID)).thenReturn(List.of());
+
+        service.getSuggestions(USER_ID);
+
+        verify(suggestionRepository).deleteByUserId(USER_ID);
+        ArgumentCaptor<Suggestion> captor = ArgumentCaptor.forClass(Suggestion.class);
+        verify(suggestionRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues()).extracting(Suggestion::getSuggestion)
+                .containsExactly("Upload your train ticket for the Berlin hotel.",
+                        "Add the internet bill for your home office claim.");
+    }
+
+    @Test
     void skipsGenerationWhenSuggestionNewerThanInvoices() {
         LocalDateTime invoiceTime = LocalDateTime.now().minusDays(1);
         when(invoiceClient.fetchLatestInvoices(USER_ID, 5))
                 .thenReturn(List.of(invoice(invoiceTime)));
         when(suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID))
                 .thenReturn(Optional.of(storedSuggestion(LocalDateTime.now())));
-        when(suggestionRepository.findTop5ByUserIdOrderByCreatedAtDesc(USER_ID))
+        when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID))
                 .thenReturn(List.of(storedSuggestion(LocalDateTime.now())));
 
         List<SuggestionResponse> result = service.getSuggestions(USER_ID);
@@ -115,7 +145,7 @@ class SuggestionServiceTest {
                 .thenReturn(Optional.of(storedSuggestion(LocalDateTime.now().minusDays(1))));
         when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(LLM_RESPONSE));
-        when(suggestionRepository.findTop5ByUserIdOrderByCreatedAtDesc(USER_ID))
+        when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID))
                 .thenReturn(List.of(storedSuggestion(LocalDateTime.now())));
 
         service.getSuggestions(USER_ID);
@@ -131,7 +161,7 @@ class SuggestionServiceTest {
                 .thenReturn(Optional.of(storedSuggestion(LocalDateTime.now().minusDays(1))));
         when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
                 .thenThrow(new RuntimeException("LLM down"));
-        when(suggestionRepository.findTop5ByUserIdOrderByCreatedAtDesc(USER_ID))
+        when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID))
                 .thenReturn(List.of(storedSuggestion(LocalDateTime.now().minusDays(1))));
 
         List<SuggestionResponse> result = service.getSuggestions(USER_ID);

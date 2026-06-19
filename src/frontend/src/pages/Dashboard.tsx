@@ -32,6 +32,48 @@ function formatSuggestionDate(value: string): string {
     : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
+// Lightweight rendering for the simple markdown the LLM emits (bullet lists and
+// **bold**). Avoids pulling in a full markdown dependency for these few cases.
+function renderInline(text: string) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**') ? (
+      <strong key={i}>{part.slice(2, -2)}</strong>
+    ) : (
+      part
+    ),
+  )
+}
+
+function renderSuggestion(text: string) {
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
+  const blocks: JSX.Element[] = []
+  let bullets: string[] = []
+
+  const flushBullets = () => {
+    if (bullets.length === 0) return
+    blocks.push(
+      <ul key={`ul-${blocks.length}`} className="list-disc pl-5 space-y-1">
+        {bullets.map((b, i) => (
+          <li key={i}>{renderInline(b)}</li>
+        ))}
+      </ul>,
+    )
+    bullets = []
+  }
+
+  for (const line of lines) {
+    const bullet = line.match(/^[-*•]\s+(.*)$/)
+    if (bullet) {
+      bullets.push(bullet[1])
+    } else {
+      flushBullets()
+      blocks.push(<p key={`p-${blocks.length}`}>{renderInline(line)}</p>)
+    }
+  }
+  flushBullets()
+  return blocks
+}
+
 interface SummaryCardProps {
   label: string
   value: string
@@ -341,9 +383,9 @@ export default function Dashboard() {
                     key={`${s.createdAt}-${i}`}
                     className="bg-surface p-4 rounded-lg border border-surface-container-highest"
                   >
-                    <p className="font-body-sm text-body-sm text-on-surface mb-2">
-                      {s.suggestion}
-                    </p>
+                    <div className="font-body-sm text-body-sm text-on-surface mb-2 space-y-2">
+                      {renderSuggestion(s.suggestion)}
+                    </div>
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-data-mono text-xs text-on-surface-variant">
                         {formatSuggestionDate(s.createdAt)}
