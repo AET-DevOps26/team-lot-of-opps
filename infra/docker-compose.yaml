@@ -76,6 +76,7 @@ services:
       - LLM_CHAT_URL=${LLM_CHAT_URL}
     volumes:
       - ../services/invoice-service/src:/app/src
+      - invoice_uploads:/app/uploads
     networks:
       - network
     healthcheck:
@@ -176,6 +177,7 @@ services:
 
 volumes:
   postgres_data:
+  invoice_uploads:
 
 networks:
   network:
