@@ -1,15 +1,15 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "taxforward.fullname" . }}-db-suggestions
+  name: {{ include "taxforward.fullname" . }}-db
   labels:
     {{- include "taxforward.labels" . | nindent 4 }}
-    app.kubernetes.io/name: db-suggestions
+    app.kubernetes.io/name: db
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: db-suggestions
+      app.kubernetes.io/name: db
       app.kubernetes.io/instance: {{ .Release.Name }}
   strategy:
     type: Recreate
@@ -17,7 +17,7 @@ spec:
     metadata:
       labels:
         {{- include "taxforward.labels" . | nindent 8 }}
-        app.kubernetes.io/name: db-suggestions
+        app.kubernetes.io/name: db
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       securityContext:
@@ -26,7 +26,7 @@ spec:
         fsGroup: 999
       containers:
         - name: postgres
-          image: postgres:16
+          image: pgvector/pgvector:pg16
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -40,22 +40,22 @@ spec:
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
             - name: POSTGRES_DB
-              value: {{ .Values.dbSuggestions.name | quote }}
+              value: {{ .Values.db.name | quote }}
             - name: POSTGRES_USER
-              value: {{ .Values.dbSuggestions.user | quote }}
+              value: {{ .Values.db.user | quote }}
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "taxforward.fullname" . }}-secret
-                  key: dbSuggestionsPassword
+                  key: dbPassword
           livenessProbe:
             exec:
               command:
                 - pg_isready
                 - -U
-                - {{ .Values.dbSuggestions.user }}
+                - {{ .Values.db.user }}
                 - -d
-                - {{ .Values.dbSuggestions.name }}
+                - {{ .Values.db.name }}
             initialDelaySeconds: 15
             periodSeconds: 10
             timeoutSeconds: 5
@@ -65,9 +65,9 @@ spec:
               command:
                 - pg_isready
                 - -U
-                - {{ .Values.dbSuggestions.user }}
+                - {{ .Values.db.user }}
                 - -d
-                - {{ .Values.dbSuggestions.name }}
+                - {{ .Values.db.name }}
             initialDelaySeconds: 5
             periodSeconds: 5
             timeoutSeconds: 3
@@ -75,9 +75,14 @@ spec:
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
+            - name: db-init
+              mountPath: /docker-entrypoint-initdb.d
           resources:
-            {{- toYaml .Values.resources.dbSuggestions | nindent 12 }}
+            {{- toYaml .Values.resources.db | nindent 12 }}
       volumes:
         - name: postgres-data
           persistentVolumeClaim:
-            claimName: {{ include "taxforward.fullname" . }}-db-suggestions-data
+            claimName: {{ include "taxforward.fullname" . }}-db-data
+        - name: db-init
+          configMap:
+            name: {{ include "taxforward.fullname" . }}-db-init

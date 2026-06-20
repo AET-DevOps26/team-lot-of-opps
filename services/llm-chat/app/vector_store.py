@@ -10,6 +10,7 @@ from sqlalchemy.exc import ProgrammingError
 DATABASE_URL = os.getenv("DATABASE_URL")
 TABLE_NAME = "langchain_invoice_embeddings"
 VECTOR_SIZE = 384  # sentence-transformers/all-MiniLM-L6-v2
+SCHEMA_NAME = "llm_chat"
 
 def _asyncpg_url(url: str) -> str:
     return url.replace("postgresql://", "postgresql+asyncpg://", 1)
@@ -49,18 +50,31 @@ async def get_vectorstore() -> PGVectorStore:
     async with _init_lock:
         if _vectorstore is not None:
             return _vectorstore
-        _engine = PGEngine.from_connection_string(url=_asyncpg_url(DATABASE_URL))
+        _ext_conn = await asyncpg.connect(DATABASE_URL)
+        try:
+            await _ext_conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        finally:
+            await _ext_conn.close()
+
+        _engine = PGEngine.from_connection_string(
+            url=_asyncpg_url(DATABASE_URL),
+            connect_args={"server_settings": {"search_path": f"{SCHEMA_NAME}, public"}},
+        )
         try:
             await _engine.ainit_vectorstore_table(
                 table_name=TABLE_NAME,
                 vector_size=VECTOR_SIZE,
+                schema_name=SCHEMA_NAME,
+                overwrite_existing=False,
             )
-        except ProgrammingError:
-            pass  # Table already exists from a previous run
+        except ProgrammingError as e:
+            if "already exists" not in str(e):
+                raise
         _vectorstore = await PGVectorStore.create(
             engine=_engine,
             table_name=TABLE_NAME,
             embedding_service=get_embeddings(),
+            schema_name=SCHEMA_NAME,
         )
     return _vectorstore
 
@@ -109,7 +123,7 @@ async def update_embeddings(
 
 
 async def delete_embeddings(invoice_id: int) -> None:
-    conn = await asyncpg.connect(DATABASE_URL)
+    conn = await asyncpg.connect(DATABASE_URL, server_settings={"search_path": f"{SCHEMA_NAME}, public"})
     try:
         await conn.execute(
             f"DELETE FROM {TABLE_NAME} WHERE langchain_metadata->>'invoice_id' = $1",

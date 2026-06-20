@@ -46,14 +46,14 @@ spec:
           # Per-service topology + secrets (can't go through envFrom).
           env:
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://{{ include "taxforward.fullname" . }}-db-suggestions:5432/{{ .Values.dbSuggestions.name }}"
+              value: "jdbc:postgresql://{{ include "taxforward.fullname" . }}-db:5432/{{ .Values.db.name }}?currentSchema=suggestions"
             - name: POSTGRES_USER
-              value: {{ .Values.dbSuggestions.user | quote }}
+              value: {{ .Values.db.user | quote }}
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "taxforward.fullname" . }}-secret
-                  key: dbSuggestionsPassword
+                  key: dbPassword
             - name: LLM_API_KEY
               valueFrom:
                 secretKeyRef:

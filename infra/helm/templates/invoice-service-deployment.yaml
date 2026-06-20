@@ -43,14 +43,14 @@ spec:
                 name: {{ include "taxforward.fullname" . }}-config
           env:
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://{{ include "taxforward.fullname" . }}-db-invoice:5432/{{ .Values.dbInvoice.name }}"
+              value: "jdbc:postgresql://{{ include "taxforward.fullname" . }}-db:5432/{{ .Values.db.name }}?currentSchema=invoice"
             - name: POSTGRES_USER
-              value: {{ .Values.dbInvoice.user | quote }}
+              value: {{ .Values.db.user | quote }}
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "taxforward.fullname" . }}-secret
-                  key: dbInvoicePassword
+                  key: dbPassword
             - name: LLM_API_KEY
               valueFrom:
                 secretKeyRef:

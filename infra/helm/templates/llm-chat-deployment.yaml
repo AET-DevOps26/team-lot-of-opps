@@ -49,9 +49,9 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ include "taxforward.fullname" . }}-secret
-                  key: dbLlmChatPassword
+                  key: dbPassword
             - name: DATABASE_URL
-              value: "postgresql://{{ .Values.dbLlmChat.user }}:$(DB_PASSWORD)@{{ include "taxforward.fullname" . }}-db-llm-chat:5432/{{ .Values.dbLlmChat.name }}"
+              value: "postgresql://{{ .Values.db.user }}:$(DB_PASSWORD)@{{ include "taxforward.fullname" . }}-db:5432/{{ .Values.db.name }}"
             - name: LLM_API_KEY
               valueFrom:
                 secretKeyRef:

@@ -131,9 +131,7 @@ jobs:
             --set llm.model="${{ vars.LLM_MODEL }}" \
             --set llm.apiKey="${{ secrets.LLM_API_KEY }}" \
             --set firebase.projectId="${{ secrets.FIREBASE_PROJECT_ID }}" \
-            --set dbInvoice.password="${{ secrets.DB_INVOICE_PASSWORD }}" \
-            --set dbLlmChat.password="${{ secrets.DB_LLM_CHAT_PASSWORD }}" \
-            --set dbSuggestions.password="${{ secrets.DB_SUGGESTIONS_PASSWORD }}" \
+            --set db.password="${{ secrets.DB_PASSWORD }}" \
             --set images.authService.repository="${REGISTRY}/auth-service" \
             --set images.authService.tag="sha-${SHORT_SHA}" \
             --set images.invoiceService.repository="${REGISTRY}/invoice-service" \
@@ -144,7 +142,8 @@ jobs:
             --set images.client.tag="sha-${SHORT_SHA}" \
             --set images.suggestionsService.repository="${REGISTRY}/suggestions-service" \
             --set images.suggestionsService.tag="sha-${SHORT_SHA}" \
-            --set-file firebase.serviceAccountJson=firebase-sa.json
+            --set-file firebase.serviceAccountJson=firebase-sa.json \
+            --set-file db.initSql=infra/postgres/init.sql
 
       - name: Diagnose on failure
         if: failure()

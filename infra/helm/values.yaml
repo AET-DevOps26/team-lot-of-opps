@@ -44,29 +44,19 @@ suggestions:
   invoiceLimit: "5"
 
 # ─── Database configuration ─────────────────────────────────────────────────
-# Passwords are injected from the environment at deploy time (see llm note).
-dbInvoice:
-  name: invoice_db
+# Single PostgreSQL instance; logical schemas (invoice, llm_chat, suggestions)
+# provide data isolation between services.
+db:
+  name: taxforward
   user: appuser
   password: ""
-dbLlmChat:
-  name: llm_db
-  user: appuser
-  password: ""
-dbSuggestions:
-  name: suggestions_db
-  user: appuser
-  password: ""
+  initSql: ""  # injected at deploy time via --set-file db.initSql=infra/postgres/init.sql
 
 # ─── Persistent storage ──────────────────────────────────────────────────────
 persistence:
   storageClassName: "csi-rbd-sc"   # cluster default; set explicitly to avoid ambiguity
-  dbInvoice:
-    size: "5Gi"
-  dbLlmChat:
-    size: "5Gi"
-  dbSuggestions:
-    size: "5Gi"
+  db:
+    size: "10Gi"
 
 # ─── TLS / Ingress ───────────────────────────────────────────────────────────
 # Cluster uses nginx ingress class + cert-manager with letsencrypt-prod.
@@ -122,27 +112,13 @@ resources:
     limits:
       cpu: "150m"
       memory: "128Mi"
-  dbInvoice:
+  db:
     requests:
-      cpu: "100m"
-      memory: "256Mi"
-    limits:
-      cpu: "400m"
+      cpu: "150m"
       memory: "384Mi"
-  dbLlmChat:
-    requests:
-      cpu: "100m"
-      memory: "256Mi"
     limits:
-      cpu: "400m"
-      memory: "384Mi"
-  dbSuggestions:
-    requests:
-      cpu: "100m"
-      memory: "256Mi"
-    limits:
-      cpu: "400m"
-      memory: "384Mi"
+      cpu: "500m"
+      memory: "512Mi"
 
 # ─── Replica counts ──────────────────────────────────────────────────────────
 replicaCount:
