@@ -1,0 +1,646 @@
+openapi: 3.0.3
+
+info:
+  title: TaxForward API
+  version: 1.0.0
+  description: |
+    Single source of truth for the contracts between the TaxForward backend
+    services (Spring Boot + FastAPI) and the web `client`.
+
+    **Public API** (tags `Documents`, `Invoices`, `Suggestions`, `Chat`) is the
+    surface the web client consumes. All public traffic flows through the
+    **Traefik** gateway, which validates a Firebase ID token via the
+    `auth-service` forward-auth middleware and injects the resolved user id as the
+    `X-User-Sub` header before proxying to the owning service. Clients therefore
+    only send `Authorization: Bearer <firebase-id-token>`.
+
+    **Internal API** (tag `Internal`) documents service-to-service contracts that
+    are **not** exposed through the public gateway (no Firebase auth). They are
+    reachable only on the internal Docker/Kubernetes network and are listed here
+    so the spec stays a complete source of truth.
+
+servers:
+  - url: /
+    description: >-
+      Public Traefik gateway; the base path is relative to the deployed host
+      (e.g. http://localhost in docker-compose dev). The web client calls these
+      paths relative to `VITE_API_BASE_URL`.
+
+tags:
+  - name: Documents
+    description: Upload, list, download, and delete user documents (invoice-service).
+  - name: Invoices
+    description: Create, list, review, update, and delete invoices (invoice-service).
+  - name: Suggestions
+    description: Proactive, LLM-generated tax suggestions (suggestions-service).
+  - name: Chat
+    description: Conversational RAG agent over the user's invoices (llm-chat).
+  - name: Internal
+    description: >-
+      Service-to-service endpoints, not exposed through the public gateway and
+      not Firebase-authenticated. The hosting service is noted on each operation.
+
+security:
+  - firebaseToken: []
+
+paths:
+  /api/documents:
+    get:
+      tags: [Documents]
+      operationId: listDocuments
+      summary: List documents for the authenticated user
+      responses:
+        "200":
+          description: List of documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DocumentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/documents/upload:
+    post:
+      tags: [Documents]
+      operationId: uploadDocument
+      summary: Upload a document
+      description: >-
+        Stores the uploaded file, runs AI extraction, and creates the resulting
+        invoices in `PENDING` review state. Allowed content types: PDF, JPEG,
+        PNG, WEBP, TIFF.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Document received and processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResponse"
+        "400":
+          description: No file provided, unsupported type, or file too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: A document with identical content already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Failed to store file or extraction failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          description: AI extraction service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/documents/{id}:
+    delete:
+      tags: [Documents]
+      operationId: deleteDocument
+      summary: Delete a document and all its invoices
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/documents/{id}/content:
+    get:
+      tags: [Documents]
+      operationId: downloadDocument
+      summary: Download the raw document content
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: File content (Content-Type matches the stored document)
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/invoices:
+    get:
+      tags: [Invoices]
+      operationId: listInvoices
+      summary: List invoices for the authenticated user
+      description: >-
+        Optionally filtered by review status and/or invoice year and/or limited
+        to the most recent N results. Defaults to `ACCEPTED` invoices so
+        documents still under review stay hidden.
+      parameters:
+        - name: invoiceYear
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/InvoiceStatus"
+      responses:
+        "200":
+          description: List of invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InvoiceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Invoices]
+      operationId: createInvoice
+      summary: Manually create a new invoice
+      description: Manually created invoices are accepted immediately (no review step).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/invoices/{id}:
+    put:
+      tags: [Invoices]
+      operationId: updateInvoice
+      summary: Update an existing invoice
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Invoices]
+      operationId: deleteInvoice
+      summary: Delete an invoice
+      description: >-
+        Also deletes the associated document if no other invoices reference it.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/invoices/{id}/accept:
+    post:
+      tags: [Invoices]
+      operationId: acceptInvoice
+      summary: Keep (accept) an invoice that is under review
+      description: >-
+        Makes the invoice visible in the list and embeds it for chat retrieval.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/suggestions:
+    get:
+      tags: [Suggestions]
+      operationId: getSuggestions
+      summary: Get proactive tax suggestions
+      description: >-
+        Suggestions are derived from the user's most recent accepted invoices,
+        most recent first.
+      responses:
+        "200":
+          description: List of suggestions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SuggestionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/agent/chat:
+    post:
+      tags: [Chat]
+      operationId: agentChat
+      summary: Ask the RAG agent a question
+      description: >-
+        Streams the answer back as Server-Sent Events (`text/event-stream`).
+        Each event is a `data: <json>` line whose payload is an agent event.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentChatRequest"
+      responses:
+        "200":
+          description: Server-Sent Events stream of agent events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /internal/invoices/latest:
+    get:
+      tags: [Internal]
+      operationId: getLatestInvoicesInternal
+      summary: "[invoice-service] Latest accepted invoices for a user"
+      description: >-
+        Consumed by suggestions-service. Returns only `ACCEPTED` invoices, most
+        recent first. Not exposed through the public gateway.
+      security: []
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: List of invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InvoiceResponse"
+
+  /embed:
+    post:
+      tags: [Internal]
+      operationId: createEmbedding
+      summary: "[llm-chat] Embed an invoice into the chat vector store"
+      description: Consumed by invoice-service. Not exposed through the public gateway.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmbedRequest"
+      responses:
+        "200":
+          description: Embedding stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+    put:
+      tags: [Internal]
+      operationId: updateEmbedding
+      summary: "[llm-chat] Update an invoice embedding"
+      description: Consumed by invoice-service. Not exposed through the public gateway.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmbedRequest"
+      responses:
+        "200":
+          description: Embedding updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+
+  /embed/{invoiceId}:
+    delete:
+      tags: [Internal]
+      operationId: deleteEmbedding
+      summary: "[llm-chat] Delete an invoice embedding"
+      description: Consumed by invoice-service. Not exposed through the public gateway.
+      security: []
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Embedding deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+
+components:
+  securitySchemes:
+    firebaseToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        Firebase ID token. Validated by the Traefik forward-auth middleware
+        (auth-service `/verify`), which injects `X-User-Sub` downstream.
+
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid Firebase ID token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: The resource belongs to another user
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    InvoiceStatus:
+      type: string
+      description: Review state of an invoice.
+      enum:
+        - PENDING
+        - ACCEPTED
+
+    InvoiceCategory:
+      type: string
+      description: Tax-deductible expense category (German tax terms).
+      enum:
+        - KONTOFUEHRUNGSGEBUEHREN
+        - WEGE_ZUR_ARBEIT
+        - HOMEOFFICE_UND_ARBEITSZIMMER
+        - INTERNET_UND_TELEFON
+        - ARBEITSMITTEL
+        - BERUFSVERBÄNDE_UND_GEWERKSCHAFTEN
+        - STEUERBERATUNGSKOSTEN
+        - REISEKOSTEN
+        - BEWERBUNGEN
+        - FORTBILDUNGEN
+        - UMZUG
+        - BEWIRTUNG
+        - DOPPELTER_HAUSHALT
+        - AUSSERGEWOEHNLICHE_FAHRZEUGKOSTEN
+        - SONSTIGE_AUSGABEN
+
+    DocumentResponse:
+      type: object
+      required: [id, filename, contentType, sizeBytes, uploadedAt, userId]
+      properties:
+        id:
+          type: integer
+          format: int64
+        filename:
+          type: string
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        uploadedAt:
+          type: string
+          format: date-time
+        userId:
+          type: string
+
+    UploadResponse:
+      type: object
+      required: [message, filename, documentId, invoiceIds]
+      properties:
+        message:
+          type: string
+        filename:
+          type: string
+        documentId:
+          type: integer
+          format: int64
+        invoiceIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+
+    InvoiceRequest:
+      type: object
+      required: [itemName, company, price]
+      properties:
+        itemName:
+          type: string
+        company:
+          type: string
+        price:
+          type: number
+        category:
+          type: string
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/InvoiceCategory"
+        invoiceDate:
+          type: string
+          format: date
+          nullable: true
+
+    InvoiceResponse:
+      type: object
+      required:
+        [id, itemName, company, price, category, userId, invoiceDate, createdAt, documentId, status]
+      properties:
+        id:
+          type: integer
+          format: int64
+        itemName:
+          type: string
+        company:
+          type: string
+        price:
+          type: number
+        category:
+          type: string
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/InvoiceCategory"
+        userId:
+          type: string
+        invoiceDate:
+          type: string
+          format: date
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        documentId:
+          type: integer
+          format: int64
+          nullable: true
+        status:
+          $ref: "#/components/schemas/InvoiceStatus"
+
+    SuggestionResponse:
+      type: object
+      required: [suggestion, createdAt]
+      properties:
+        suggestion:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    AgentChatRequest:
+      type: object
+      required: [question]
+      properties:
+        question:
+          type: string
+
+    EmbedRequest:
+      type: object
+      required: [invoice_id, text, user_id]
+      properties:
+        invoice_id:
+          type: integer
+          format: int64
+        text:
+          type: string
+        user_id:
+          type: string
+        item_name:
+          type: string
+          default: "N/A"
+        company:
+          type: string
+          default: "N/A"
+        price:
+          type: number
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        invoice_date:
+          type: string
+          nullable: true
+        document_id:
+          type: integer
+          format: int64
+          nullable: true
+
+    StatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        documentId:
+          type: integer
+          format: int64
+          description: Present on duplicate-document (409) responses.

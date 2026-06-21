@@ -19,28 +19,28 @@ jobs:
     strategy:
       matrix:
         include:
-          - service: frontend
-            context: ./src/frontend
-            dockerfile: ./src/frontend/Dockerfile
+          - service: client
+            context: ./client
+            dockerfile: ./client/Dockerfile
           - service: auth-service
-            context: ./src/auth-service
-            dockerfile: ./src/auth-service/Dockerfile
+            context: ./services/auth-service
+            dockerfile: ./services/auth-service/Dockerfile
           - service: invoice-service
-            context: ./src/invoice-service
-            dockerfile: ./src/invoice-service/Dockerfile
+            context: ./services/invoice-service
+            dockerfile: ./services/invoice-service/Dockerfile
           - service: llm-chat
-            context: ./src/llm-chat
-            dockerfile: ./src/llm-chat/Dockerfile
+            context: ./services/llm-chat
+            dockerfile: ./services/llm-chat/Dockerfile
           - service: suggestions-service
-            context: ./src/suggestions-service
-            dockerfile: ./src/suggestions-service/Dockerfile
+            context: ./services/suggestions-service
+            dockerfile: ./services/suggestions-service/Dockerfile
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -48,19 +48,19 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.ORG }}/${{ matrix.service }}
           tags: |
             type=sha,prefix=sha-,format=short
             type=raw,value=latest
 
-      # Vite bakes env vars into the bundle at build time, so the frontend
+      # Vite bakes env vars into the bundle at build time, so the client
       # image needs the Firebase config as build args.
-      - name: Set frontend build args
+      - name: Set client build args
         id: build_args
         run: |
-          if [ "${{ matrix.service }}" = "frontend" ]; then
+          if [ "${{ matrix.service }}" = "client" ]; then
             {
               echo 'args<<EOF'
               echo 'VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }}'
@@ -76,7 +76,7 @@ jobs:
           fi
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
@@ -122,29 +122,28 @@ jobs:
           SHORT_SHA=$(echo "${{ github.sha }}" | head -c 7)
           REGISTRY=ghcr.io/aet-devops26/taxforward
 
-          helm upgrade --install taxforward ./deployment/helm \
+          helm upgrade --install taxforward ./infra/helm \
             --namespace taxforward \
             --atomic \
             --timeout 10m \
-            -f deployment/helm/values.yaml \
+            -f infra/helm/values.yaml \
             --set llm.url="${{ vars.LLM_URL }}" \
             --set llm.model="${{ vars.LLM_MODEL }}" \
             --set llm.apiKey="${{ secrets.LLM_API_KEY }}" \
             --set firebase.projectId="${{ secrets.FIREBASE_PROJECT_ID }}" \
-            --set dbInvoice.password="${{ secrets.DB_INVOICE_PASSWORD }}" \
-            --set dbLlmChat.password="${{ secrets.DB_LLM_CHAT_PASSWORD }}" \
-            --set dbSuggestions.password="${{ secrets.DB_SUGGESTIONS_PASSWORD }}" \
+            --set db.password="${{ secrets.DB_PASSWORD }}" \
             --set images.authService.repository="${REGISTRY}/auth-service" \
             --set images.authService.tag="sha-${SHORT_SHA}" \
             --set images.invoiceService.repository="${REGISTRY}/invoice-service" \
             --set images.invoiceService.tag="sha-${SHORT_SHA}" \
             --set images.llmChat.repository="${REGISTRY}/llm-chat" \
             --set images.llmChat.tag="sha-${SHORT_SHA}" \
-            --set images.frontend.repository="${REGISTRY}/frontend" \
-            --set images.frontend.tag="sha-${SHORT_SHA}" \
+            --set images.client.repository="${REGISTRY}/client" \
+            --set images.client.tag="sha-${SHORT_SHA}" \
             --set images.suggestionsService.repository="${REGISTRY}/suggestions-service" \
             --set images.suggestionsService.tag="sha-${SHORT_SHA}" \
-            --set-file firebase.serviceAccountJson=firebase-sa.json
+            --set-file firebase.serviceAccountJson=firebase-sa.json \
+            --set-file db.initSql=infra/postgres/init.sql
 
       - name: Diagnose on failure
         if: failure()

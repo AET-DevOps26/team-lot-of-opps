@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "taxforward.fullname" . }}-client
+  labels:
+    {{- include "taxforward.labels" . | nindent 4 }}
+    app.kubernetes.io/name: client
+spec:
+  replicas: {{ .Values.replicaCount.client }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: client
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "taxforward.labels" . | nindent 8 }}
+        app.kubernetes.io/name: client
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        fsGroup: 101
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: client
+          image: "{{ .Values.images.client.repository }}:{{ .Values.images.client.tag }}"
+          imagePullPolicy: {{ .Values.images.client.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources.client | nindent 12 }}

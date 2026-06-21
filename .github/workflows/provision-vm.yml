@@ -1,0 +1,82 @@
+name: Provision and Configure Azure VM
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  secrets: write
+
+jobs:
+  provision:
+    name: Terraform — create VM
+    runs-on: ubuntu-latest
+    outputs:
+      vm_ip: ${{ steps.output.outputs.vm_ip }}
+    env:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: infra/terraform
+        run: |
+          terraform apply -auto-approve \
+            -var="ssh_public_key=${{ secrets.VM_SSH_PUBLIC_KEY }}"
+
+      - name: Get VM IP
+        id: output
+        working-directory: infra/terraform
+        run: echo "vm_ip=$(terraform output -raw vm_public_ip)" >> $GITHUB_OUTPUT
+
+      - name: Update AZURE_VM_HOST secret
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh secret set AZURE_VM_HOST --body "${{ steps.output.outputs.vm_ip }}"
+
+  configure:
+    name: Ansible — configure VM
+    runs-on: ubuntu-latest
+    needs: provision
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: pip install ansible
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VM_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Wait for VM to be ready
+        run: |
+          echo "Waiting for SSH to become available..."
+          for i in $(seq 1 20); do
+            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
+              -i ~/.ssh/id_rsa azureuser@${{ needs.provision.outputs.vm_ip }} \
+              "echo ok" && break || sleep 15
+          done
+
+      - name: Add VM to known hosts
+        run: ssh-keyscan ${{ needs.provision.outputs.vm_ip }} >> ~/.ssh/known_hosts
+
+      - name: Run Ansible playbook
+        working-directory: infra/ansible
+        run: |
+          sed "s/<VM_IP>/${{ needs.provision.outputs.vm_ip }}/" inventory.ini > inventory.tmp.ini
+          ansible-playbook -i inventory.tmp.ini playbook.yml

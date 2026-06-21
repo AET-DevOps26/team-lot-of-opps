@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "taxforward.fullname" . }}-suggestions-service
+  labels:
+    {{- include "taxforward.labels" . | nindent 4 }}
+    app.kubernetes.io/name: suggestions-service
+spec:
+  replicas: {{ .Values.replicaCount.suggestionsService }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: suggestions-service
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "taxforward.labels" . | nindent 8 }}
+        app.kubernetes.io/name: suggestions-service
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: suggestions-service
+          image: "{{ .Values.images.suggestionsService.repository }}:{{ .Values.images.suggestionsService.tag }}"
+          imagePullPolicy: {{ .Values.images.suggestionsService.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 8083
+              protocol: TCP
+          # Shared non-secret config (LLM_URL, LLM_MODEL,
+          # SUGGESTIONS_INVOICE_LIMIT, ...) — mirrors infra/.env.
+          envFrom:
+            - configMapRef:
+                name: {{ include "taxforward.fullname" . }}-config
+          # Per-service topology + secrets (can't go through envFrom).
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ include "taxforward.fullname" . }}-db:5432/{{ .Values.db.name }}?currentSchema=suggestions"
+            - name: POSTGRES_USER
+              value: {{ .Values.db.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "taxforward.fullname" . }}-secret
+                  key: dbPassword
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "taxforward.fullname" . }}-secret
+                  key: llmApiKey
+            - name: INVOICE_SERVICE_URL
+              value: "http://{{ include "taxforward.fullname" . }}-invoice-service:8080"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8083
+            initialDelaySeconds: 40
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8083
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources.suggestionsService | nindent 12 }}

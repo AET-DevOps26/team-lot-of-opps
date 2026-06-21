@@ -1,0 +1,145 @@
+services:
+  traefik:
+    image: traefik:v3.3
+    container_name: traefik
+    ports:
+      - "80:80"
+    volumes:
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      - network
+    restart: unless-stopped
+
+  auth-service:
+    image: ${REGISTRY}/auth-service:${IMAGE_TAG}
+    platform: linux/amd64
+    container_name: auth-service
+    environment:
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json
+    volumes:
+      - ./firebase-sa.json:/app/firebase-service-account.json:ro
+    networks:
+      - network
+    restart: unless-stopped
+
+  invoice-service:
+    image: ${REGISTRY}/invoice-service:${IMAGE_TAG}
+    platform: linux/amd64
+    container_name: invoice-service
+    environment:
+      # SPRING_DATASOURCE_URL is per-service topology (points at this service's
+      # own DB), so it stays a literal rather than a shared ${SPRING_DATASOURCE_URL}.
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/taxforward?currentSchema=invoice
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - STORAGE_LOCATION=${STORAGE_LOCATION:-/app/uploads}
+      - UPLOAD_MAX_SIZE_BYTES=${UPLOAD_MAX_SIZE_BYTES}
+      - LLM_URL=${LLM_URL}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_CHAT_URL=${LLM_CHAT_URL}
+    networks:
+      - network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      db:
+        condition: service_healthy
+      llm-chat:
+        condition: service_healthy
+    restart: unless-stopped
+
+  llm-chat:
+    image: ${REGISTRY}/llm-chat:${IMAGE_TAG}
+    platform: linux/amd64
+    container_name: llm-chat
+    environment:
+      - LLM_URL=${LLM_URL}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${DB_PASSWORD}@db:5432/taxforward
+    networks:
+      - network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  suggestions-service:
+    image: ${REGISTRY}/suggestions-service:${IMAGE_TAG}
+    platform: linux/amd64
+    container_name: suggestions-service
+    environment:
+      # SPRING_DATASOURCE_URL is per-service topology (points at this service's
+      # own DB), so it stays a literal rather than a shared ${SPRING_DATASOURCE_URL}.
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/taxforward?currentSchema=suggestions
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - LLM_URL=${LLM_URL}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - INVOICE_SERVICE_URL=${INVOICE_SERVICE_URL}
+      - SUGGESTIONS_INVOICE_LIMIT=${SUGGESTIONS_INVOICE_LIMIT}
+    networks:
+      - network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      db:
+        condition: service_healthy
+      invoice-service:
+        condition: service_healthy
+    restart: unless-stopped
+
+  client:
+    image: ${REGISTRY}/client:${IMAGE_TAG}
+    platform: linux/amd64
+    container_name: client
+    networks:
+      - network
+    depends_on:
+      - traefik
+    restart: unless-stopped
+
+  db:
+    platform: linux/amd64
+    image: pgvector/pgvector:pg16
+    container_name: db
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=taxforward
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d taxforward"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  network:
+    driver: bridge

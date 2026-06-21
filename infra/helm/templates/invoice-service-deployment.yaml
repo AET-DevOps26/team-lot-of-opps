@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "taxforward.fullname" . }}-invoice-service
+  labels:
+    {{- include "taxforward.labels" . | nindent 4 }}
+    app.kubernetes.io/name: invoice-service
+spec:
+  replicas: {{ .Values.replicaCount.invoiceService }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: invoice-service
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "taxforward.labels" . | nindent 8 }}
+        app.kubernetes.io/name: invoice-service
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: invoice-service
+          image: "{{ .Values.images.invoiceService.repository }}:{{ .Values.images.invoiceService.tag }}"
+          imagePullPolicy: {{ .Values.images.invoiceService.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "taxforward.fullname" . }}-config
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ include "taxforward.fullname" . }}-db:5432/{{ .Values.db.name }}?currentSchema=invoice"
+            - name: POSTGRES_USER
+              value: {{ .Values.db.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "taxforward.fullname" . }}-secret
+                  key: dbPassword
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "taxforward.fullname" . }}-secret
+                  key: llmApiKey
+            - name: LLM_CHAT_URL
+              value: "http://{{ include "taxforward.fullname" . }}-llm-chat:8081"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources.invoiceService | nindent 12 }}

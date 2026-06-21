@@ -1,0 +1,34 @@
+
+images:
+  authService:
+    pullPolicy: Never
+  invoiceService:
+    pullPolicy: Never
+  llmChat:
+    pullPolicy: Never
+  suggestionsService:
+    pullPolicy: Never
+  client:
+    pullPolicy: Never
+
+traefik:
+  dashboard: true
+
+llm:
+  url: "https://logos.aet.cit.tum.de"
+  model: "openai/gpt-oss-120b"
+  apiKey: "<your-llm-api-key>"
+
+firebase:
+  projectId: "<your-firebase-project-id>"
+
+# ─── Client Firebase config (baked into the Vite bundle at docker build time)
+# These are NOT Helm values — local-deploy.sh reads them from infra/.env.
+# Make sure infra/.env has all VITE_FIREBASE_* variables set before building.
+# See infra/.env.example for the full list.
+
+db:
+  password: "password"
+
+persistence:
+  storageClassName: "local-path"

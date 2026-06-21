@@ -1,0 +1,73 @@
+name: OpenAPI
+
+# Enforces the OpenAPI single source of truth on every PR (and push to main)
+# that touches the spec, its lint config, or the generated client types. This
+# is the authoritative gate — the local pre-commit hook is only a convenience
+# and can be bypassed.
+
+on:
+  pull_request:
+    paths:
+      - "api/openapi.yaml"
+      - ".redocly.yaml"
+      - ".pre-commit-config.yaml"
+      - "client/src/api/schema.ts"
+  push:
+    branches: [main]
+    paths:
+      - "api/openapi.yaml"
+      - ".redocly.yaml"
+      - ".pre-commit-config.yaml"
+      - "client/src/api/schema.ts"
+  workflow_dispatch:
+
+jobs:
+  lint-spec:
+    name: Redocly lint
+    # Runs the exact same `openapi-lint` pre-commit hook used locally, so CI and
+    # local linting always agree on rules and Redocly CLI version.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pre-commit
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint OpenAPI spec
+        run: pre-commit run openapi-lint --all-files --show-diff-on-failure
+
+  check-types-drift:
+    name: Generated TS types in sync
+    # The committed client/src/api/schema.ts must match what the spec generates.
+    # Regenerate with the pinned openapi-typescript and fail if it differs.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install client deps
+        run: npm ci
+        working-directory: client
+
+      - name: Regenerate types from the spec
+        run: npm run openapi:types
+        working-directory: client
+
+      - name: Fail if generated types are stale
+        run: |
+          if ! git diff --exit-code -- client/src/api/schema.ts; then
+            echo "::error::client/src/api/schema.ts is out of date with api/openapi.yaml."
+            echo "Run 'npm run openapi:types' in client/ and commit the result."
+            exit 1
+          fi
