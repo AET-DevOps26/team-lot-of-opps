@@ -30,7 +30,7 @@ class SuggestionsControllerTest {
 
     @Test
     void getSuggestionsReturnsSuggestionFields() throws Exception {
-        when(suggestionService.getSuggestions("test-user")).thenReturn(List.of(
+        when(suggestionService.getSuggestions("test-user", "en")).thenReturn(List.of(
                 new SuggestionResponse("Upload your train ticket", LocalDateTime.of(2026, 6, 12, 10, 0))));
 
         mockMvc.perform(get("/api/suggestions")
@@ -41,8 +41,22 @@ class SuggestionsControllerTest {
     }
 
     @Test
+    void getSuggestionsForwardsLanguageQueryParam() throws Exception {
+        when(suggestionService.getSuggestions("test-user", "de")).thenReturn(List.of(
+                new SuggestionResponse("Lade deine Zugfahrkarte hoch", LocalDateTime.of(2026, 6, 12, 10, 0))));
+
+        mockMvc.perform(get("/api/suggestions")
+                        .param("language", "de")
+                        .header("X-User-Sub", "test-user"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].suggestion").value("Lade deine Zugfahrkarte hoch"));
+
+        verify(suggestionService).getSuggestions("test-user", "de");
+    }
+
+    @Test
     void getSuggestionsReturnsEmptyListWhenNoInvoices() throws Exception {
-        when(suggestionService.getSuggestions("test-user")).thenReturn(List.of());
+        when(suggestionService.getSuggestions("test-user", "en")).thenReturn(List.of());
 
         mockMvc.perform(get("/api/suggestions")
                         .header("X-User-Sub", "test-user"))
@@ -55,6 +69,6 @@ class SuggestionsControllerTest {
         mockMvc.perform(get("/api/suggestions"))
                 .andExpect(status().isUnauthorized());
 
-        verify(suggestionService, never()).getSuggestions(anyString());
+        verify(suggestionService, never()).getSuggestions(anyString(), anyString());
     }
 }

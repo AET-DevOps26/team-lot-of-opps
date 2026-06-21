@@ -19,6 +19,8 @@ services:
     environment:
       - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json
+      # Local dev only: skip Firebase verification when no admin credentials exist.
+      - DEV_AUTH=${DEV_AUTH:-false}
     volumes:
       - ../services/auth-service/devops-25c9a-firebase-adminsdk-fbsvc-d15365a6ac.json:/app/firebase-service-account.json:ro
     networks:
