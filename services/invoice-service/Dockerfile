@@ -17,16 +17,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr tesseract-ocr-deu wget \
     && rm -rf /var/lib/apt/lists/*
 
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
-
 WORKDIR /app
 
 COPY --from=builder /app/build/libs/*.jar app.jar
 
-RUN chown appuser:appgroup app.jar
-RUN mkdir -p /app/uploads && chown appuser:appgroup /app/uploads
+RUN chown 1000 app.jar
+RUN mkdir -p /app/uploads && chown 1000:1000 /app/uploads
 
-USER appuser
+USER 1000
 
 EXPOSE 8080
 

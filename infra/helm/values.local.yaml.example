@@ -27,9 +27,8 @@ firebase:
 # Make sure infra/.env has all VITE_FIREBASE_* variables set before building.
 # See infra/.env.example for the full list.
 
-dbInvoice:
+db:
   password: "password"
-dbLlmChat:
-  password: "password"
-dbSuggestions:
-  password: "password"
+
+persistence:
+  storageClassName: "local-path"

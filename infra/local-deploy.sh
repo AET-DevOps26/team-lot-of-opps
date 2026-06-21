@@ -43,6 +43,8 @@ for entry in "${services[@]}"; do
   echo "    docker build $name"
   if [ "$name" = "client" ]; then
     docker build "${FIREBASE_BUILD_ARGS[@]}" -t "$REGISTRY/$name:latest" "$context"
+  elif [ "$name" = "llm-chat" ]; then
+    docker build --platform linux/amd64 -t "$REGISTRY/$name:latest" "$context"
   else
     docker build -t "$REGISTRY/$name:latest" "$context"
   fi
@@ -60,6 +62,7 @@ fi
 helm upgrade --install "$RELEASE" "$HELM_DIR" \
   -f "$HELM_DIR/values.yaml" \
   -f "$VALUES_LOCAL" \
+  --set-file "db.initSql=$REPO_ROOT/infra/postgres/init.sql" \
   "${FIREBASE_SA_ARG[@]}"
 
 echo "==> Done. App should be available at http://localhost:30080"

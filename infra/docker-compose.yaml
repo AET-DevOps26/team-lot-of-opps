@@ -38,13 +38,13 @@ services:
       - LLM_URL=${LLM_URL}
       - LLM_MODEL=${LLM_MODEL}
       - LLM_API_KEY=${LLM_API_KEY}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${DB_LLM_CHAT_PASSWORD}@db-llm-chat:5432/llm_db
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${DB_PASSWORD}@db:5432/taxforward
     volumes:
       - ../services/llm-chat/app:/app/app
     networks:
       - network
     depends_on:
-      db-llm-chat:
+      db:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
@@ -65,9 +65,9 @@ services:
     environment:
       # SPRING_DATASOURCE_URL is per-service topology (points at this service's
       # own DB), so it stays a literal rather than a shared ${SPRING_DATASOURCE_URL}.
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://db-invoice:5432/invoice_db
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/taxforward?currentSchema=invoice
       - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${DB_INVOICE_PASSWORD}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
       - STORAGE_LOCATION=${STORAGE_LOCATION:-/app/uploads}
       - UPLOAD_MAX_SIZE_BYTES=${UPLOAD_MAX_SIZE_BYTES}
       - LLM_URL=${LLM_URL}
@@ -76,6 +76,7 @@ services:
       - LLM_CHAT_URL=${LLM_CHAT_URL}
     volumes:
       - ../services/invoice-service/src:/app/src
+      - invoice_uploads:/app/uploads
     networks:
       - network
     healthcheck:
@@ -85,7 +86,7 @@ services:
       retries: 3
       start_period: 40s
     depends_on:
-      db-invoice:
+      db:
         condition: service_healthy
       llm-chat:
         condition: service_healthy
@@ -102,9 +103,9 @@ services:
     environment:
       # SPRING_DATASOURCE_URL is per-service topology (points at this service's
       # own DB), so it stays a literal rather than a shared ${SPRING_DATASOURCE_URL}.
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://db-suggestions:5432/suggestions_db
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/taxforward?currentSchema=suggestions
       - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${DB_SUGGESTIONS_PASSWORD}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
       - LLM_URL=${LLM_URL}
       - LLM_MODEL=${LLM_MODEL}
       - LLM_API_KEY=${LLM_API_KEY}
@@ -121,64 +122,27 @@ services:
       retries: 3
       start_period: 40s
     depends_on:
-      db-suggestions:
+      db:
         condition: service_healthy
       invoice-service:
         condition: service_healthy
     restart: unless-stopped
 
-  db-invoice:
-    platform: linux/amd64
-    image: postgres:16
-    container_name: db-invoice
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${DB_INVOICE_PASSWORD}
-      - POSTGRES_DB=invoice_db
-    volumes:
-      - postgres_invoice:/var/lib/postgresql/data
-    networks:
-      - network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U appuser -d invoice_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  db-llm-chat:
+  db:
     platform: linux/amd64
     image: pgvector/pgvector:pg16
-    container_name: db-llm-chat
+    container_name: db
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${DB_LLM_CHAT_PASSWORD}
-      - POSTGRES_DB=llm_db
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=taxforward
     volumes:
-      - postgres_llm_chat:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U appuser -d llm_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  db-suggestions:
-    platform: linux/amd64
-    image: postgres:16
-    container_name: db-suggestions
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${DB_SUGGESTIONS_PASSWORD}
-      - POSTGRES_DB=suggestions_db
-    volumes:
-      - postgres_suggestions:/var/lib/postgresql/data
-    networks:
-      - network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U appuser -d suggestions_db"]
+      test: ["CMD-SHELL", "pg_isready -U appuser -d taxforward"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -212,9 +176,8 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_invoice:
-  postgres_llm_chat:
-  postgres_suggestions:
+  postgres_data:
+  invoice_uploads:
 
 networks:
   network:

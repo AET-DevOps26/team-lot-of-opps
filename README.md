@@ -43,9 +43,7 @@ An external OpenAI-compatible LLM endpoint (e.g. LM Studio or Ollama on the host
 | `suggestions-service` | Spring Boot (Java, JPA)       | `8083`        | `suggestions-service` |
 | `auth-service`    | FastAPI (Python, Firebase Admin)  | `8000`        | `auth-service`    |
 | `traefik`         | Traefik v3                        | `80` / `8090` | `traefik`         |
-| `db-invoice`      | PostgreSQL 16                     | `5432`        | `db-invoice`      |
-| `db-llm-chat`     | PostgreSQL 16 + pgvector          | `5432`        | `db-llm-chat`     |
-| `db-suggestions`  | PostgreSQL 16                     | `5432`        | `db-suggestions`  |
+| `db`              | PostgreSQL 16 + pgvector          | `5432`        | `db`              |
 
 ## Setup
 
