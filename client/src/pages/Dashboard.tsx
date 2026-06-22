@@ -5,6 +5,8 @@ import Icon from '../components/Icon'
 import { apiGet } from '../api/client'
 import type { SuggestionResponse } from '../api/types'
 import { usePersistentState } from '../hooks/usePersistentState'
+import { useAppSelector } from '../store/hooks'
+import { selectLanguage } from '../features/i18nSlice'
 
 const TAX_RATE_STORAGE_KEY = 'dashboard.taxRatePercent'
 const DEFAULT_TAX_RATE_PERCENT = 30
@@ -128,6 +130,7 @@ function SummaryCard({ label, value, icon, hint, hintIcon, hintColor, highlight 
 
 export default function Dashboard() {
   const t = useT()
+  const language = useAppSelector(selectLanguage)
   const [reversed, setReversed] = useState(false)
   const [taxRatePercent, setTaxRatePercent] = usePersistentState(
     TAX_RATE_STORAGE_KEY,
@@ -158,7 +161,7 @@ export default function Dashboard() {
     let cancelled = false
     setSuggestionsLoading(true)
     setSuggestionsError(false)
-    apiGet<SuggestionResponse[]>('/api/suggestions')
+    apiGet<SuggestionResponse[]>(`/api/suggestions?language=${language}`)
       .then((data) => {
         if (cancelled) return
         setSuggestions(data || [])
@@ -174,7 +177,7 @@ export default function Dashboard() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [language])
 
   const totalExpenses = invoices.reduce((s, inv) => s + Number(inv.price || 0), 0)
   const carryforward = totalExpenses // placeholder: same as recorded expenses

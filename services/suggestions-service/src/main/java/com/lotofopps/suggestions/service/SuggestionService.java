@@ -73,28 +73,37 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
         this.restTemplate = restTemplate;
     }
 
-    public List<SuggestionResponse> getSuggestions(String userId) {
+    public List<SuggestionResponse> getSuggestions(String userId, String language) {
+        String lang = normalizeLanguage(language);
         List<InvoiceItem> invoices = invoiceClient.fetchLatestInvoices(userId, invoiceLimit);
         if (invoices.isEmpty()) {
             return List.of();
         }
 
-        if (needsNewSuggestion(userId, invoices)) {
-            generateAndStore(userId, invoices);
+        if (needsNewSuggestion(userId, invoices, lang)) {
+            generateAndStore(userId, invoices, lang);
         }
 
         return suggestionRepository.findByUserIdOrderByIdAsc(userId)
                 .stream().map(SuggestionResponse::from).toList();
     }
 
+    /** The frontend only offers en/de; anything unrecognized falls back to English. */
+    private static String normalizeLanguage(String language) {
+        return "de".equalsIgnoreCase(language) ? "de" : "en";
+    }
+
     /**
-     * Only call the LLM when invoices were uploaded after the most recent
-     * stored suggestion, so dashboard reloads don't trigger redundant
-     * generations.
+     * Call the LLM when invoices were uploaded after the most recent stored
+     * suggestion (so dashboard reloads don't trigger redundant generations),
+     * or when the stored suggestions are in a different language than requested.
      */
-    private boolean needsNewSuggestion(String userId, List<InvoiceItem> invoices) {
+    private boolean needsNewSuggestion(String userId, List<InvoiceItem> invoices, String language) {
         Optional<Suggestion> latest = suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(userId);
         if (latest.isEmpty()) {
+            return true;
+        }
+        if (!language.equals(latest.get().getLanguage())) {
             return true;
         }
         Optional<LocalDateTime> newestInvoice = invoices.stream()
@@ -104,14 +113,14 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
         return newestInvoice.map(t -> latest.get().getCreatedAt().isBefore(t)).orElse(false);
     }
 
-    private void generateAndStore(String userId, List<InvoiceItem> invoices) {
+    private void generateAndStore(String userId, List<InvoiceItem> invoices, String language) {
         try {
-            List<String> suggestions = callLlm(invoices);
+            List<String> suggestions = callLlm(invoices, language);
             if (!suggestions.isEmpty()) {
                 // Replace the previous set so each suggestion is its own row and
                 // stale suggestions don't accumulate.
                 suggestionRepository.deleteByUserId(userId);
-                suggestions.forEach(text -> suggestionRepository.save(new Suggestion(userId, text)));
+                suggestions.forEach(text -> suggestionRepository.save(new Suggestion(userId, text, language)));
             }
         } catch (Exception e) {
             // Fall back to previously stored suggestions; fail only if there are none.
@@ -124,7 +133,7 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
     }
 
     /** Ask the LLM for a structured {"suggestions": [...]} object and return at most two entries. */
-    private List<String> callLlm(List<InvoiceItem> invoices) throws Exception {
+    private List<String> callLlm(List<InvoiceItem> invoices, String language) throws Exception {
         String context = invoices.stream()
                 .map(inv -> String.format("- %s | %s | %s EUR | %s | %s",
                         Objects.toString(inv.itemName(), ""),
@@ -134,10 +143,14 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
                         Objects.toString(inv.invoiceDate(), "")))
                 .collect(Collectors.joining("\n"));
 
+        // Keep the German-tax domain prompt; only steer the output language.
+        String languageName = "de".equals(language) ? "German" : "English";
+        String systemPrompt = SYSTEM_PROMPT + "\nWrite each suggestion in " + languageName + ".";
+
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", llmModel);
         body.put("messages", List.of(
-                Map.of("role", "system", "content", SYSTEM_PROMPT),
+                Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content",
                         "Here are the user's uploaded invoices:\n" + context
                                 + "\n\nWhat tax documents are missing?")));

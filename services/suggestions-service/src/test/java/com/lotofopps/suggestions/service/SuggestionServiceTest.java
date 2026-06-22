@@ -54,7 +54,7 @@ class SuggestionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SuggestionService("http://localhost:9999", "test-model", 5,
+        service = new SuggestionService("http://localhost:9999", "test-model", "EMPTY", 5,
                 suggestionRepository, invoiceClient, restTemplate);
     }
 
@@ -64,7 +64,11 @@ class SuggestionServiceTest {
     }
 
     private Suggestion storedSuggestion(LocalDateTime createdAt) {
-        Suggestion s = new Suggestion(USER_ID, "Stored suggestion");
+        return storedSuggestion(createdAt, "en");
+    }
+
+    private Suggestion storedSuggestion(LocalDateTime createdAt, String language) {
+        Suggestion s = new Suggestion(USER_ID, "Stored suggestion", language);
         ReflectionTestUtils.setField(s, "createdAt", createdAt);
         return s;
     }
@@ -73,7 +77,7 @@ class SuggestionServiceTest {
     void returnsEmptyListWhenUserHasNoInvoices() {
         when(invoiceClient.fetchLatestInvoices(USER_ID, 5)).thenReturn(List.of());
 
-        assertThat(service.getSuggestions(USER_ID)).isEmpty();
+        assertThat(service.getSuggestions(USER_ID, "en")).isEmpty();
         verify(suggestionRepository, never()).save(any());
     }
 
@@ -88,7 +92,7 @@ class SuggestionServiceTest {
         when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID))
                 .thenReturn(List.of(storedSuggestion(LocalDateTime.now())));
 
-        List<SuggestionResponse> result = service.getSuggestions(USER_ID);
+        List<SuggestionResponse> result = service.getSuggestions(USER_ID, "en");
 
         assertThat(result).hasSize(1);
         verify(suggestionRepository).save(any(Suggestion.class));
@@ -110,7 +114,7 @@ class SuggestionServiceTest {
                 .thenReturn(ResponseEntity.ok(twoSuggestions));
         when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID)).thenReturn(List.of());
 
-        service.getSuggestions(USER_ID);
+        service.getSuggestions(USER_ID, "en");
 
         verify(suggestionRepository).deleteByUserId(USER_ID);
         ArgumentCaptor<Suggestion> captor = ArgumentCaptor.forClass(Suggestion.class);
@@ -130,7 +134,7 @@ class SuggestionServiceTest {
         when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID))
                 .thenReturn(List.of(storedSuggestion(LocalDateTime.now())));
 
-        List<SuggestionResponse> result = service.getSuggestions(USER_ID);
+        List<SuggestionResponse> result = service.getSuggestions(USER_ID, "en");
 
         assertThat(result).hasSize(1);
         verify(restTemplate, never()).exchange(anyString(), any(HttpMethod.class), any(), eq(String.class));
@@ -148,9 +152,29 @@ class SuggestionServiceTest {
         when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID))
                 .thenReturn(List.of(storedSuggestion(LocalDateTime.now())));
 
-        service.getSuggestions(USER_ID);
+        service.getSuggestions(USER_ID, "en");
 
         verify(suggestionRepository).save(any(Suggestion.class));
+    }
+
+    @Test
+    void regeneratesWhenStoredLanguageDiffersFromRequested() {
+        // Invoices are older than the stored suggestion, so without the language
+        // check no regeneration would happen — but the user switched to German.
+        when(invoiceClient.fetchLatestInvoices(USER_ID, 5))
+                .thenReturn(List.of(invoice(LocalDateTime.now().minusDays(1))));
+        when(suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID))
+                .thenReturn(Optional.of(storedSuggestion(LocalDateTime.now(), "en")));
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(LLM_RESPONSE));
+        when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID))
+                .thenReturn(List.of(storedSuggestion(LocalDateTime.now(), "de")));
+
+        service.getSuggestions(USER_ID, "de");
+
+        ArgumentCaptor<Suggestion> captor = ArgumentCaptor.forClass(Suggestion.class);
+        verify(suggestionRepository).save(captor.capture());
+        assertThat(captor.getValue().getLanguage()).isEqualTo("de");
     }
 
     @Test
@@ -164,7 +188,7 @@ class SuggestionServiceTest {
         when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID))
                 .thenReturn(List.of(storedSuggestion(LocalDateTime.now().minusDays(1))));
 
-        List<SuggestionResponse> result = service.getSuggestions(USER_ID);
+        List<SuggestionResponse> result = service.getSuggestions(USER_ID, "en");
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getSuggestion()).isEqualTo("Stored suggestion");

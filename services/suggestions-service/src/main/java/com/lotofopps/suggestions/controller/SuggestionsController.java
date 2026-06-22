@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -34,11 +35,13 @@ public class SuggestionsController {
         @ApiResponse(responseCode = "200", description = "List of suggestions, most recent first"),
         @ApiResponse(responseCode = "401", description = "Unauthorized")
     })
-    public ResponseEntity<List<SuggestionResponse>> getSuggestions(HttpServletRequest request) {
+    public ResponseEntity<List<SuggestionResponse>> getSuggestions(
+            HttpServletRequest request,
+            @RequestParam(name = "language", defaultValue = "en") String language) {
         String userId = currentUserId(request);
         if (userId == null || userId.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(suggestionService.getSuggestions(userId));
+        return ResponseEntity.ok(suggestionService.getSuggestions(userId, language));
     }
 }
