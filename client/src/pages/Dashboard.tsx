@@ -5,6 +5,7 @@ import Icon from '../components/Icon'
 import { apiGet } from '../api/client'
 import type { SuggestionResponse } from '../api/types'
 import { usePersistentState } from '../hooks/usePersistentState'
+import { useCategoryLabel } from '../lib/invoices'
 import { useAppSelector } from '../store/hooks'
 import { selectLanguage } from '../features/i18nSlice'
 
@@ -130,6 +131,7 @@ function SummaryCard({ label, value, icon, hint, hintIcon, hintColor, highlight 
 
 export default function Dashboard() {
   const t = useT()
+  const categoryLabel = useCategoryLabel()
   const language = useAppSelector(selectLanguage)
   const [reversed, setReversed] = useState(false)
   const [taxRatePercent, setTaxRatePercent] = usePersistentState(
@@ -192,7 +194,7 @@ export default function Dashboard() {
   }, {})
 
   const sorted = Object.entries(byCategory)
-    .map(([label, amount]) => ({ label, amount }))
+    .map(([key, amount]) => ({ label: categoryLabel(key), amount }))
     .sort((a, b) => b.amount - a.amount)
 
   const EXPENSE_BARS: readonly ExpenseBar[] = sorted.slice(0, 4).map((row) => ({

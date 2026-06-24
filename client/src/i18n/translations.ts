@@ -159,6 +159,8 @@ export interface TranslationDict {
     error: string
     sources: { one: string; other: string; jump: string }
   }
+  // Keys match the backend InvoiceCategory enum (see lib/invoices.ts CATEGORY_KEYS).
+  categories: Record<string, string>
 }
 
 const translations: Record<Language, TranslationDict> = {
@@ -352,6 +354,23 @@ const translations: Record<Language, TranslationDict> = {
       error: 'Something went wrong.',
       sources: { one: 'source', other: 'sources', jump: 'View this invoice' },
     },
+    categories: {
+      KONTOFUEHRUNGSGEBUEHREN: 'Account maintenance fees',
+      WEGE_ZUR_ARBEIT: 'Commuting to work',
+      HOMEOFFICE_UND_ARBEITSZIMMER: 'Home office and study',
+      INTERNET_UND_TELEFON: 'Internet and phone',
+      ARBEITSMITTEL: 'Work equipment',
+      BERUFSVERBÄNDE_UND_GEWERKSCHAFTEN: 'Professional associations and unions',
+      STEUERBERATUNGSKOSTEN: 'Tax advice costs',
+      REISEKOSTEN: 'Travel expenses',
+      BEWERBUNGEN: 'Job applications',
+      FORTBILDUNGEN: 'Further education',
+      UMZUG: 'Relocation',
+      BEWIRTUNG: 'Hospitality',
+      DOPPELTER_HAUSHALT: 'Second household',
+      AUSSERGEWOEHNLICHE_FAHRZEUGKOSTEN: 'Extraordinary vehicle costs',
+      SONSTIGE_AUSGABEN: 'Other expenses',
+    },
   },
   de: {
     brand: 'TaxForward',
@@ -543,6 +562,23 @@ const translations: Record<Language, TranslationDict> = {
         'Frag mich zu deinen hochgeladenen Dokumenten oder was du für deine Steuererklärung noch hochladen solltest.',
       error: 'Etwas ist schiefgelaufen.',
       sources: { one: 'Quelle', other: 'Quellen', jump: 'Rechnung anzeigen' },
+    },
+    categories: {
+      KONTOFUEHRUNGSGEBUEHREN: 'Kontoführungsgebühren',
+      WEGE_ZUR_ARBEIT: 'Wege zur Arbeit',
+      HOMEOFFICE_UND_ARBEITSZIMMER: 'Homeoffice und Arbeitszimmer',
+      INTERNET_UND_TELEFON: 'Internet und Telefon',
+      ARBEITSMITTEL: 'Arbeitsmittel',
+      BERUFSVERBÄNDE_UND_GEWERKSCHAFTEN: 'Berufsverbände und Gewerkschaften',
+      STEUERBERATUNGSKOSTEN: 'Steuerberatungskosten',
+      REISEKOSTEN: 'Reisekosten',
+      BEWERBUNGEN: 'Bewerbungen',
+      FORTBILDUNGEN: 'Fortbildungen',
+      UMZUG: 'Umzug',
+      BEWIRTUNG: 'Bewirtung',
+      DOPPELTER_HAUSHALT: 'Doppelter Haushalt',
+      AUSSERGEWOEHNLICHE_FAHRZEUGKOSTEN: 'Außergewöhnliche Fahrzeugkosten',
+      SONSTIGE_AUSGABEN: 'Sonstige Ausgaben',
     },
   },
 }
