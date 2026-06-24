@@ -76,9 +76,11 @@ services:
       - LLM_MODEL=${LLM_MODEL}
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_CHAT_URL=${LLM_CHAT_URL}
+      - OPENAPI_SPEC_PATH=/api/openapi.yaml
     volumes:
       - ../services/invoice-service/src:/app/src
       - invoice_uploads:/app/uploads
+      - ../api/openapi.yaml:/api/openapi.yaml:ro
     networks:
       - network
     healthcheck:
@@ -113,8 +115,10 @@ services:
       - LLM_API_KEY=${LLM_API_KEY}
       - INVOICE_SERVICE_URL=${INVOICE_SERVICE_URL}
       - SUGGESTIONS_INVOICE_LIMIT=${SUGGESTIONS_INVOICE_LIMIT}
+      - OPENAPI_SPEC_PATH=/api/openapi.yaml
     volumes:
       - ../services/suggestions-service/src:/app/src
+      - ../api/openapi.yaml:/api/openapi.yaml:ro
     networks:
       - network
     healthcheck:
