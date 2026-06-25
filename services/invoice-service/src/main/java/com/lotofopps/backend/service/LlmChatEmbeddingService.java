@@ -1,5 +1,6 @@
 package com.lotofopps.backend.service;
 
+import com.lotofopps.backend.client.model.EmbedRequest;
 import com.lotofopps.backend.model.Invoice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,7 +9,6 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Service
@@ -47,11 +47,11 @@ public class LlmChatEmbeddingService {
 
     public void embedInvoice(Invoice invoice) {
         try {
-            Map<String, Object> body = buildEmbedBody(invoice);
+            EmbedRequest body = buildEmbedBody(invoice);
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             restTemplate.exchange(
-                    llmChatUrl + "/embed",
+                    llmChatUrl + "/v1/embed",
                     HttpMethod.POST,
                     new HttpEntity<>(body, headers),
                     String.class);
@@ -63,25 +63,24 @@ public class LlmChatEmbeddingService {
 
     public void deleteEmbedding(Long invoiceId) {
         try {
-            restTemplate.delete(llmChatUrl + "/embed/" + invoiceId);
+            restTemplate.delete(llmChatUrl + "/v1/embed/" + invoiceId);
             log.info("Deleted embedding for invoice id={}", invoiceId);
         } catch (Exception e) {
             log.warn("Failed to delete embedding for invoice id={}: {}", invoiceId, e.getMessage());
         }
     }
 
-    private Map<String, Object> buildEmbedBody(Invoice invoice) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("invoice_id",   invoice.getId());
-        body.put("text",         buildText(invoice));
-        body.put("user_id",      invoice.getUserId() != null ? invoice.getUserId() : "");
-        body.put("item_name",    invoice.getItemName());
-        body.put("company",      invoice.getCompany());
-        body.put("price",        invoice.getPrice() != null ? invoice.getPrice().doubleValue() : null);
-        body.put("category",     invoice.getCategory() != null ? invoice.getCategory().name() : null);
-        body.put("invoice_date", invoice.getInvoiceDate() != null ? invoice.getInvoiceDate().toString() : null);
-        body.put("document_id",  invoice.getDocument() != null ? invoice.getDocument().getId() : null);
-        return body;
+    private EmbedRequest buildEmbedBody(Invoice invoice) {
+        return new EmbedRequest()
+                .invoiceId(invoice.getId())
+                .text(buildText(invoice))
+                .userId(invoice.getUserId() != null ? invoice.getUserId() : "")
+                .itemName(invoice.getItemName())
+                .company(invoice.getCompany())
+                .price(invoice.getPrice())
+                .category(invoice.getCategory() != null ? invoice.getCategory().name() : null)
+                .invoiceDate(invoice.getInvoiceDate() != null ? invoice.getInvoiceDate().toString() : null)
+                .documentId(invoice.getDocument() != null ? invoice.getDocument().getId() : null);
     }
 
     private String buildText(Invoice invoice) {

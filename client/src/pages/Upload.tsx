@@ -3,9 +3,8 @@ import { Link } from 'react-router-dom'
 import useT, { type Translator } from '../i18n/useT'
 import Icon from '../components/Icon'
 import InvoiceFormModal from '../components/InvoiceFormModal'
-import { apiGet, apiPost, apiDelete, apiPostFormData } from '../api/client'
+import { api, unwrap } from '../api/client'
 import type { InvoiceResponse } from '../lib/invoices'
-import type { UploadResponse } from '../api/types'
 
 type QueueItemType = 'processing' | 'review' | 'verified' | 'error'
 
@@ -210,8 +209,8 @@ export default function Upload() {
   // followed by the most recent kept invoices.
   useEffect(() => {
     Promise.all([
-      apiGet<InvoiceResponse[]>('/api/invoices?status=PENDING').catch(() => []),
-      apiGet<InvoiceResponse[]>('/api/invoices?limit=5').catch(() => []),
+      unwrap(api.GET('/api/v1/invoices', { params: { query: { status: 'PENDING' } } })).catch(() => []),
+      unwrap(api.GET('/api/v1/invoices', { params: { query: { limit: 5 } } })).catch(() => []),
     ]).then(([pending, recent]) => {
       setQueue([
         ...pending.map((inv) => reviewQueueItem(inv, t)),
@@ -240,11 +239,16 @@ export default function Upload() {
         const form = new FormData()
         form.append('file', file)
 
-        apiPostFormData<UploadResponse>('/api/documents/upload', form)
+        unwrap(api.POST('/api/v1/documents/upload', {
+          body: form as unknown as { file: string },
+          bodySerializer: (b) => b as unknown as FormData,
+        }))
           .then(async (res) => {
             // Extraction creates the invoices as PENDING. Pull them back so the user can
             // review the extracted data before it counts.
-            const pending = await apiGet<InvoiceResponse[]>('/api/invoices?status=PENDING').catch(() => [])
+            const pending = await unwrap(
+              api.GET('/api/v1/invoices', { params: { query: { status: 'PENDING' } } }),
+            ).catch(() => [])
             const created = pending.filter((inv) => res.invoiceIds.includes(inv.id))
             const reviewItems: QueueItem[] = created.length > 0
               ? created.map((inv) => reviewQueueItem(inv, t))
@@ -288,7 +292,7 @@ export default function Upload() {
   const handleKeep = useCallback(
     (item: QueueItem) => {
       if (!item.invoice) return
-      apiPost<InvoiceResponse>(`/api/invoices/${item.invoice.id}/accept`, {})
+      unwrap(api.POST('/api/v1/invoices/{id}/accept', { params: { path: { id: item.invoice.id } } }))
         .then((saved) =>
           setQueue((prev) => prev.map((q) => (q.id === item.id ? verifiedQueueItem(saved, t) : q))),
         )
@@ -300,7 +304,7 @@ export default function Upload() {
   // Undo: discard the extracted invoice (and its document if it has no other invoices).
   const handleUndo = useCallback((item: QueueItem) => {
     if (!item.invoice) return
-    apiDelete<void>(`/api/invoices/${item.invoice.id}`)
+    unwrap(api.DELETE('/api/v1/invoices/{id}', { params: { path: { id: item.invoice.id } } }))
       .then(() => setQueue((prev) => prev.filter((q) => q.id !== item.id)))
       .catch(() => {})
   }, [])

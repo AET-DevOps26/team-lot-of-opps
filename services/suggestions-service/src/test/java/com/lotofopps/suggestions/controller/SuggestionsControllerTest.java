@@ -33,7 +33,7 @@ class SuggestionsControllerTest {
         when(suggestionService.getSuggestions("test-user", "en")).thenReturn(List.of(
                 new SuggestionResponse("Upload your train ticket", LocalDateTime.of(2026, 6, 12, 10, 0))));
 
-        mockMvc.perform(get("/api/suggestions")
+        mockMvc.perform(get("/api/v1/suggestions")
                         .header("X-User-Sub", "test-user"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].suggestion").value("Upload your train ticket"))
@@ -45,7 +45,7 @@ class SuggestionsControllerTest {
         when(suggestionService.getSuggestions("test-user", "de")).thenReturn(List.of(
                 new SuggestionResponse("Lade deine Zugfahrkarte hoch", LocalDateTime.of(2026, 6, 12, 10, 0))));
 
-        mockMvc.perform(get("/api/suggestions")
+        mockMvc.perform(get("/api/v1/suggestions")
                         .param("language", "de")
                         .header("X-User-Sub", "test-user"))
                 .andExpect(status().isOk())
@@ -58,7 +58,7 @@ class SuggestionsControllerTest {
     void getSuggestionsReturnsEmptyListWhenNoInvoices() throws Exception {
         when(suggestionService.getSuggestions("test-user", "en")).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/suggestions")
+        mockMvc.perform(get("/api/v1/suggestions")
                         .header("X-User-Sub", "test-user"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
@@ -66,7 +66,7 @@ class SuggestionsControllerTest {
 
     @Test
     void getSuggestionsReturns401WithoutUserHeader() throws Exception {
-        mockMvc.perform(get("/api/suggestions"))
+        mockMvc.perform(get("/api/v1/suggestions"))
                 .andExpect(status().isUnauthorized());
 
         verify(suggestionService, never()).getSuggestions(anyString(), anyString());

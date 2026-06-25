@@ -1,7 +1,8 @@
 package com.lotofopps.suggestions.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lotofopps.suggestions.dto.InvoiceItem;
+import com.lotofopps.suggestions.client.model.InvoiceCategory;
+import com.lotofopps.suggestions.client.model.InvoiceResponse;
 import com.lotofopps.suggestions.dto.SuggestionResponse;
 import com.lotofopps.suggestions.model.Suggestion;
 import com.lotofopps.suggestions.repository.SuggestionRepository;
@@ -58,9 +59,15 @@ class SuggestionServiceTest {
                 suggestionRepository, invoiceClient, restTemplate);
     }
 
-    private InvoiceItem invoice(LocalDateTime createdAt) {
-        return new InvoiceItem(1L, "Hotel Berlin", "Ibis", new BigDecimal("200.00"),
-                "REISEKOSTEN", LocalDate.of(2026, 5, 1), createdAt);
+    private InvoiceResponse invoice(LocalDateTime createdAt) {
+        return new InvoiceResponse()
+                .id(1L)
+                .itemName("Hotel Berlin")
+                .company("Ibis")
+                .price(new BigDecimal("200.00"))
+                .category(InvoiceCategory.REISEKOSTEN)
+                .invoiceDate(LocalDate.of(2026, 5, 1))
+                .createdAt(createdAt);
     }
 
     private Suggestion storedSuggestion(LocalDateTime createdAt) {

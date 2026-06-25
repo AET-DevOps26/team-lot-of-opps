@@ -63,7 +63,12 @@ class AgentChatRequest(BaseModel):
     question: str
 
 
-@app.post("/embed")
+class StatusResponse(BaseModel):
+    status: str = "ok"
+
+
+@app.post("/v1/embed", tags=["Internal"], response_model=StatusResponse,
+          summary="Embed an invoice into the chat vector store")
 async def embed(request: EmbedRequest):
     await store_embeddings(
         request.invoice_id, request.text, request.user_id,
@@ -72,7 +77,8 @@ async def embed(request: EmbedRequest):
     )
     return {"status": "ok"}
 
-@app.put("/embed")
+@app.put("/v1/embed", tags=["Internal"], response_model=StatusResponse,
+         summary="Update an invoice embedding")
 async def update(request: UpdateRequest):
     await update_embeddings(
         request.invoice_id, request.text, request.user_id,
@@ -81,13 +87,18 @@ async def update(request: UpdateRequest):
     )
     return {"status": "ok"}
 
-@app.delete("/embed/{invoice_id}")
+@app.delete("/v1/embed/{invoice_id}", tags=["Internal"], response_model=StatusResponse,
+            summary="Delete an invoice embedding")
 async def delete_embed(invoice_id: int):
     await delete_embeddings(invoice_id)
     return {"status": "ok"}
 
 
-@app.post("/api/agent/chat")
+@app.post("/api/v1/agent/chat", tags=["Chat"],
+          summary="Ask the RAG agent a question",
+          response_class=StreamingResponse,
+          responses={200: {"content": {"text/event-stream": {}},
+                           "description": "Server-Sent Events stream of agent events"}})
 async def agent_chat(request: AgentChatRequest, x_user_sub: str = Header(...)):
     async def _gen():
         async for event_dict in run_agent_streaming(request.question, x_user_sub):
@@ -95,7 +106,7 @@ async def agent_chat(request: AgentChatRequest, x_user_sub: str = Header(...)):
     return StreamingResponse(_gen(), media_type="text/event-stream")
 
 
-@app.get("/health")
+@app.get("/health", tags=["Internal"], response_model=StatusResponse, summary="Health check")
 def health():
     return {"status": "ok"}
 

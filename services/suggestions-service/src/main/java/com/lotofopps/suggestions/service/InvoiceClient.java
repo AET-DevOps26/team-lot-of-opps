@@ -1,6 +1,6 @@
 package com.lotofopps.suggestions.service;
 
-import com.lotofopps.suggestions.dto.InvoiceItem;
+import com.lotofopps.suggestions.client.model.InvoiceResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
@@ -26,13 +26,13 @@ public class InvoiceClient {
         this.restTemplate = restTemplate;
     }
 
-    public List<InvoiceItem> fetchLatestInvoices(String userId, int limit) {
+    public List<InvoiceResponse> fetchLatestInvoices(String userId, int limit) {
         String url = UriComponentsBuilder
-                .fromUriString(invoiceServiceUrl + "/internal/invoices/latest")
+                .fromUriString(invoiceServiceUrl + "/internal/v1/invoices/latest")
                 .queryParam("userId", userId)
                 .queryParam("limit", limit)
                 .toUriString();
-        ResponseEntity<List<InvoiceItem>> response = restTemplate.exchange(
+        ResponseEntity<List<InvoiceResponse>> response = restTemplate.exchange(
                 url, HttpMethod.GET, null,
                 new ParameterizedTypeReference<>() {});
         if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {

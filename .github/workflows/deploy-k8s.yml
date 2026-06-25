@@ -28,12 +28,14 @@ jobs:
           - service: invoice-service
             context: ./services/invoice-service
             dockerfile: ./services/invoice-service/Dockerfile
+            build_contexts: api=api
           - service: llm-chat
             context: ./services/llm-chat
             dockerfile: ./services/llm-chat/Dockerfile
           - service: suggestions-service
             context: ./services/suggestions-service
             dockerfile: ./services/suggestions-service/Dockerfile
+            build_contexts: api=api
     steps:
       - uses: actions/checkout@v4
 
@@ -80,6 +82,7 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
+          build-contexts: ${{ matrix.build_contexts }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

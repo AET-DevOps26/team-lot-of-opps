@@ -4,6 +4,7 @@ import base64
 import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 logger = logging.getLogger("auth-service")
 
@@ -23,7 +24,11 @@ if not DEV_AUTH:
 else:
     logger.warning("DEV_AUTH enabled: Firebase token verification is DISABLED.")
 
-app = FastAPI()
+app = FastAPI(title="Auth service", version="1.0.0")
+
+
+class StatusResponse(BaseModel):
+    status: str = "ok"
 
 
 def _uid_from_unverified_token(token: str) -> str | None:
@@ -37,7 +42,8 @@ def _uid_from_unverified_token(token: str) -> str | None:
         return None
 
 
-@app.get("/verify")
+@app.get("/verify", tags=["Auth"],
+         summary="Traefik forward-auth: validate the Firebase ID token and emit X-User-Sub")
 async def verify(request: Request):
     auth_header = request.headers.get("Authorization", "")
 
@@ -63,6 +69,6 @@ async def verify(request: Request):
         return JSONResponse(status_code=401, content={"error": str(e)})
 
 
-@app.get("/health")
+@app.get("/health", tags=["Auth"], response_model=StatusResponse, summary="Health check")
 async def health():
     return {"status": "ok"}

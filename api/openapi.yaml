@@ -44,7 +44,7 @@ security:
   - firebaseToken: []
 
 paths:
-  /api/documents:
+  /api/v1/documents:
     get:
       tags: [Documents]
       operationId: listDocuments
@@ -61,7 +61,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /api/documents/upload:
+  /api/v1/documents/upload:
     post:
       tags: [Documents]
       operationId: uploadDocument
@@ -115,7 +115,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/documents/{id}:
+  /api/v1/documents/{id}:
     delete:
       tags: [Documents]
       operationId: deleteDocument
@@ -132,7 +132,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /api/documents/{id}/content:
+  /api/v1/documents/{id}/content:
     get:
       tags: [Documents]
       operationId: downloadDocument
@@ -154,7 +154,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /api/invoices:
+  /api/v1/invoices:
     get:
       tags: [Invoices]
       operationId: listInvoices
@@ -217,7 +217,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /api/invoices/{id}:
+  /api/v1/invoices/{id}:
     put:
       tags: [Invoices]
       operationId: updateInvoice
@@ -261,7 +261,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /api/invoices/{id}/accept:
+  /api/v1/invoices/{id}/accept:
     post:
       tags: [Invoices]
       operationId: acceptInvoice
@@ -284,7 +284,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /api/suggestions:
+  /api/v1/suggestions:
     get:
       tags: [Suggestions]
       operationId: getSuggestions
@@ -292,6 +292,14 @@ paths:
       description: >-
         Suggestions are derived from the user's most recent accepted invoices,
         most recent first.
+      parameters:
+        - name: language
+          in: query
+          required: false
+          description: ISO language code the suggestions are localized to.
+          schema:
+            type: string
+            default: en
       responses:
         "200":
           description: List of suggestions
@@ -304,7 +312,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /api/agent/chat:
+  /api/v1/agent/chat:
     post:
       tags: [Chat]
       operationId: agentChat
@@ -328,7 +336,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /internal/invoices/latest:
+  /internal/v1/invoices/latest:
     get:
       tags: [Internal]
       operationId: getLatestInvoicesInternal
@@ -359,7 +367,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/InvoiceResponse"
 
-  /embed:
+  /v1/embed:
     post:
       tags: [Internal]
       operationId: createEmbedding
@@ -399,7 +407,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/StatusResponse"
 
-  /embed/{invoiceId}:
+  /v1/embed/{invoiceId}:
     delete:
       tags: [Internal]
       operationId: deleteEmbedding

@@ -26,9 +26,9 @@ All API traffic flows through **Traefik**, which enforces Firebase authenticatio
 
 ```
 Browser → Traefik ──► auth-service (/verify)   [validates Firebase ID token]
-                  └──► invoice-service          [/api/documents, /api/invoices]
-                  └──► llm-chat                 [/api/agent]
-                  └──► suggestions-service      [/api/suggestions]
+                  └──► invoice-service          [/api/v1/documents, /api/v1/invoices]
+                  └──► llm-chat                 [/api/v1/agent]
+                  └──► suggestions-service      [/api/v1/suggestions]
 ```
 
 An external OpenAI-compatible LLM endpoint (e.g. LM Studio or Ollama on the host, reachable via `host.docker.internal`) is used for OCR extraction, vision, and chat completions.
