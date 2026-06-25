@@ -146,6 +146,10 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
         // Keep the German-tax domain prompt; only steer the output language.
         String languageName = "de".equals(language) ? "German" : "English";
         String systemPrompt = SYSTEM_PROMPT + "\nWrite each suggestion in " + languageName + ".";
+        if ("de".equals(language)) {
+            // The rest of the UI duzt the user, so keep the informal register here too.
+            systemPrompt += " Address the user informally with \"du\" (duzen), never the formal \"Sie\".";
+        }
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", llmModel);
