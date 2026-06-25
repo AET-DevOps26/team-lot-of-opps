@@ -7,7 +7,6 @@ import type { SuggestionResponse } from '../api/types'
 import { usePersistentState } from '../hooks/usePersistentState'
 import { useAppSelector } from '../store/hooks'
 import { selectLanguage } from '../features/i18nSlice'
-import { categoryLabel } from '../lib/invoices'
 
 const TAX_RATE_STORAGE_KEY = 'dashboard.taxRatePercent'
 const UPLOAD_SNAPSHOT_STORAGE_KEY = 'dashboard.uploadSnapshot'
@@ -226,7 +225,7 @@ export default function Dashboard() {
     .sort((a, b) => b.amount - a.amount)
 
   const EXPENSE_BARS: readonly ExpenseBar[] = sorted.slice(0, 4).map((row) => ({
-    label: categoryLabel(row.label),
+    label: row.label,
     amount: `€${row.amount.toFixed(2)}`,
     width: `${Math.min(100, (row.amount / (totalExpenses || 1)) * 100).toFixed(0)}%`,
     bar: 'bg-primary',
