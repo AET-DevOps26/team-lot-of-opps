@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import useT from '../i18n/useT'
 import Icon from './Icon'
 import { apiPost, apiPut } from '../api/client'
-import { CATEGORY_LABELS, type InvoiceResponse } from '../lib/invoices'
+import { CATEGORY_KEYS, type InvoiceResponse } from '../lib/invoices'
 import type { InvoiceRequest, InvoiceCategory } from '../api/types'
 
 interface InvoiceFormModalProps {
@@ -133,8 +133,8 @@ export default function InvoiceFormModal({ mode, initial, onSave, onClose }: Inv
                 onChange={(e) => setCategory(e.target.value as InvoiceCategory | '')}
               >
                 <option value="">{t('invoices.form.noCategory')}</option>
-                {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
+                {CATEGORY_KEYS.map((key) => (
+                  <option key={key} value={key}>{t(`categories.${key}`)}</option>
                 ))}
               </select>
               <Icon

@@ -5,7 +5,7 @@ import Icon from '../components/Icon'
 import InvoiceFormModal from '../components/InvoiceFormModal'
 import { auth } from '../firebase'
 import { apiGet, apiDelete } from '../api/client'
-import { categoryLabel, type InvoiceResponse } from '../lib/invoices'
+import { useCategoryLabel, type InvoiceResponse } from '../lib/invoices'
 
 type SortKey = 'date' | 'vendor' | 'category' | 'amount'
 type SortDir = 'asc' | 'desc'
@@ -42,6 +42,7 @@ function fmtEur(n: number): string {
 
 export default function Invoices() {
   const t = useT()
+  const categoryLabel = useCategoryLabel()
   const [invoices, setInvoices] = useState<InvoiceResponse[]>([])
   const [search, setSearch] = useState('')
   const [year, setYear] = useState('')
@@ -105,7 +106,7 @@ export default function Invoices() {
       if (inv.category) found.add(inv.category)
     }
     return [...found].sort((a, b) => categoryLabel(a).localeCompare(categoryLabel(b)))
-  }, [invoices])
+  }, [invoices, categoryLabel])
 
   const visibleInvoices = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -136,7 +137,7 @@ export default function Invoices() {
           return 0
       }
     })
-  }, [invoices, search, year, category, minAmount, maxAmount, sortKey, sortDir])
+  }, [invoices, search, year, category, minAmount, maxAmount, sortKey, sortDir, categoryLabel])
 
   function toggleSort(key: SortKey) {
     if (key === sortKey) {

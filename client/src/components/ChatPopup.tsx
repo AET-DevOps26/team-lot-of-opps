@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useChat, type ChatMessage } from '../hooks/useChat'
 import useT, { type Translator } from '../i18n/useT'
 import Icon from './Icon'
+import { useCategoryLabel } from '../lib/invoices'
 
 interface ChatPopupProps {
   open: boolean
@@ -201,6 +202,7 @@ function Sources({
   onClose: () => void
 }) {
   const navigate = useNavigate()
+  const categoryLabel = useCategoryLabel()
   const [expanded, setExpanded] = useState(false)
   const label = sources.length === 1 ? t('chat.sources.one') : t('chat.sources.other')
 
@@ -250,7 +252,7 @@ function Sources({
                       {date && <span>· {date}</span>}
                       {source.category && (
                         <span className="rounded-full bg-surface-container px-2 py-0.5 font-label-caps text-label-caps uppercase tracking-wide">
-                          {source.category}
+                          {categoryLabel(source.category)}
                         </span>
                       )}
                     </p>

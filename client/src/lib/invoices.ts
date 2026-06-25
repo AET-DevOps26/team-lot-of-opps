@@ -3,30 +3,34 @@
 // Types are generated from api/openapi.yaml (see client/src/api/schema.ts) and
 // re-exported here so existing import sites keep working unchanged.
 
+import { useCallback } from 'react'
+import useT from '../i18n/useT'
+
 export type { InvoiceResponse, InvoiceStatus } from '../api/types'
 
-// Maps the backend `InvoiceCategory` enum values (sent verbatim by the API)
-// to the human-readable labels shown in the UI. Keep keys in sync with
-// backend/.../model/InvoiceCategory.java.
-export const CATEGORY_LABELS: Record<string, string> = {
-  KONTOFUEHRUNGSGEBUEHREN: 'Kontoführungsgebühren',
-  WEGE_ZUR_ARBEIT: 'Wege zur Arbeit',
-  HOMEOFFICE_UND_ARBEITSZIMMER: 'Homeoffice und Arbeitszimmer',
-  INTERNET_UND_TELEFON: 'Internet und Telefon',
-  ARBEITSMITTEL: 'Arbeitsmittel',
-  BERUFSVERBÄNDE_UND_GEWERKSCHAFTEN: 'Berufsverbände und Gewerkschaften',
-  STEUERBERATUNGSKOSTEN: 'Steuerberatungskosten',
-  REISEKOSTEN: 'Reisekosten',
-  BEWERBUNGEN: 'Bewerbungen',
-  FORTBILDUNGEN: 'Fortbildungen',
-  UMZUG: 'Umzug',
-  BEWIRTUNG: 'Bewirtung',
-  DOPPELTER_HAUSHALT: 'Doppelter Haushalt',
-  AUSSERGEWOEHNLICHE_FAHRZEUGKOSTEN: 'Außergewöhnliche Fahrzeugkosten',
-  SONSTIGE_AUSGABEN: 'Sonstige Ausgaben',
-}
+// Backend `InvoiceCategory` enum values, sent verbatim by the API. Keep in sync
+// with backend/.../model/InvoiceCategory.java and the `categories` blocks in
+// i18n/translations.ts (which hold the localized labels).
+export const CATEGORY_KEYS = [
+  'KONTOFUEHRUNGSGEBUEHREN',
+  'WEGE_ZUR_ARBEIT',
+  'HOMEOFFICE_UND_ARBEITSZIMMER',
+  'INTERNET_UND_TELEFON',
+  'ARBEITSMITTEL',
+  'BERUFSVERBÄNDE_UND_GEWERKSCHAFTEN',
+  'STEUERBERATUNGSKOSTEN',
+  'REISEKOSTEN',
+  'BEWERBUNGEN',
+  'FORTBILDUNGEN',
+  'UMZUG',
+  'BEWIRTUNG',
+  'DOPPELTER_HAUSHALT',
+  'AUSSERGEWOEHNLICHE_FAHRZEUGKOSTEN',
+  'SONSTIGE_AUSGABEN',
+] as const
 
-export function categoryLabel(value: string | null): string {
-  if (!value) return '—'
-  return CATEGORY_LABELS[value] ?? value
+// Returns a `(category) => localized label` function bound to the active language.
+export function useCategoryLabel(): (value: string | null) => string {
+  const t = useT()
+  return useCallback((value) => (value ? t(`categories.${value}`) : '—'), [t])
 }
