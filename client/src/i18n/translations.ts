@@ -40,10 +40,18 @@ export interface TranslationDict {
     forgotPassword: string
     sendResetEmail: string
     resetEmailSent: string
+    passwordHint: string
     passwordMismatch: string
     weakPassword: string
     emailInUse: string
     invalidCredentials: string
+    invalidEmail: string
+    userDisabled: string
+    tooManyRequests: string
+    networkError: string
+    popupBlocked: string
+    accountExists: string
+    genericError: string
   }
   settings: {
     title: string
@@ -216,10 +224,18 @@ const translations: Record<Language, TranslationDict> = {
       forgotPassword: 'Forgot password?',
       sendResetEmail: 'Send reset email',
       resetEmailSent: 'Check your inbox — reset link sent.',
+      passwordHint: 'Use at least 6 characters.',
       passwordMismatch: 'Passwords do not match.',
       weakPassword: 'Password must be at least 6 characters.',
       emailInUse: 'An account with this email already exists.',
       invalidCredentials: 'Incorrect email or password.',
+      invalidEmail: 'Please enter a valid email address.',
+      userDisabled: 'This account has been disabled.',
+      tooManyRequests: 'Too many attempts. Please try again in a moment.',
+      networkError: 'Network error. Check your connection and try again.',
+      popupBlocked: 'Your browser blocked the sign-in popup. Please allow popups and try again.',
+      accountExists: 'An account already exists with this email. Try signing in with email.',
+      genericError: 'Something went wrong. Please try again.',
     },
     settings: {
       title: 'Settings',
@@ -425,10 +441,18 @@ const translations: Record<Language, TranslationDict> = {
       forgotPassword: 'Passwort vergessen?',
       sendResetEmail: 'Reset-E-Mail senden',
       resetEmailSent: 'Postfach prüfen — Reset-Link wurde gesendet.',
+      passwordHint: 'Mindestens 6 Zeichen verwenden.',
       passwordMismatch: 'Passwörter stimmen nicht überein.',
       weakPassword: 'Passwort muss mindestens 6 Zeichen haben.',
       emailInUse: 'Ein Konto mit dieser E-Mail existiert bereits.',
       invalidCredentials: 'Falsche E-Mail oder falsches Passwort.',
+      invalidEmail: 'Bitte eine gültige E-Mail-Adresse eingeben.',
+      userDisabled: 'Dieses Konto wurde deaktiviert.',
+      tooManyRequests: 'Zu viele Versuche. Bitte versuche es gleich erneut.',
+      networkError: 'Netzwerkfehler. Bitte Verbindung prüfen und erneut versuchen.',
+      popupBlocked: 'Dein Browser hat das Anmelde-Popup blockiert. Bitte Popups erlauben und erneut versuchen.',
+      accountExists: 'Mit dieser E-Mail existiert bereits ein Konto. Versuche, dich mit E-Mail anzumelden.',
+      genericError: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
     },
     settings: {
       title: 'Einstellungen',

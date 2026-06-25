@@ -79,6 +79,20 @@ describe('EmailPasswordForm', () => {
     expect(createUserWithEmailAndPassword).not.toHaveBeenCalled()
   })
 
+  it('rejects sign-up with a too-short password before calling Firebase', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<EmailPasswordForm />)
+
+    await user.click(screen.getByRole('button', { name: t.switchToSignUp }))
+    await user.type(screen.getByPlaceholderText(t.emailLabel), 'jane@example.com')
+    await user.type(screen.getByPlaceholderText(t.passwordLabel), '123')
+    await user.type(screen.getByPlaceholderText(t.confirmPasswordLabel), '123')
+    await user.click(screen.getByRole('button', { name: t.createAccount }))
+
+    expect(await screen.findByText(t.weakPassword)).toBeInTheDocument()
+    expect(createUserWithEmailAndPassword).not.toHaveBeenCalled()
+  })
+
   it('creates an account when sign-up passwords match', async () => {
     const user = userEvent.setup()
     vi.mocked(createUserWithEmailAndPassword).mockResolvedValue({} as never)
@@ -125,5 +139,31 @@ describe('EmailPasswordForm', () => {
 
     await user.click(screen.getByRole('button', { name: t.switchToSignUp }))
     expect(screen.queryByText(t.invalidCredentials)).not.toBeInTheDocument()
+  })
+
+  it('clears the error as soon as the user edits a field', async () => {
+    const user = userEvent.setup()
+    vi.mocked(signInWithEmailAndPassword).mockRejectedValue({ code: 'auth/wrong-password' })
+    renderWithProviders(<EmailPasswordForm />)
+
+    await user.type(screen.getByPlaceholderText(t.emailLabel), 'jane@example.com')
+    await user.type(screen.getByPlaceholderText(t.passwordLabel), 'wrong-pass')
+    await user.click(screen.getByRole('button', { name: t.signInWithEmail }))
+    expect(await screen.findByText(t.invalidCredentials)).toBeInTheDocument()
+
+    await user.type(screen.getByPlaceholderText(t.passwordLabel), 'x')
+    expect(screen.queryByText(t.invalidCredentials)).not.toBeInTheDocument()
+  })
+
+  it('shows a generic message for unexpected error codes', async () => {
+    const user = userEvent.setup()
+    vi.mocked(signInWithEmailAndPassword).mockRejectedValue({ code: 'auth/internal-error' })
+    renderWithProviders(<EmailPasswordForm />)
+
+    await user.type(screen.getByPlaceholderText(t.emailLabel), 'jane@example.com')
+    await user.type(screen.getByPlaceholderText(t.passwordLabel), 'secret123')
+    await user.click(screen.getByRole('button', { name: t.signInWithEmail }))
+
+    expect(await screen.findByText(t.genericError)).toBeInTheDocument()
   })
 })
