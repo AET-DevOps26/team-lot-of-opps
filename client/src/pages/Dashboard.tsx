@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import useT from '../i18n/useT'
 import Icon from '../components/Icon'
-import { apiGet } from '../api/client'
+import { api, unwrap } from '../api/client'
 import type { SuggestionResponse } from '../api/types'
 import { usePersistentState } from '../hooks/usePersistentState'
 import { useCategoryLabel } from '../lib/invoices'
@@ -154,7 +154,7 @@ export default function Dashboard() {
   const [suggestionsError, setSuggestionsError] = useState(false)
 
   useEffect(() => {
-    apiGet<typeof invoices>('/api/invoices')
+    unwrap(api.GET('/api/v1/invoices'))
       .then((data) => setInvoices(data || []))
       .catch(() => setInvoices([]))
   }, [])
@@ -163,7 +163,7 @@ export default function Dashboard() {
     let cancelled = false
     setSuggestionsLoading(true)
     setSuggestionsError(false)
-    apiGet<SuggestionResponse[]>(`/api/suggestions?language=${language}`)
+    unwrap(api.GET('/api/v1/suggestions', { params: { query: { language } } }))
       .then((data) => {
         if (cancelled) return
         setSuggestions(data || [])

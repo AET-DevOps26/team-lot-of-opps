@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/suggestions")
+@RequestMapping("/api/v1/suggestions")
 @Tag(name = "Suggestions")
 public class SuggestionsController {
 

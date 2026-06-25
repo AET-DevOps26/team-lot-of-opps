@@ -68,7 +68,7 @@ async def _search_documents_async(query: str, user_id: str, referenced: list[dic
 async def _fetch_invoices(user_id: str) -> list[dict]:
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{INVOICE_SERVICE_URL}/internal/invoices/latest",
+            f"{INVOICE_SERVICE_URL}/internal/v1/invoices/latest",
             params={"userId": user_id, "limit": 1000},
             timeout=10.0,
         )

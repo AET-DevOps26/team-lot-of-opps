@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import useT from '../i18n/useT'
 import Icon from './Icon'
-import { apiPost, apiPut } from '../api/client'
+import { api, unwrap } from '../api/client'
 import { CATEGORY_KEYS, type InvoiceResponse } from '../lib/invoices'
 import type { InvoiceRequest, InvoiceCategory } from '../api/types'
 
@@ -39,12 +39,9 @@ export default function InvoiceFormModal({ mode, initial, onSave, onClose }: Inv
       invoiceDate: invoiceDate || null,
     }
     try {
-      let saved: InvoiceResponse
-      if (mode === 'create') {
-        saved = await apiPost<InvoiceResponse, InvoiceRequest>('/api/invoices', body)
-      } else {
-        saved = await apiPut<InvoiceResponse, InvoiceRequest>(`/api/invoices/${initial!.id}`, body)
-      }
+      const saved = mode === 'create'
+        ? await unwrap(api.POST('/api/v1/invoices', { body }))
+        : await unwrap(api.PUT('/api/v1/invoices/{id}', { params: { path: { id: initial!.id } }, body }))
       onSave(saved)
     } catch {
       setError(t('invoices.form.saveFailed') ?? 'Failed to save invoice')

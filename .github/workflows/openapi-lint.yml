@@ -12,6 +12,7 @@ on:
       - ".redocly.yaml"
       - ".pre-commit-config.yaml"
       - "client/src/api/schema.ts"
+      - "api/scripts/gen-all.sh"
   push:
     branches: [main]
     paths:
@@ -71,3 +72,32 @@ jobs:
             echo "Run 'npm run openapi:types' in client/ and commit the result."
             exit 1
           fi
+
+  generate-all:
+    name: Codegen smoke (all targets)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install client deps (TypeScript generator)
+        run: npm ci
+        working-directory: client
+
+      - name: Install openapi-python-client
+        run: pipx install openapi-python-client
+
+      - name: Generate every stub from the spec
+        run: ./api/scripts/gen-all.sh

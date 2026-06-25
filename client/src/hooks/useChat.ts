@@ -1,7 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { auth } from '../firebase'
-
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+import { authHeaders, BASE_URL } from '../api/client'
 
 /** An invoice the agent referenced while answering, surfaced to the user as a source. */
 export interface ChatSource {
@@ -109,14 +107,13 @@ export function useChat() {
       abortRef.current = controller
 
       try {
-        const token = await auth.currentUser?.getIdToken()
         const headers: Record<string, string> = {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
           Accept: 'text/event-stream',
         }
-        if (token) headers['Authorization'] = `Bearer ${token}`
 
-        const res = await fetch(`${BASE_URL}/api/agent/chat`, {
+        const res = await fetch(`${BASE_URL}/api/v1/agent/chat`, {
           method: 'POST',
           headers,
           body: JSON.stringify({ question: trimmed }),

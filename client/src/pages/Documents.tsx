@@ -3,8 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import useT from '../i18n/useT'
 import Icon from '../components/Icon'
 import InvoiceFormModal from '../components/InvoiceFormModal'
-import { auth } from '../firebase'
-import { apiGet, apiDelete } from '../api/client'
+import { api, unwrap, authHeaders, BASE_URL } from '../api/client'
 import { useCategoryLabel, type InvoiceResponse } from '../lib/invoices'
 
 type SortKey = 'date' | 'vendor' | 'category' | 'amount'
@@ -58,8 +57,8 @@ export default function Invoices() {
   const [editingInvoice, setEditingInvoice] = useState<InvoiceResponse | null>(null)
 
   useEffect(() => {
-    apiGet<InvoiceResponse[]>('/api/invoices')
-      .then(setInvoices)
+    unwrap(api.GET('/api/v1/invoices'))
+      .then((data) => setInvoices(data || []))
       .catch(() => {})
   }, [])
 
@@ -166,7 +165,7 @@ export default function Invoices() {
   async function handleDelete(id: number) {
     if (!confirm(t('invoices.confirmDelete') ?? 'Delete invoice?')) return
     try {
-      await apiDelete<void>(`/api/invoices/${id}`)
+      await unwrap(api.DELETE('/api/v1/invoices/{id}', { params: { path: { id } } }))
       setInvoices((prev) => prev.filter((i) => i.id !== id))
     } catch (e) {
       // eslint-disable-next-line no-alert
@@ -177,13 +176,9 @@ export default function Invoices() {
   async function handleView(documentId: number | null) {
     if (!documentId) return
     try {
-      const headers: Record<string, string> = {}
-      const token = await auth.currentUser?.getIdToken()
-      const uid = auth.currentUser?.uid
-      if (token) headers.Authorization = `Bearer ${token}`
-      if (uid) headers['X-User-Sub'] = uid
-      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
-      const response = await fetch(`${baseUrl}/api/documents/${documentId}/content`, { headers })
+      const response = await fetch(`${BASE_URL}/api/v1/documents/${documentId}/content`, {
+        headers: await authHeaders(),
+      })
       if (!response.ok) throw new Error(`Failed to load document: ${response.status}`)
       const blob = await response.blob()
       const objectUrl = URL.createObjectURL(blob)

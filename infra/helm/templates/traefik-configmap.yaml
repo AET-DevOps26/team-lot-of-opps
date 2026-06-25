@@ -39,7 +39,7 @@ data:
 
       routers:
         invoice-router:
-          rule: "PathPrefix(`/api/documents`) || PathPrefix(`/api/invoices`)"
+          rule: "PathPrefix(`/api/v1/documents`) || PathPrefix(`/api/v1/invoices`)"
           entryPoints:
             - web
           middlewares:
@@ -47,7 +47,7 @@ data:
           service: invoice-svc
 
         llm-chat-router:
-          rule: "PathPrefix(`/api/agent`)"
+          rule: "PathPrefix(`/api/v1/agent`)"
           entryPoints:
             - web
           middlewares:
@@ -55,7 +55,7 @@ data:
           service: llm-chat-svc
 
         suggestions-router:
-          rule: "PathPrefix(`/api/suggestions`)"
+          rule: "PathPrefix(`/api/v1/suggestions`)"
           entryPoints:
             - web
           middlewares:

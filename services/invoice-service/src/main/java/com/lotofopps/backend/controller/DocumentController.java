@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.Set;
 
 @RestController
-@RequestMapping("/api/documents")
+@RequestMapping("/api/v1/documents")
 @Tag(name = "Documents")
 public class DocumentController {
 

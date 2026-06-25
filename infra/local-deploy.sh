@@ -45,6 +45,8 @@ for entry in "${services[@]}"; do
     docker build "${FIREBASE_BUILD_ARGS[@]}" -t "$REGISTRY/$name:latest" "$context"
   elif [ "$name" = "llm-chat" ]; then
     docker build --platform linux/amd64 -t "$REGISTRY/$name:latest" "$context"
+  elif [ "$name" = "invoice-service" ] || [ "$name" = "suggestions-service" ]; then
+    docker build --build-context "api=$REPO_ROOT/api" -t "$REGISTRY/$name:latest" "$context"
   else
     docker build -t "$REGISTRY/$name:latest" "$context"
   fi
@@ -65,5 +67,13 @@ helm upgrade --install "$RELEASE" "$HELM_DIR" \
   --set-file "db.initSql=$REPO_ROOT/infra/postgres/init.sql" \
   "${FIREBASE_SA_ARG[@]}"
 
-echo "==> Done. App should be available at http://localhost:30080"
+NODE_PORT=$(kubectl get svc \
+  -l "app.kubernetes.io/name=traefik,app.kubernetes.io/instance=$RELEASE" \
+  -o jsonpath='{.items[0].spec.ports[0].nodePort}' 2>/dev/null || true)
+
+if [ -n "$NODE_PORT" ]; then
+  echo "==> Done. App available at http://localhost:$NODE_PORT"
+else
+  echo "==> Done. Could not read the traefik NodePort — check: kubectl get svc"
+fi
 echo "    Watch pods: kubectl get pods -w"

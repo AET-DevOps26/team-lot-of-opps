@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM eclipse-temurin:17-jdk AS builder
 
 WORKDIR /app
@@ -8,6 +9,9 @@ COPY gradle/ gradle/
 COPY build.gradle settings.gradle ./
 
 COPY src/ src/
+
+COPY --from=api openapi.yaml ./api/openapi.yaml
+ENV OPENAPI_SPEC_PATH=/app/api/openapi.yaml
 
 RUN chmod +x ./gradlew && ./gradlew build -x test
 

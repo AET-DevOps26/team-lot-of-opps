@@ -2,6 +2,7 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '4.0.6'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id 'org.openapi.generator' version '7.16.0'
 }
 
 group = 'com.lotofopps'
@@ -36,3 +37,27 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+openApiGenerate {
+	generatorName = 'java'
+	library = 'restclient'
+	inputSpec = System.getenv('OPENAPI_SPEC_PATH') ?: "$rootDir/../../api/openapi.yaml"
+	outputDir = layout.buildDirectory.dir('generated/openapi').get().asFile.path
+	modelPackage = 'com.lotofopps.backend.client.model'
+	globalProperties = [models: '']
+	configOptions = [
+		dateLibrary          : 'java8',
+		useJakartaEe         : 'true',
+		serializationLibrary : 'jackson',
+		openApiNullable      : 'false',
+		hideGenerationTimestamp: 'true',
+	]
+	typeMappings = ['DateTime': 'java.time.LocalDateTime']
+	importMappings = ['java.time.LocalDateTime': 'java.time.LocalDateTime']
+}
+
+sourceSets.main.java.srcDir(layout.buildDirectory.dir('generated/openapi/src/main/java'))
+tasks.named('openApiGenerate') {
+	doNotTrackState("openapi-generator 7.x uses /dev/stderr as inputSpec default, not a regular file on Gradle 9")
+}
+tasks.named('compileJava') { dependsOn tasks.named('openApiGenerate') }

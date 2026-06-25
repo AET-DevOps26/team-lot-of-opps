@@ -55,7 +55,7 @@ class DocumentControllerTest {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "invoice.pdf", "application/pdf", "dummy content".getBytes());
 
-        mockMvc.perform(multipart("/api/documents/upload")
+        mockMvc.perform(multipart("/api/v1/documents/upload")
                         .file(file)
                         .header("X-User-Sub", "test-user"))
                 .andExpect(status().isOk())
@@ -70,7 +70,7 @@ class DocumentControllerTest {
         MockMultipartFile emptyFile = new MockMultipartFile(
                 "file", "empty.pdf", "application/pdf", new byte[0]);
 
-        mockMvc.perform(multipart("/api/documents/upload")
+        mockMvc.perform(multipart("/api/v1/documents/upload")
                         .file(emptyFile)
                         .header("X-User-Sub", "test-user"))
                 .andExpect(status().isBadRequest())
@@ -82,7 +82,7 @@ class DocumentControllerTest {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "document.txt", "text/plain", "some text".getBytes());
 
-        mockMvc.perform(multipart("/api/documents/upload")
+        mockMvc.perform(multipart("/api/v1/documents/upload")
                         .file(file)
                         .header("X-User-Sub", "test-user"))
                 .andExpect(status().isBadRequest())
@@ -95,7 +95,7 @@ class DocumentControllerTest {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "big.pdf", "application/pdf", largeContent);
 
-        mockMvc.perform(multipart("/api/documents/upload")
+        mockMvc.perform(multipart("/api/v1/documents/upload")
                         .file(file)
                         .header("X-User-Sub", "test-user"))
                 .andExpect(status().isBadRequest())
@@ -112,7 +112,7 @@ class DocumentControllerTest {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "invoice.pdf", "application/pdf", "dummy content".getBytes());
 
-        mockMvc.perform(multipart("/api/documents/upload")
+        mockMvc.perform(multipart("/api/v1/documents/upload")
                         .file(file)
                         .header("X-User-Sub", "test-user"))
                 .andExpect(status().isInternalServerError())
@@ -124,7 +124,7 @@ class DocumentControllerTest {
         Document document = new Document("report.pdf", "application/pdf", 42L, "/uploads/report.pdf");
         when(documentRepository.findByUserId(any())).thenReturn(List.of(document));
 
-        mockMvc.perform(get("/api/documents")
+        mockMvc.perform(get("/api/v1/documents")
                         .header("X-User-Sub", "test-user"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].filename").value("report.pdf"))

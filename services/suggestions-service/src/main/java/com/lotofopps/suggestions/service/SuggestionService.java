@@ -2,7 +2,7 @@ package com.lotofopps.suggestions.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lotofopps.suggestions.dto.InvoiceItem;
+import com.lotofopps.suggestions.client.model.InvoiceResponse;
 import com.lotofopps.suggestions.dto.SuggestionResponse;
 import com.lotofopps.suggestions.model.Suggestion;
 import com.lotofopps.suggestions.repository.SuggestionRepository;
@@ -75,7 +75,7 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
 
     public List<SuggestionResponse> getSuggestions(String userId, String language) {
         String lang = normalizeLanguage(language);
-        List<InvoiceItem> invoices = invoiceClient.fetchLatestInvoices(userId, invoiceLimit);
+        List<InvoiceResponse> invoices = invoiceClient.fetchLatestInvoices(userId, invoiceLimit);
         if (invoices.isEmpty()) {
             return List.of();
         }
@@ -98,7 +98,7 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
      * suggestion (so dashboard reloads don't trigger redundant generations),
      * or when the stored suggestions are in a different language than requested.
      */
-    private boolean needsNewSuggestion(String userId, List<InvoiceItem> invoices, String language) {
+    private boolean needsNewSuggestion(String userId, List<InvoiceResponse> invoices, String language) {
         Optional<Suggestion> latest = suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(userId);
         if (latest.isEmpty()) {
             return true;
@@ -107,13 +107,13 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
             return true;
         }
         Optional<LocalDateTime> newestInvoice = invoices.stream()
-                .map(InvoiceItem::createdAt)
+                .map(InvoiceResponse::getCreatedAt)
                 .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder());
         return newestInvoice.map(t -> latest.get().getCreatedAt().isBefore(t)).orElse(false);
     }
 
-    private void generateAndStore(String userId, List<InvoiceItem> invoices, String language) {
+    private void generateAndStore(String userId, List<InvoiceResponse> invoices, String language) {
         try {
             List<String> suggestions = callLlm(invoices, language);
             if (!suggestions.isEmpty()) {
@@ -133,14 +133,14 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
     }
 
     /** Ask the LLM for a structured {"suggestions": [...]} object and return at most two entries. */
-    private List<String> callLlm(List<InvoiceItem> invoices, String language) throws Exception {
+    private List<String> callLlm(List<InvoiceResponse> invoices, String language) throws Exception {
         String context = invoices.stream()
                 .map(inv -> String.format("- %s | %s | %s EUR | %s | %s",
-                        Objects.toString(inv.itemName(), ""),
-                        Objects.toString(inv.company(), ""),
-                        Objects.toString(inv.price(), ""),
-                        Objects.toString(inv.category(), ""),
-                        Objects.toString(inv.invoiceDate(), "")))
+                        Objects.toString(inv.getItemName(), ""),
+                        Objects.toString(inv.getCompany(), ""),
+                        Objects.toString(inv.getPrice(), ""),
+                        Objects.toString(inv.getCategory(), ""),
+                        Objects.toString(inv.getInvoiceDate(), "")))
                 .collect(Collectors.joining("\n"));
 
         // Keep the German-tax domain prompt; only steer the output language.

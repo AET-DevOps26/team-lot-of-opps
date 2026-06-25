@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/api/documents": {
+    "/api/v1/documents": {
         parameters: {
             query?: never;
             header?: never;
@@ -21,7 +21,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/documents/upload": {
+    "/api/v1/documents/upload": {
         parameters: {
             query?: never;
             header?: never;
@@ -41,7 +41,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{id}": {
+    "/api/v1/documents/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -58,7 +58,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/documents/{id}/content": {
+    "/api/v1/documents/{id}/content": {
         parameters: {
             query?: never;
             header?: never;
@@ -75,7 +75,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/invoices": {
+    "/api/v1/invoices": {
         parameters: {
             query?: never;
             header?: never;
@@ -99,7 +99,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/invoices/{id}": {
+    "/api/v1/invoices/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -120,7 +120,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/invoices/{id}/accept": {
+    "/api/v1/invoices/{id}/accept": {
         parameters: {
             query?: never;
             header?: never;
@@ -140,7 +140,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/suggestions": {
+    "/api/v1/suggestions": {
         parameters: {
             query?: never;
             header?: never;
@@ -160,7 +160,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/agent/chat": {
+    "/api/v1/agent/chat": {
         parameters: {
             query?: never;
             header?: never;
@@ -180,7 +180,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/internal/invoices/latest": {
+    "/internal/v1/invoices/latest": {
         parameters: {
             query?: never;
             header?: never;
@@ -200,7 +200,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/embed": {
+    "/v1/embed": {
         parameters: {
             query?: never;
             header?: never;
@@ -224,7 +224,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/embed/{invoiceId}": {
+    "/v1/embed/{invoiceId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -645,7 +645,10 @@ export interface operations {
     };
     getSuggestions: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description ISO language code the suggestions are localized to. */
+                language?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
