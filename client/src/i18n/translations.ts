@@ -230,7 +230,7 @@ const translations: Record<Language, TranslationDict> = {
       subtitle: 'Here is the current state of your academic tax loss carryforward.',
       cards: {
         totalExpenses: 'Total Expenses',
-        sinceLastUpload: '+€350 since last upload',
+        sinceLastUpload: 'since last upload',
         carryforward: 'Est. Loss Carryforward',
         aiVerified: 'AI Verified',
         futureRefund: 'Estimated Future Refund',
@@ -422,7 +422,7 @@ const translations: Record<Language, TranslationDict> = {
       subtitle: 'Hier ist der aktuelle Stand deines akademischen Verlustvortrags.',
       cards: {
         totalExpenses: 'Gesamtausgaben',
-        sinceLastUpload: '+350 € seit letztem Upload',
+        sinceLastUpload: 'seit letztem Upload',
         carryforward: 'Geschätzter Verlustvortrag',
         aiVerified: 'KI-geprüft',
         futureRefund: 'Geschätzte zukünftige Rückerstattung',

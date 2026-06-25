@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import useT from '../i18n/useT'
 import Icon from '../components/Icon'
@@ -7,8 +7,10 @@ import type { SuggestionResponse } from '../api/types'
 import { usePersistentState } from '../hooks/usePersistentState'
 import { useAppSelector } from '../store/hooks'
 import { selectLanguage } from '../features/i18nSlice'
+import { categoryLabel } from '../lib/invoices'
 
 const TAX_RATE_STORAGE_KEY = 'dashboard.taxRatePercent'
+const UPLOAD_SNAPSHOT_STORAGE_KEY = 'dashboard.uploadSnapshot'
 const DEFAULT_TAX_RATE_PERCENT = 30
 const MIN_TAX_RATE_PERCENT = 0
 const MAX_TAX_RATE_PERCENT = 50
@@ -151,11 +153,39 @@ export default function Dashboard() {
   const [suggestionsLoading, setSuggestionsLoading] = useState(true)
   const [suggestionsError, setSuggestionsError] = useState(false)
 
+  const [uploadSnapshot, setUploadSnapshot] = usePersistentState(
+    UPLOAD_SNAPSHOT_STORAGE_KEY,
+    { total: 0, count: 0, delta: 0 },
+  )
+  const [sinceLastUpload, setSinceLastUpload] = useState(uploadSnapshot.delta)
+  const [invoicesLoaded, setInvoicesLoaded] = useState(false)
+  const hasSnapshotted = useRef(false)
+
   useEffect(() => {
     apiGet<typeof invoices>('/api/invoices')
       .then((data) => setInvoices(data || []))
       .catch(() => setInvoices([]))
+      .finally(() => setInvoicesLoaded(true))
   }, [])
+
+  useEffect(() => {
+    if (!invoicesLoaded || hasSnapshotted.current) return
+    hasSnapshotted.current = true
+    const total = invoices.reduce((s, inv) => s + Number(inv.price || 0), 0)
+    const count = invoices.length
+
+    // Only move the baseline when the invoice count actually changed (a real
+    // upload or deletion) — otherwise keep showing the last computed delta so
+    // it survives navigating away and back.
+    if (count === uploadSnapshot.count) {
+      setSinceLastUpload(uploadSnapshot.delta)
+      return
+    }
+    const delta = Math.max(0, total - uploadSnapshot.total)
+    setSinceLastUpload(delta)
+    setUploadSnapshot({ total, count, delta })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoicesLoaded, invoices])
 
   useEffect(() => {
     let cancelled = false
@@ -196,7 +226,7 @@ export default function Dashboard() {
     .sort((a, b) => b.amount - a.amount)
 
   const EXPENSE_BARS: readonly ExpenseBar[] = sorted.slice(0, 4).map((row) => ({
-    label: row.label,
+    label: categoryLabel(row.label),
     amount: `€${row.amount.toFixed(2)}`,
     width: `${Math.min(100, (row.amount / (totalExpenses || 1)) * 100).toFixed(0)}%`,
     bar: 'bg-primary',
@@ -209,7 +239,7 @@ export default function Dashboard() {
       label: t('dashboard.cards.totalExpenses'),
       value: `€${totalExpenses.toFixed(2)}`,
       icon: 'payments',
-      hint: t('dashboard.cards.sinceLastUpload'),
+      hint: `+€${sinceLastUpload.toFixed(2)} ${t('dashboard.cards.sinceLastUpload')}`,
       hintIcon: 'trending_up',
       hintColor: 'text-secondary',
     },
