@@ -10,6 +10,7 @@ export interface AuthUser {
 
 interface AuthState {
   user: AuthUser | null
+  /** True only until the initial Firebase session check resolves. */
   loading: boolean
 }
 
@@ -17,9 +18,6 @@ const authSlice = createSlice({
   name: 'auth',
   initialState: { user: null, loading: true } as AuthState,
   reducers: {
-    signingIn(state) {
-      state.loading = true
-    },
     signedIn(state, action: PayloadAction<AuthUser>) {
       state.user = action.payload
       state.loading = false
@@ -31,7 +29,7 @@ const authSlice = createSlice({
   },
 })
 
-export const { signingIn, signedIn, signedOut } = authSlice.actions
+export const { signedIn, signedOut } = authSlice.actions
 export const selectUser = (state: RootState) => state.auth.user
 export const selectIsAuthenticated = (state: RootState) => state.auth.user !== null
 export const selectAuthLoading = (state: RootState) => state.auth.loading

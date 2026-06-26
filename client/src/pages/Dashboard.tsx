@@ -376,9 +376,17 @@ export default function Dashboard() {
                   {t('dashboard.ai.error')}
                 </p>
               ) : suggestions.length === 0 ? (
-                <p className="font-body-sm text-body-sm text-on-surface-variant">
-                  {t('dashboard.ai.empty')}
-                </p>
+                <div className="space-y-4">
+                  <p className="font-body-sm text-body-sm text-on-surface-variant">
+                    {t('dashboard.ai.empty')}
+                  </p>
+                  <Link
+                    to="/upload"
+                    className="inline-flex items-center gap-1 bg-white border border-outline-variant text-primary font-body-sm text-body-sm px-3 py-1.5 rounded hover:bg-surface-container transition-colors"
+                  >
+                    <Icon name="upload" size={16} /> {t('dashboard.ai.uploadCta')}
+                  </Link>
+                </div>
               ) : (
                 suggestions.map((s, i) => (
                   <div
