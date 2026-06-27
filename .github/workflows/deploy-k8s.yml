@@ -109,12 +109,15 @@ jobs:
           chmod 600 ~/.kube/config
 
       - name: Create GHCR image pull secret
+        env:
+          GH_ACTOR: ${{ github.actor }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           kubectl create secret docker-registry ghcr-pull-secret \
             --namespace taxforward \
             --docker-server=ghcr.io \
-            --docker-username=${{ github.actor }} \
-            --docker-password=${{ secrets.GITHUB_TOKEN }} \
+            --docker-username="$GH_ACTOR" \
+            --docker-password="$GH_TOKEN" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Write Firebase service account file

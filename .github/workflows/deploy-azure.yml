@@ -22,10 +22,14 @@ jobs:
 
       - name: Deploy
         uses: appleboy/ssh-action@v1
+        env:
+          GH_ACTOR: ${{ github.actor }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.AZURE_VM_HOST }}
           username: ${{ secrets.AZURE_VM_USER }}
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          envs: GH_ACTOR,GH_TOKEN
           script: |
             set -e
             cd ~/app
@@ -44,8 +48,8 @@ jobs:
             LLM_MODEL=${{ vars.LLM_MODEL }}
             EOF
 
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
-              -u ${{ github.actor }} --password-stdin
+            echo "$GH_TOKEN" | docker login ghcr.io \
+              -u "$GH_ACTOR" --password-stdin
 
             docker compose --env-file .env.prod -f docker-compose.prod.yaml pull
             docker compose --env-file .env.prod -f docker-compose.prod.yaml up -d
