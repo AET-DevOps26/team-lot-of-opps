@@ -135,6 +135,31 @@ in [`client/e2e/`](client/e2e/), and CI runs them via
 
 ---
 
+## Pre-commit hooks & secret scanning
+
+Git hooks are managed with [pre-commit](https://pre-commit.com). One-time setup:
+
+```bash
+pip install -r requirements-dev.txt
+pre-commit install
+```
+
+Configured hooks ([.pre-commit-config.yaml](.pre-commit-config.yaml)):
+
+- **gitleaks** — scans staged changes for hardcoded secrets (API keys, tokens,
+  passwords) and **blocks the commit** if any are found. Rules and the allowlist for
+  placeholder/example files live in [`.gitleaks.toml`](.gitleaks.toml).
+- **openapi-lint** — lints the OpenAPI spec when it changes (see [api/README.md](api/README.md)).
+
+Run on demand: `pre-commit run gitleaks --all-files` (or `pre-commit run -a` for all hooks).
+
+If a finding is a false positive you can bypass with `git commit --no-verify`, but the
+same scan runs in CI ([`.github/workflows/secret-scan.yml`](.github/workflows/secret-scan.yml))
+on every PR and push to `main` as the authoritative, unbypassable gate. Prefer fixing
+the allowlist in `.gitleaks.toml` over routinely skipping the hook.
+
+---
+
 ## Notes
 
 - Each database service uses a Docker named volume (`postgres_invoice`, `postgres_llm_chat`) for persistence across restarts.
