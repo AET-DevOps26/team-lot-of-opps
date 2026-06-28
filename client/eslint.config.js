@@ -8,7 +8,7 @@ export default {
     'plugin:react-hooks/recommended',
   ],
   // src/api/schema.ts is generated from api/openapi.yaml (api/scripts/gen-all.sh).
-  ignorePatterns: ['dist', 'node_modules', 'src/api/schema.ts'],
+  ignorePatterns: ['dist', 'node_modules', 'src/api/schema.ts', 'e2e', 'playwright-report', 'test-results'],
   parser: '@typescript-eslint/parser',
   parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
   settings: { react: { version: '18.2' } },

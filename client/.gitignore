@@ -31,3 +31,8 @@ dist-ssr
 coverage
 .nyc_output
 *.tsbuildinfo
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/

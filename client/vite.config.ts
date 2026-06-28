@@ -14,7 +14,8 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    open: true,
+    // Don't pop a browser tab when the dev server is managed by Playwright (E2E=1).
+    open: !process.env.E2E,
     ...(apiTarget && {
       proxy: {
         '/api': {

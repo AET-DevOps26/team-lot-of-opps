@@ -83,6 +83,7 @@ export default function InvoiceFormModal({ mode, initial, onSave, onClose }: Inv
             <input
               ref={firstInputRef}
               required
+              aria-label={t('invoices.form.itemName')}
               className={fieldInputClass}
               value={itemName}
               onChange={(e) => setItemName(e.target.value)}
@@ -92,6 +93,7 @@ export default function InvoiceFormModal({ mode, initial, onSave, onClose }: Inv
             <label className={labelClass}>{t('invoices.form.company')}</label>
             <input
               required
+              aria-label={t('invoices.form.company')}
               className={fieldInputClass}
               value={company}
               onChange={(e) => setCompany(e.target.value)}
@@ -106,6 +108,7 @@ export default function InvoiceFormModal({ mode, initial, onSave, onClose }: Inv
                 inputMode="decimal"
                 min="0"
                 step="0.01"
+                aria-label={t('invoices.form.price')}
                 className={fieldInputClass}
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
@@ -115,6 +118,7 @@ export default function InvoiceFormModal({ mode, initial, onSave, onClose }: Inv
               <label className={labelClass}>{t('invoices.form.date')}</label>
               <input
                 type="date"
+                aria-label={t('invoices.form.date')}
                 className={fieldInputClass}
                 value={invoiceDate}
                 onChange={(e) => setInvoiceDate(e.target.value)}
@@ -125,6 +129,7 @@ export default function InvoiceFormModal({ mode, initial, onSave, onClose }: Inv
             <label className={labelClass}>{t('invoices.form.category')}</label>
             <div className="relative">
               <select
+                aria-label={t('invoices.form.category')}
                 className={`${fieldInputClass} appearance-none pr-10 cursor-pointer`}
                 value={category}
                 onChange={(e) => setCategory(e.target.value as InvoiceCategory | '')}
