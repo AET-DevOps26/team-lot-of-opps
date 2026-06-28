@@ -113,6 +113,28 @@ docker compose up -d
 
 ---
 
+## Frontend end-to-end tests
+
+Playwright drives the real frontend through complete user journeys (auth, dashboard,
+invoices, upload). The backend REST API (`/api/v1/**`) is mocked in-browser, and
+authentication runs against the Firebase Auth emulator — so the suite needs **no**
+running backend services.
+
+```bash
+cd client
+npm install
+npx playwright install chromium   # one-time
+npm run e2e                        # runs headless; npm run e2e:ui for the UI mode
+```
+
+`npm run e2e` is self-contained: Playwright boots the Auth emulator (via the local
+`firebase-tools`) and a Vite dev server on port `5273` automatically. **Java is
+required** for the emulator (the only system prerequisite). Tests and fixtures live
+in [`client/e2e/`](client/e2e/), and CI runs them via
+[`.github/workflows/e2e.yml`](.github/workflows/e2e.yml).
+
+---
+
 ## Notes
 
 - Each database service uses a Docker named volume (`postgres_invoice`, `postgres_llm_chat`) for persistence across restarts.
