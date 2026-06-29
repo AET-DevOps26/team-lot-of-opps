@@ -1,0 +1,25 @@
+# Gitleaks configuration for the TaxForward repo.
+#
+# Used by both the local pre-commit hook (.pre-commit-config.yaml) and the CI
+# gate (.github/workflows/secret-scan.yml) so they always agree. `useDefault`
+# pulls in gitleaks' maintained ruleset; the allowlist below exempts files that
+# only ever hold placeholders/examples (verified: `your-firebase-api-key`,
+# `changeme`, `EMPTY`, `demo-key`, etc.) plus vendored/generated paths.
+#
+# When fixing a false positive, prefer a narrow rule below over a broad path —
+# never allowlist real source files just to silence one match.
+title = "TaxForward gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholder/example, vendored, and lockfile paths"
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''infra/helm/values\.local\.yaml\.example$''',
+  '''client/e2e/firebase\.emulator\.json$''',
+  '''(^|/)node_modules/''',
+  '''(^|/)(build|dist)/''',
+  '''(^|/)package-lock\.json$''',
+]

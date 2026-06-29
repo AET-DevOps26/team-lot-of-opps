@@ -21,3 +21,14 @@ repos:
           - "@redocly/cli@1.34.15"
         files: ^(api/openapi\.yaml|\.redocly\.yaml)$
         pass_filenames: false
+
+  # Scans staged changes for hardcoded secrets (API keys, tokens, passwords) and
+  # blocks the commit if any are found. Rules + allowlist live in .gitleaks.toml.
+  # The pinned rev below is the single source of truth for the scanner version —
+  # keep it in sync with the image tag in .github/workflows/secret-scan.yml so the
+  # local hook and the CI gate always agree. Bypass a false positive with
+  # `git commit --no-verify` (CI still enforces it). See https://github.com/gitleaks/gitleaks
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
