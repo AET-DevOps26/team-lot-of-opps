@@ -48,6 +48,7 @@ jobs:
           vm_ip: ${{ env.VM_HOST }}
           kube_config: ${{ secrets.KUBE_CONFIG }}
           ssh_private_key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          ssh_known_hosts: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
 
       - name: Deploy monitoring stack
         run: |

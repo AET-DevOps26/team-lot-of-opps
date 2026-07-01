@@ -54,6 +54,20 @@ for entry in "${services[@]}"; do
   fi
 done
 
+# Install first: app chart's ServiceMonitor templates are gated on the
+# monitoring.coreos.com/v1 CRD, which this release provides.
+echo "==> Deploying observability stack..."
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null
+helm repo add grafana https://grafana.github.io/helm-charts >/dev/null
+helm repo update >/dev/null
+helm dependency update "$REPO_ROOT/infra/monitoring" >/dev/null
+helm upgrade --install monitoring "$REPO_ROOT/infra/monitoring" \
+  --namespace monitoring --create-namespace \
+  --wait --rollback-on-failure --timeout 10m \
+  --set 'kube-prometheus-stack.grafana.persistence.storageClassName=local-path' \
+  --set 'kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=local-path' \
+  --set 'loki-stack.loki.persistence.storageClassName=local-path'
+
 echo "==> Deploying with Helm..."
 SA_JSON="$REPO_ROOT/services/auth-service/devops-25c9a-firebase-adminsdk-fbsvc-d15365a6ac.json"
 FIREBASE_SA_ARG=()
@@ -85,18 +99,6 @@ helm upgrade --install "$RELEASE" "$HELM_DIR" \
     echo "===== EVENTS ====="; kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp || true
     exit 1
   }
-
-echo "==> Deploying observability stack..."
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null
-helm repo add grafana https://grafana.github.io/helm-charts >/dev/null
-helm repo update >/dev/null
-helm dependency update "$REPO_ROOT/infra/monitoring" >/dev/null
-helm upgrade --install monitoring "$REPO_ROOT/infra/monitoring" \
-  --namespace monitoring --create-namespace \
-  --wait --rollback-on-failure --timeout 10m \
-  --set 'kube-prometheus-stack.grafana.persistence.storageClassName=local-path' \
-  --set 'kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=local-path' \
-  --set 'loki-stack.loki.persistence.storageClassName=local-path'
 
 NODE_PORT=$(kubectl get svc "$RELEASE-tax-forward-traefik" \
   --namespace "$NAMESPACE" \

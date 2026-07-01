@@ -51,9 +51,11 @@
     # its own. kubeconfig stays root-owned (600); CI reads it via sudo.
     - name: Install single-node k3s
       shell: |
+        set -o pipefail
         curl -sfL https://get.k3s.io | \
           INSTALL_K3S_EXEC="--disable traefik --write-kubeconfig-mode 600" sh -
       args:
+        executable: /bin/bash
         creates: /usr/local/bin/k3s
 
     # ── On-box tooling (debugging convenience) ──────────────────────────────

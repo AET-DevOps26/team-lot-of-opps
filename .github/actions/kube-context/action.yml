@@ -14,6 +14,13 @@ inputs:
   ssh_private_key:
     description: SSH private key for the Azure VM (required when target=vm)
     required: false
+  ssh_known_hosts:
+    description: Pinned known_hosts entry for the VM, e.g. from `ssh-keyscan` run once at provision time (required when target=vm)
+    required: false
+  ssh_user:
+    description: SSH username for the Azure VM (defaults to azureuser, matching Terraform's admin_username default)
+    required: false
+    default: azureuser
 
 runs:
   using: composite
@@ -25,6 +32,8 @@ runs:
         VM_IP: ${{ inputs.vm_ip }}
         KUBE_CONFIG: ${{ inputs.kube_config }}
         SSH_KEY: ${{ inputs.ssh_private_key }}
+        SSH_KNOWN_HOSTS: ${{ inputs.ssh_known_hosts }}
+        SSH_USER: ${{ inputs.ssh_user }}
       run: |
         set -euo pipefail
         KCFG="$RUNNER_TEMP/kubeconfig"
@@ -36,15 +45,17 @@ runs:
             ;;
           vm)
             [ -n "$VM_IP" ] || { echo "::error::vm_ip required for target=vm (the VM_HOST env in the calling workflow)"; exit 1; }
+            [ -n "$SSH_KEY" ] || { echo "::error::ssh_private_key required for target=vm"; exit 1; }
+            [ -n "$SSH_KNOWN_HOSTS" ] || { echo "::error::ssh_known_hosts required for target=vm"; exit 1; }
             mkdir -p ~/.ssh
             echo "$SSH_KEY" > ~/.ssh/id_rsa
             chmod 600 ~/.ssh/id_rsa
-            ssh-keyscan "$VM_IP" >> ~/.ssh/known_hosts 2>/dev/null
+            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
             # k3s writes its kubeconfig root-owned (mode 600); read it via passwordless sudo.
             # Its server is already https://127.0.0.1:6443, so we tunnel that port locally
             # instead of exposing the k3s API (6443) to the internet.
-            ssh -i ~/.ssh/id_rsa azureuser@"$VM_IP" "sudo cat /etc/rancher/k3s/k3s.yaml" > "$KCFG"
-            ssh -i ~/.ssh/id_rsa -o ExitOnForwardFailure=yes -fNL 6443:127.0.0.1:6443 azureuser@"$VM_IP"
+            ssh -i ~/.ssh/id_rsa "$SSH_USER@$VM_IP" "sudo cat /etc/rancher/k3s/k3s.yaml" > "$KCFG"
+            ssh -i ~/.ssh/id_rsa -o ExitOnForwardFailure=yes -fNL 6443:127.0.0.1:6443 "$SSH_USER@$VM_IP"
             ;;
           *)
             echo "::error::unknown target '$TARGET' (expected aet or vm)"; exit 1

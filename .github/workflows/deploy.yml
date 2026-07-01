@@ -65,11 +65,15 @@ jobs:
           vm_ip: ${{ env.VM_HOST }}
           kube_config: ${{ secrets.KUBE_CONFIG }}
           ssh_private_key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          ssh_known_hosts: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
 
       - name: Create GHCR image pull secret
         env:
           GH_ACTOR: ${{ github.actor }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN expires when this job ends, which would break image
+          # pulls on later pod restarts/rollouts — use a long-lived read-only
+          # GHCR PAT instead.
+          GH_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
         run: |
           kubectl create namespace taxforward --dry-run=client -o yaml | kubectl apply -f -
           kubectl create secret docker-registry ghcr-pull-secret \
