@@ -140,6 +140,8 @@ async def update_embeddings(
 
 
 async def delete_embeddings(invoice_id: int) -> None:
+    if DATABASE_URL is None:
+        raise RuntimeError("DATABASE_URL environment variable is required")
     conn = await asyncpg.connect(
         DATABASE_URL, server_settings={"search_path": f"{SCHEMA_NAME}, public"}
     )

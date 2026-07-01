@@ -6,6 +6,7 @@ import com.lotofopps.backend.repository.DocumentRepository;
 import com.lotofopps.backend.repository.InvoiceRepository;
 import com.lotofopps.backend.service.DocumentStorageService;
 import com.lotofopps.backend.service.ExtractionService;
+import com.lotofopps.backend.service.LlmChatEmbeddingService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -41,6 +42,9 @@ class DocumentControllerTest {
 
     @MockitoBean
     private ExtractionService extractionService;
+
+    @MockitoBean
+    private LlmChatEmbeddingService embeddingService;
 
     @Test
     void uploadDocumentReturnsUploadResponse() throws Exception {
