@@ -71,6 +71,14 @@ data:
             - web
           service: client-svc
 
+        # Grafana keeps the /grafana prefix in the forwarded path (no StripPrefix) —
+        # Grafana itself is configured to serve from that sub-path, see infra/monitoring/values.yaml.
+        grafana-router:
+          rule: "PathPrefix(`/grafana`)"
+          entryPoints:
+            - web
+          service: grafana-svc
+
       services:
         invoice-svc:
           loadBalancer:
@@ -91,3 +99,9 @@ data:
           loadBalancer:
             servers:
               - url: "http://{{ include "taxforward.fullname" . }}-client:80"
+
+        grafana-svc:
+          loadBalancer:
+            servers:
+              # Grafana lives in the "monitoring" namespace/release, not this one — cross-namespace ClusterIP DNS.
+              - url: "http://monitoring-grafana.monitoring.svc.cluster.local:80"

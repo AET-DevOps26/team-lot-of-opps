@@ -3,7 +3,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REGISTRY="ghcr.io/aet-devops26/team-taxforward"
-RELEASE="taxapp-lot-of-opps"
+TAG="latest"
+RELEASE="taxforward"
+NAMESPACE="taxforward"
 HELM_DIR="$REPO_ROOT/infra/helm"
 
 VALUES_LOCAL="$HELM_DIR/values.local.yaml"
@@ -62,18 +64,47 @@ else
 fi
 
 helm upgrade --install "$RELEASE" "$HELM_DIR" \
+  --namespace "$NAMESPACE" --create-namespace \
+  --wait --rollback-on-failure --timeout 10m \
   -f "$HELM_DIR/values.yaml" \
   -f "$VALUES_LOCAL" \
+  --set images.authService.repository="$REGISTRY/auth-service" \
+  --set images.authService.tag="$TAG" \
+  --set images.invoiceService.repository="$REGISTRY/invoice-service" \
+  --set images.invoiceService.tag="$TAG" \
+  --set images.llmChat.repository="$REGISTRY/llm-chat" \
+  --set images.llmChat.tag="$TAG" \
+  --set images.client.repository="$REGISTRY/client" \
+  --set images.client.tag="$TAG" \
+  --set images.suggestionsService.repository="$REGISTRY/suggestions-service" \
+  --set images.suggestionsService.tag="$TAG" \
   --set-file "db.initSql=$REPO_ROOT/infra/postgres/init.sql" \
-  "${FIREBASE_SA_ARG[@]}"
+  "${FIREBASE_SA_ARG[@]}" || {
+    echo "===== PVC ====="; kubectl get pvc -n "$NAMESPACE" -o wide || true
+    echo "===== PODS ====="; kubectl get pods -n "$NAMESPACE" -o wide || true
+    echo "===== EVENTS ====="; kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp || true
+    exit 1
+  }
 
-NODE_PORT=$(kubectl get svc \
-  -l "app.kubernetes.io/name=traefik,app.kubernetes.io/instance=$RELEASE" \
-  -o jsonpath='{.items[0].spec.ports[0].nodePort}' 2>/dev/null || true)
+echo "==> Deploying observability stack..."
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null
+helm repo add grafana https://grafana.github.io/helm-charts >/dev/null
+helm repo update >/dev/null
+helm dependency update "$REPO_ROOT/infra/monitoring" >/dev/null
+helm upgrade --install monitoring "$REPO_ROOT/infra/monitoring" \
+  --namespace monitoring --create-namespace \
+  --wait --rollback-on-failure --timeout 10m \
+  --set 'kube-prometheus-stack.grafana.persistence.storageClassName=local-path' \
+  --set 'kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=local-path' \
+  --set 'loki-stack.loki.persistence.storageClassName=local-path'
+
+NODE_PORT=$(kubectl get svc "$RELEASE-tax-forward-traefik" \
+  --namespace "$NAMESPACE" \
+  -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || true)
 
 if [ -n "$NODE_PORT" ]; then
   echo "==> Done. App available at http://localhost:$NODE_PORT"
 else
-  echo "==> Done. Could not read the traefik NodePort — check: kubectl get svc"
+  echo "==> Done. Could not read the traefik NodePort — check: kubectl get svc -n $NAMESPACE"
 fi
-echo "    Watch pods: kubectl get pods -w"
+echo "    Watch pods: kubectl get pods -n $NAMESPACE -w"

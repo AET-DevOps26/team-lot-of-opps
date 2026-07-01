@@ -1,0 +1,65 @@
+kube-prometheus-stack:
+  prometheus:
+    prometheusSpec:
+      # Discover ServiceMonitors from all namespaces, not just the chart's own
+      serviceMonitorSelectorNilUsesHelmValues: false
+      serviceMonitorNamespaceSelector: {}
+      serviceMonitorSelector: {}
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: csi-rbd-sc
+            resources:
+              requests:
+                storage: 5Gi
+
+  grafana:
+    persistence:
+      enabled: true
+      storageClassName: csi-rbd-sc
+      size: 2Gi
+    "grafana.ini":
+      server:
+        # Reached through the app's Traefik at /grafana (see infra/helm/templates/traefik-configmap.yaml).
+        domain: taxforward-devops-ss26.stud.k8s.aet.cit.tum.de
+        root_url: "%(protocol)s://%(domain)s/grafana/"
+        serve_from_sub_path: true
+    sidecar:
+      dashboards:
+        enabled: true
+        label: grafana_dashboard
+        searchNamespace: ALL   # pick up dashboard ConfigMaps from the app namespace too
+    additionalDataSources:
+      - name: Loki
+        uid: loki                    # dashboard log panel references this uid explicitly
+        type: loki
+        access: proxy
+        url: http://monitoring-loki:3100   # loki-stack service name is release-prefixed
+        jsonData:
+          maxLines: 1000
+
+  alertmanager:
+    enabled: true
+
+  # Surface pod labels so deployed image version (app.kubernetes.io/version) is queryable.
+  # Without an allowlist, kube_pod_labels carries no label_* columns.
+  kube-state-metrics:
+    metricLabelsAllowlist:
+      - pods=[app.kubernetes.io/name,app.kubernetes.io/version]
+
+loki-stack:
+  loki:
+    isDefault: false   # loki-stack ships its own Loki datasource defaulted to true, conflicts with kube-prometheus-stack's default Prometheus one
+    persistence:
+      enabled: true
+      storageClassName: csi-rbd-sc
+      size: 5Gi
+  promtail:
+    enabled: true   # ships pod logs from all namespaces to Loki automatically
+    config:
+      clients:
+        # Chart default templates to http://{{ .Release.Name }}:3100/..., which
+        # isn't a real service — the loki subchart's actual service is release-prefixed.
+        - url: http://monitoring-loki:3100/loki/api/v1/push
+  grafana:
+    enabled: false  # use kube-prometheus-stack's Grafana instead

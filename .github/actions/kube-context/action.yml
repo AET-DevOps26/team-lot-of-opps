@@ -1,0 +1,55 @@
+name: Resolve kube context
+description: Point KUBECONFIG at the chosen cluster (aet | vm) for helm/kubectl steps.
+
+inputs:
+  target:
+    description: aet (AET cluster via KUBE_CONFIG) or vm (Azure VM k3s via SSH tunnel)
+    required: true
+  vm_ip:
+    description: Public IP of the Azure VM (required when target=vm)
+    required: false
+  kube_config:
+    description: base64-encoded kubeconfig for the AET cluster (required when target=aet)
+    required: false
+  ssh_private_key:
+    description: SSH private key for the Azure VM (required when target=vm)
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve kubeconfig
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+        VM_IP: ${{ inputs.vm_ip }}
+        KUBE_CONFIG: ${{ inputs.kube_config }}
+        SSH_KEY: ${{ inputs.ssh_private_key }}
+      run: |
+        set -euo pipefail
+        KCFG="$RUNNER_TEMP/kubeconfig"
+
+        case "$TARGET" in
+          aet)
+            [ -n "$KUBE_CONFIG" ] || { echo "::error::kube_config required for target=aet"; exit 1; }
+            echo "$KUBE_CONFIG" | base64 -d > "$KCFG"
+            ;;
+          vm)
+            [ -n "$VM_IP" ] || { echo "::error::vm_ip required for target=vm (the VM_HOST env in the calling workflow)"; exit 1; }
+            mkdir -p ~/.ssh
+            echo "$SSH_KEY" > ~/.ssh/id_rsa
+            chmod 600 ~/.ssh/id_rsa
+            ssh-keyscan "$VM_IP" >> ~/.ssh/known_hosts 2>/dev/null
+            # k3s writes its kubeconfig root-owned (mode 600); read it via passwordless sudo.
+            # Its server is already https://127.0.0.1:6443, so we tunnel that port locally
+            # instead of exposing the k3s API (6443) to the internet.
+            ssh -i ~/.ssh/id_rsa azureuser@"$VM_IP" "sudo cat /etc/rancher/k3s/k3s.yaml" > "$KCFG"
+            ssh -i ~/.ssh/id_rsa -o ExitOnForwardFailure=yes -fNL 6443:127.0.0.1:6443 azureuser@"$VM_IP"
+            ;;
+          *)
+            echo "::error::unknown target '$TARGET' (expected aet or vm)"; exit 1
+            ;;
+        esac
+
+        chmod 600 "$KCFG"
+        echo "KUBECONFIG=$KCFG" >> "$GITHUB_ENV"

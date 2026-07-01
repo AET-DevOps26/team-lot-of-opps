@@ -18,91 +18,45 @@
           - ufw
         state: present
 
-    - name: Add Docker GPG key
-      apt_key:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        state: present
-
-    - name: Add Docker apt repository
-      apt_repository:
-        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
-        state: present
-
-    - name: Install Docker
-      apt:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-          - docker-buildx-plugin
-          - docker-compose-plugin
-        state: present
-        update_cache: true
-
-    - name: Enable and start Docker
-      systemd:
-        name: docker
-        enabled: true
-        state: started
-
-    - name: Add user to docker group
-      user:
-        name: "{{ ansible_user }}"
-        groups: docker
-        append: true
-      notify: Reboot to apply group
-
-    - name: Allow SSH through UFW
+    # ── Firewall ────────────────────────────────────────────────────────────
+    # Only SSH + Traefik (80/443) are exposed publicly. The k3s API (6443) is
+    # reached over an SSH tunnel from CI, never opened to the internet.
+    - name: Allow public ports through UFW
       ufw:
         rule: allow
-        port: "22"
+        port: "{{ item }}"
         proto: tcp
+      loop:
+        - "22"
+        - "80"
+        - "443"
 
-    - name: Allow HTTP through UFW
+    # Without this, UFW's default-deny drops intra-cluster (flannel) traffic and
+    # the single-node cluster's pods can't talk to each other or the API.
+    - name: Allow k3s pod and service CIDRs through UFW
       ufw:
         rule: allow
-        port: "80"
-        proto: tcp
-
-    - name: Allow HTTPS through UFW
-      ufw:
-        rule: allow
-        port: "443"
-        proto: tcp
-
-    - name: Allow backend port through UFW
-      ufw:
-        rule: allow
-        port: "8080"
-        proto: tcp
-
-    - name: Allow AI port through UFW
-      ufw:
-        rule: allow
-        port: "8081"
-        proto: tcp
+        src: "{{ item }}"
+      loop:
+        - 10.42.0.0/16
+        - 10.43.0.0/16
 
     - name: Enable UFW
       ufw:
         state: enabled
         policy: deny
 
-    - name: Add kubectl GPG key
-      apt_key:
-        url: https://pkgs.k8s.io/core:/stable:/v1.33/deb/Release.key
-        state: present
+    # ── k3s ─────────────────────────────────────────────────────────────────
+    # Single-node cluster. Disable the bundled Traefik — our Helm chart ships
+    # its own. kubeconfig stays root-owned (600); CI reads it via sudo.
+    - name: Install single-node k3s
+      shell: |
+        curl -sfL https://get.k3s.io | \
+          INSTALL_K3S_EXEC="--disable traefik --write-kubeconfig-mode 600" sh -
+      args:
+        creates: /usr/local/bin/k3s
 
-    - name: Add kubectl apt repository
-      apt_repository:
-        repo: "deb https://pkgs.k8s.io/core:/stable:/v1.33/deb/ /"
-        state: present
-
-    - name: Install kubectl
-      apt:
-        name: kubectl
-        state: present
-        update_cache: true
-
+    # ── On-box tooling (debugging convenience) ──────────────────────────────
     - name: Add Helm GPG key
       apt_key:
         url: https://baltocdn.com/helm/signing.asc
@@ -127,16 +81,11 @@
         group: "{{ ansible_user }}"
         mode: "0700"
 
-    - name: Create app directory
-      file:
-        path: "/home/{{ ansible_user }}/app"
-        state: directory
+    - name: Give user a kubeconfig so kubectl/helm work on-box
+      copy:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: "/home/{{ ansible_user }}/.kube/config"
+        remote_src: true
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
-        mode: "0755"
-
-  handlers:
-    - name: Reboot to apply group
-      reboot:
-        msg: "Rebooting to apply docker group membership"
-        reboot_timeout: 120
+        mode: "0600"

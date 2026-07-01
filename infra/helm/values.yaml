@@ -1,22 +1,22 @@
 images:
   authService:
-    repository: "ghcr.io/aet-devops26/team-lot-of-opps/auth-service"
+    repository: "ghcr.io/aet-devops26/taxforward/auth-service"
     tag: "latest"
     pullPolicy: IfNotPresent
   invoiceService:
-    repository: "ghcr.io/aet-devops26/team-lot-of-opps/invoice-service"
+    repository: "ghcr.io/aet-devops26/taxforward/invoice-service"
     tag: "latest"
     pullPolicy: IfNotPresent
   llmChat:
-    repository: "ghcr.io/aet-devops26/team-lot-of-opps/llm-chat"
+    repository: "ghcr.io/aet-devops26/taxforward/llm-chat"
     tag: "latest"
     pullPolicy: IfNotPresent
   client:
-    repository: "ghcr.io/aet-devops26/team-lot-of-opps/client"
+    repository: "ghcr.io/aet-devops26/taxforward/client"
     tag: "latest"
     pullPolicy: IfNotPresent
   suggestionsService:
-    repository: "ghcr.io/aet-devops26/team-lot-of-opps/suggestions-service"
+    repository: "ghcr.io/aet-devops26/taxforward/suggestions-service"
     tag: "latest"
     pullPolicy: IfNotPresent
 

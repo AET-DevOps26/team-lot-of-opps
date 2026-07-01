@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "taxforward.labels" . | nindent 4 }}
     app.kubernetes.io/name: suggestions-service
+    monitoring: "true"
 spec:
   type: ClusterIP
   ports:
