@@ -2,11 +2,11 @@
 Unit tests for pure functions — no external services required.
 Run with: pytest tests/test_unit.py -v
 """
-import pytest
+
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
 
 # ── date parsing ──────────────────────────────────────────────────────────────
+
 
 def parse_date(date_str: str) -> str:
     for fmt in ("%d %b %Y", "%Y-%m-%d", "%d.%m.%Y"):
@@ -15,6 +15,7 @@ def parse_date(date_str: str) -> str:
         except ValueError:
             continue
     return date_str
+
 
 def normalize(s: str) -> str:
     return s.lower().replace("ß", "ss")
@@ -56,8 +57,9 @@ class TestNormalize:
 
 # ── chunk_text ────────────────────────────────────────────────────────────────
 
+
 def chunk_text(text: str, chunk_size: int = 500) -> list:
-    return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+    return [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
 
 
 class TestChunkText:

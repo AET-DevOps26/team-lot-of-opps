@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class InvoiceCategory(str, Enum):
     KONTOFUEHRUNGSGEBUEHREN = "KONTOFUEHRUNGSGEBUEHREN"
     WEGE_ZUR_ARBEIT = "WEGE_ZUR_ARBEIT"

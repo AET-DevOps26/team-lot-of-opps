@@ -53,15 +53,17 @@ async def _search_documents_async(query: str, user_id: str, referenced: list[dic
         meta = doc.metadata
         invoice_id = meta.get("invoice_id")
         if invoice_id is not None:
-            referenced.append({
-                "invoice_id": invoice_id,
-                "item_name": meta.get("item_name"),
-                "company": meta.get("company"),
-                "price": meta.get("price"),
-                "category": meta.get("category"),
-                "invoice_date": meta.get("invoice_date"),
-                "document_id": meta.get("document_id"),
-            })
+            referenced.append(
+                {
+                    "invoice_id": invoice_id,
+                    "item_name": meta.get("item_name"),
+                    "company": meta.get("company"),
+                    "price": meta.get("price"),
+                    "category": meta.get("category"),
+                    "invoice_date": meta.get("invoice_date"),
+                    "document_id": meta.get("document_id"),
+                }
+            )
     return "\n---\n".join(f"Result {i + 1}:\n{doc.page_content}" for i, doc in enumerate(docs))
 
 
@@ -83,17 +85,21 @@ async def _list_user_documents_async(user_id: str, referenced: list[dict]) -> st
         return "The user has no uploaded documents yet."
 
     for inv in invoices:
-        referenced.append({
-            "invoice_id": inv.get("id"),
-            "item_name": inv.get("itemName"),
-            "company": inv.get("company"),
-            "price": float(inv["price"]) if inv.get("price") is not None else None,
-            "category": inv.get("category"),
-            "invoice_date": inv.get("invoiceDate"),
-            "document_id": inv.get("documentId"),
-        })
+        referenced.append(
+            {
+                "invoice_id": inv.get("id"),
+                "item_name": inv.get("itemName"),
+                "company": inv.get("company"),
+                "price": float(inv["price"]) if inv.get("price") is not None else None,
+                "category": inv.get("category"),
+                "invoice_date": inv.get("invoiceDate"),
+                "document_id": inv.get("documentId"),
+            }
+        )
 
-    lines = ["ID  | Item                          | Company              | Price   | Category                    | Date"]
+    lines = [
+        "ID  | Item                          | Company              | Price   | Category                    | Date"
+    ]
     lines.append("-" * 105)
     for inv in invoices:
         inv_id = inv.get("id")
@@ -119,8 +125,10 @@ async def _suggest_missing_documents_async(user_id: str) -> str:
     if not missing:
         return "Great news — the user has documents in all available tax categories!"
 
-    lines = [f"Categories already uploaded: {', '.join(present) if present else 'none'}",
-             "\nMissing categories and recommended documents to upload:"]
+    lines = [
+        f"Categories already uploaded: {', '.join(present) if present else 'none'}",
+        "\nMissing categories and recommended documents to upload:",
+    ]
     for cat in missing:
         suggestion = CATEGORY_SUGGESTIONS.get(cat, "Relevante Belege einreichen")
         lines.append(f"  • {cat}: {suggestion}")
@@ -202,9 +210,7 @@ async def run_agent_streaming(question: str, user_id: str) -> AsyncIterator[dict
                 chunk = event["data"]["chunk"]
                 content = chunk.content
                 if isinstance(content, list):
-                    content = "".join(
-                        c.get("text", "") for c in content if isinstance(c, dict)
-                    )
+                    content = "".join(c.get("text", "") for c in content if isinstance(c, dict))
                 if content:
                     yield {"type": "token", "content": content}
 

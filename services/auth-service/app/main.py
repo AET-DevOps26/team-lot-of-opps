@@ -18,9 +18,9 @@ if not DEV_AUTH:
     import firebase_admin
     from firebase_admin import auth as firebase_auth, credentials
 
-    project_id = os.environ['FIREBASE_PROJECT_ID']
-    cred = credentials.Certificate(os.environ['GOOGLE_APPLICATION_CREDENTIALS'])
-    app_fb = firebase_admin.initialize_app(cred, options={'projectId': project_id})
+    project_id = os.environ["FIREBASE_PROJECT_ID"]
+    cred = credentials.Certificate(os.environ["GOOGLE_APPLICATION_CREDENTIALS"])
+    app_fb = firebase_admin.initialize_app(cred, options={"projectId": project_id})
 else:
     logger.warning("DEV_AUTH enabled: Firebase token verification is DISABLED.")
 
@@ -42,8 +42,11 @@ def _uid_from_unverified_token(token: str) -> str | None:
         return None
 
 
-@app.get("/verify", tags=["Auth"],
-         summary="Traefik forward-auth: validate the Firebase ID token and emit X-User-Sub")
+@app.get(
+    "/verify",
+    tags=["Auth"],
+    summary="Traefik forward-auth: validate the Firebase ID token and emit X-User-Sub",
+)
 async def verify(request: Request):
     auth_header = request.headers.get("Authorization", "")
 
@@ -56,7 +59,9 @@ async def verify(request: Request):
         return JSONResponse(status_code=200, headers={"X-User-Sub": uid or "dev-user"}, content={})
 
     if not auth_header.startswith("Bearer "):
-        return JSONResponse(status_code=401, content={"error": "Missing or invalid Authorization header"})
+        return JSONResponse(
+            status_code=401, content={"error": "Missing or invalid Authorization header"}
+        )
     token = auth_header.removeprefix("Bearer ")
     try:
         decoded = firebase_auth.verify_id_token(token, app=app_fb)

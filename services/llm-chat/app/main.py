@@ -18,10 +18,12 @@ LLM_URL = os.getenv("LLM_URL", "http://host.docker.internal:1234")
 LLM_MODEL = os.getenv("LLM_MODEL", "google/gemma-4-e2b")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "EMPTY")
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await get_vectorstore()
     yield
+
 
 app = FastAPI(title="LLM Chat service", version="1.0.0", lifespan=lifespan)
 
@@ -67,48 +69,83 @@ class StatusResponse(BaseModel):
     status: str = "ok"
 
 
-@app.post("/v1/embed", tags=["Internal"], response_model=StatusResponse,
-          summary="Embed an invoice into the chat vector store")
+@app.post(
+    "/v1/embed",
+    tags=["Internal"],
+    response_model=StatusResponse,
+    summary="Embed an invoice into the chat vector store",
+)
 async def embed(request: EmbedRequest):
     await store_embeddings(
-        request.invoice_id, request.text, request.user_id,
-        item_name=request.item_name, company=request.company, price=request.price,
-        category=request.category, invoice_date=request.invoice_date, document_id=request.document_id,
+        request.invoice_id,
+        request.text,
+        request.user_id,
+        item_name=request.item_name,
+        company=request.company,
+        price=request.price,
+        category=request.category,
+        invoice_date=request.invoice_date,
+        document_id=request.document_id,
     )
     return {"status": "ok"}
 
-@app.put("/v1/embed", tags=["Internal"], response_model=StatusResponse,
-         summary="Update an invoice embedding")
+
+@app.put(
+    "/v1/embed",
+    tags=["Internal"],
+    response_model=StatusResponse,
+    summary="Update an invoice embedding",
+)
 async def update(request: UpdateRequest):
     await update_embeddings(
-        request.invoice_id, request.text, request.user_id,
-        item_name=request.item_name, company=request.company, price=request.price,
-        category=request.category, invoice_date=request.invoice_date, document_id=request.document_id,
+        request.invoice_id,
+        request.text,
+        request.user_id,
+        item_name=request.item_name,
+        company=request.company,
+        price=request.price,
+        category=request.category,
+        invoice_date=request.invoice_date,
+        document_id=request.document_id,
     )
     return {"status": "ok"}
 
-@app.delete("/v1/embed/{invoice_id}", tags=["Internal"], response_model=StatusResponse,
-            summary="Delete an invoice embedding")
+
+@app.delete(
+    "/v1/embed/{invoice_id}",
+    tags=["Internal"],
+    response_model=StatusResponse,
+    summary="Delete an invoice embedding",
+)
 async def delete_embed(invoice_id: int):
     await delete_embeddings(invoice_id)
     return {"status": "ok"}
 
 
-@app.post("/api/v1/agent/chat", tags=["Chat"],
-          summary="Ask the RAG agent a question",
-          response_class=StreamingResponse,
-          responses={200: {"content": {"text/event-stream": {}},
-                           "description": "Server-Sent Events stream of agent events"}})
+@app.post(
+    "/api/v1/agent/chat",
+    tags=["Chat"],
+    summary="Ask the RAG agent a question",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "content": {"text/event-stream": {}},
+            "description": "Server-Sent Events stream of agent events",
+        }
+    },
+)
 async def agent_chat(request: AgentChatRequest, x_user_sub: str = Header(...)):
     async def _gen():
         async for event_dict in run_agent_streaming(request.question, x_user_sub):
             yield f"data: {json.dumps(event_dict)}\n\n"
+
     return StreamingResponse(_gen(), media_type="text/event-stream")
 
 
 @app.get("/health", tags=["Internal"], response_model=StatusResponse, summary="Health check")
 def health():
     return {"status": "ok"}
+
 
 @app.get("/test-llm")
 async def test_llm():
