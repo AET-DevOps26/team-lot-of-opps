@@ -1,0 +1,71 @@
+name: Deploy Observability Stack
+
+# The ONLY place the monitoring chart (Prometheus + Grafana + Loki) is deployed.
+# Pushes that touch infra/monitoring auto-deploy to the AET cluster; use the
+# manual trigger to (re)deploy to the VM's k3s.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Cluster to deploy monitoring to
+        type: choice
+        options: [aet, vm]
+        default: aet
+  push:
+    branches: [main]
+    paths:
+      - infra/monitoring/**
+      - .github/workflows/deploy-observability.yml
+
+env:
+  # Deterministic Azure DNS name (Terraform domain_name_label = vm_name).
+  VM_HOST: lot-of-opps-vm.germanywestcentral.cloudapp.azure.com
+
+jobs:
+  deploy:
+    name: Helm deploy monitoring stack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v3
+        with:
+          version: v3.14.0
+
+      - name: Resolve target
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "target=aet" >> "$GITHUB_OUTPUT"
+          else
+            echo "target=${{ inputs.target }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve kube context
+        uses: ./.github/actions/kube-context
+        with:
+          target: ${{ steps.vars.outputs.target }}
+          vm_ip: ${{ env.VM_HOST }}
+          kube_config: ${{ secrets.KUBE_CONFIG }}
+          ssh_private_key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          ssh_known_hosts: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
+
+      - name: Deploy monitoring stack
+        run: |
+          # k3s on the VM has no Ceph (csi-rbd-sc) storage class; fall back to local-path.
+          EXTRA=()
+          if [ "${{ steps.vars.outputs.target }}" = "vm" ]; then
+            EXTRA=(
+              --set 'kube-prometheus-stack.grafana.persistence.storageClassName=local-path'
+              --set 'kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=local-path'
+              --set 'loki-stack.loki.persistence.storageClassName=local-path'
+            )
+          fi
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo update
+          helm dependency update infra/monitoring
+          helm upgrade --install monitoring infra/monitoring \
+            --namespace monitoring --create-namespace \
+            --atomic --timeout 10m \
+            "${EXTRA[@]}"

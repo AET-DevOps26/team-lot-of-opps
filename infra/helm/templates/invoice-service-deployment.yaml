@@ -19,6 +19,7 @@ spec:
         {{- include "taxforward.labels" . | nindent 8 }}
         app.kubernetes.io/name: invoice-service
         app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/version: {{ .Values.images.invoiceService.tag | quote }}
     spec:
       securityContext:
         runAsNonRoot: true

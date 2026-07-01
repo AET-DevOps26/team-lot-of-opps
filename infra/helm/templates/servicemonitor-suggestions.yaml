@@ -1,0 +1,22 @@
+{{- if .Capabilities.APIVersions.Has "monitoring.coreos.com/v1" }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "taxforward.fullname" . }}-suggestions-service
+  labels:
+    {{- include "taxforward.labels" . | nindent 4 }}
+    monitoring: "true"
+spec:
+  jobLabel: app.kubernetes.io/name
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      monitoring: "true"
+      app.kubernetes.io/name: suggestions-service
+  endpoints:
+    - path: /actuator/prometheus
+      port: http
+      interval: 15s
+{{- end }}

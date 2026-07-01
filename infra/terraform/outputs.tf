@@ -1,6 +1,11 @@
 output "vm_public_ip" {
-  description = "Public IP of the VM — set this as GitHub secret AZURE_VM_HOST"
+  description = "Public IP of the VM"
   value       = azurerm_public_ip.main.ip_address
+}
+
+output "vm_fqdn" {
+  description = "Stable DNS name of the VM (used by deploy workflows)"
+  value       = azurerm_public_ip.main.fqdn
 }
 
 output "ssh_command" {
