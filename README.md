@@ -14,12 +14,16 @@ TaxForward is a full-stack application that helps German students and trainees t
 │   └── auth-service/          # FastAPI — Firebase token verification (Traefik forward-auth)
 └── infra/
     ├── traefik/               # Reverse proxy config — routing + auth middleware
-    ├── helm/                  # Kubernetes Helm chart
-    ├── terraform/             # Azure VM provisioning
-    ├── ansible/               # VM configuration
+    ├── helm/                  # Kubernetes Helm chart (app + ServiceMonitors/dashboards)
+    ├── monitoring/            # Helm chart: kube-prometheus-stack + loki-stack (k8s)
+    ├── prometheus/            # Prometheus config (local Docker Compose)
+    ├── loki/                  # Loki config (local Docker Compose)
+    ├── promtail/              # Promtail config (local Docker Compose)
+    ├── grafana/               # Grafana provisioning: dashboards + datasources
+    ├── terraform/             # k3s VM provisioning (Azure)
+    ├── ansible/               # VM configuration (k3s install)
     ├── scripts/               # Utility/seed scripts
-    ├── docker-compose.yaml    # Local dev stack
-    └── docker-compose.prod.yaml
+    └── docker-compose.yaml    # Local dev stack
 ```
 
 All API traffic flows through **Traefik**, which enforces Firebase authentication via a forward-auth middleware before proxying to the relevant service:
@@ -44,6 +48,27 @@ An external OpenAI-compatible LLM endpoint (e.g. LM Studio or Ollama on the host
 | `auth-service`    | FastAPI (Python, Firebase Admin)  | `8000`        | `auth-service`    |
 | `traefik`         | Traefik v3                        | `80` / `8090` | `traefik`         |
 | `db`              | PostgreSQL 16 + pgvector          | `5432`        | `db`              |
+| `prometheus`      | Prometheus v2.52                  | `9090`        | `prometheus`      |
+| `loki`            | Grafana Loki 2.9                  | `3100`        | `loki`            |
+| `grafana`         | Grafana OSS                       | `3001` (→`3000`) | `grafana`      |
+
+## Observability
+
+Local dev gets metrics + logs for free — Prometheus, Loki, Promtail, and
+Grafana all start with `docker compose up -d`. Grafana is at
+`http://localhost:3001`, with dashboards and datasources auto-provisioned
+from [`infra/grafana/provisioning/`](infra/grafana/provisioning/) (Prometheus
++ Loki datasources, a TaxForward dashboard). Services log structured JSON,
+which Promtail ships to Loki for querying alongside metrics.
+
+On Kubernetes, monitoring is a separate Helm release —
+[`infra/monitoring`](infra/monitoring) (kube-prometheus-stack + loki-stack) —
+deployed independently of the app via
+[`.github/workflows/deploy-observability.yml`](.github/workflows/deploy-observability.yml).
+App-side ServiceMonitors, a PrometheusRule, and dashboard ConfigMaps live in
+[`infra/helm/templates/`](infra/helm/templates/). Grafana is exposed
+publicly via Traefik at `grafana.<tls.host>`, but currently has **no auth
+middleware in front of it** — see [TODO.md](TODO.md).
 
 ## Setup
 
@@ -157,6 +182,19 @@ If a finding is a false positive you can bypass with `git commit --no-verify`, b
 same scan runs in CI ([`.github/workflows/secret-scan.yml`](.github/workflows/secret-scan.yml))
 on every PR and push to `main` as the authoritative, unbypassable gate. Prefer fixing
 the allowlist in `.gitleaks.toml` over routinely skipping the hook.
+
+---
+
+## Deploy
+
+Production runs on **k3s** (a single Azure VM, or the shared AET cluster),
+not raw Docker Compose. [`provision.yml`](.github/workflows/provision.yml)
+provisions the VM with Terraform and installs k3s via Ansible;
+[`build.yml`](.github/workflows/build.yml) and
+[`deploy.yml`](.github/workflows/deploy.yml) build images and `helm upgrade`
+the app chart ([`infra/helm`](infra/helm)) on push to `main` or manual
+dispatch. The monitoring stack deploys separately — see
+[Observability](#observability) above.
 
 ---
 
