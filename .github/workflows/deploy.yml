@@ -1,7 +1,7 @@
 name: Deploy
 
 # One app deploy for both targets (both run k3s/Helm):
-#   push to main          -> auto-deploy to the Azure VM (k3s)
+#   push to main          -> auto-deploy to the AET cluster
 #   workflow_dispatch     -> choose target: aet (AET cluster) or vm
 # Monitoring is NOT deployed here — see deploy-observability.yml.
 on:
@@ -58,7 +58,7 @@ jobs:
       - name: Resolve target config and image tag
         id: vars
         run: |
-          TARGET="${{ github.event_name == 'push' && 'vm' || inputs.target }}"
+          TARGET="${{ github.event_name == 'push' && 'aet' || inputs.target }}"
           case "$TARGET" in
             vm)
               echo "storage_class=local-path"

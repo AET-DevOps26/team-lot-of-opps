@@ -1,10 +1,45 @@
 kube-prometheus-stack:
+  # Privileged per-node DaemonSet; not runnable on the shared AET cluster.
+  nodeExporter:
+    enabled: false
+  prometheus-node-exporter:
+    enabled: false
+
+  # Rancher project quota rejects pods without limits; chart defaults set none.
+  prometheusOperator:
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "128Mi"
+      limits:
+        cpu: "100m"
+        memory: "256Mi"
+
+  kube-state-metrics:
+    # Without an allowlist, kube_pod_labels carries no label_* columns.
+    metricLabelsAllowlist:
+      - pods=[app.kubernetes.io/name,app.kubernetes.io/version]
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "50m"
+        memory: "128Mi"
+
   prometheus:
     prometheusSpec:
       # Discover ServiceMonitors from all namespaces, not just the chart's own
       serviceMonitorSelectorNilUsesHelmValues: false
       serviceMonitorNamespaceSelector: {}
       serviceMonitorSelector: {}
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "512Mi"
+        limits:
+          cpu: "500m"
+          memory: "1Gi"
       storageSpec:
         volumeClaimTemplate:
           spec:
@@ -13,7 +48,25 @@ kube-prometheus-stack:
               requests:
                 storage: 5Gi
 
+  alertmanager:
+    enabled: true
+    alertmanagerSpec:
+      resources:
+        requests:
+          cpu: "25m"
+          memory: "64Mi"
+        limits:
+          cpu: "50m"
+          memory: "128Mi"
+
   grafana:
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "128Mi"
+      limits:
+        cpu: "200m"
+        memory: "512Mi"
     persistence:
       enabled: true
       storageClassName: csi-rbd-sc
@@ -38,15 +91,6 @@ kube-prometheus-stack:
         jsonData:
           maxLines: 1000
 
-  alertmanager:
-    enabled: true
-
-  # Surface pod labels so deployed image version (app.kubernetes.io/version) is queryable.
-  # Without an allowlist, kube_pod_labels carries no label_* columns.
-  kube-state-metrics:
-    metricLabelsAllowlist:
-      - pods=[app.kubernetes.io/name,app.kubernetes.io/version]
-
 loki-stack:
   loki:
     isDefault: false   # loki-stack ships its own Loki datasource defaulted to true, conflicts with kube-prometheus-stack's default Prometheus one
@@ -54,8 +98,22 @@ loki-stack:
       enabled: true
       storageClassName: csi-rbd-sc
       size: 5Gi
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "200m"
+        memory: "512Mi"
   promtail:
-    enabled: true   # ships pod logs from all namespaces to Loki automatically
+    enabled: true
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
     config:
       clients:
         # Chart default templates to http://{{ .Release.Name }}:3100/..., which

@@ -103,5 +103,5 @@ data:
         grafana-svc:
           loadBalancer:
             servers:
-              # Grafana lives in the "monitoring" namespace/release, not this one — cross-namespace ClusterIP DNS.
-              - url: "http://monitoring-grafana.monitoring.svc.cluster.local:80"
+              # Grafana lives in the "taxforward-observ" namespace/release, not this one — cross-namespace ClusterIP DNS.
+              - url: "http://monitoring-grafana.taxforward-observ.svc.cluster.local:80"
