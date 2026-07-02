@@ -12,17 +12,17 @@ TABLE_NAME = "langchain_invoice_embeddings"
 VECTOR_SIZE = 384  # sentence-transformers/all-MiniLM-L6-v2
 SCHEMA_NAME = "llm_chat"
 
+
 def _asyncpg_url(url: str) -> str:
     return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
 
 _embeddings: HuggingFaceEmbeddings | None = None
 _engine: PGEngine | None = None
 _vectorstore: PGVectorStore | None = None
 _init_lock = asyncio.Lock()
 
-_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=500, chunk_overlap=50, add_start_index=True
-)
+_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50, add_start_index=True)
 
 
 def chunk_text(text: str, invoice_id: int, user_id: str, **metadata) -> list[Document]:
@@ -39,14 +39,14 @@ def chunk_text(text: str, invoice_id: int, user_id: str, **metadata) -> list[Doc
 def get_embeddings() -> HuggingFaceEmbeddings:
     global _embeddings
     if _embeddings is None:
-        _embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
+        _embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     return _embeddings
 
 
 async def get_vectorstore() -> PGVectorStore:
     global _engine, _vectorstore
+    if DATABASE_URL is None:
+        raise RuntimeError("DATABASE_URL environment variable is required")
     async with _init_lock:
         if _vectorstore is not None:
             return _vectorstore
@@ -91,17 +91,28 @@ async def store_embeddings(
     document_id: int | None = None,
 ) -> None:
     vs = await get_vectorstore()
-    await vs.aadd_documents(chunk_text(
-        text, invoice_id, user_id,
-        item_name=item_name, company=company, price=price,
-        category=category, invoice_date=invoice_date, document_id=document_id,
-    ))
+    await vs.aadd_documents(
+        chunk_text(
+            text,
+            invoice_id,
+            user_id,
+            item_name=item_name,
+            company=company,
+            price=price,
+            category=category,
+            invoice_date=invoice_date,
+            document_id=document_id,
+        )
+    )
 
 
-async def search_embeddings(query: str, limit: int = 5, user_id: str | None = None) -> list[Document]:
+async def search_embeddings(
+    query: str, limit: int = 5, user_id: str | None = None
+) -> list[Document]:
     vs = await get_vectorstore()
     filter_dict = {"user_id": user_id} if user_id else None
     return await vs.asimilarity_search(query, k=limit, filter=filter_dict)
+
 
 async def update_embeddings(
     invoice_id: int,
@@ -116,14 +127,24 @@ async def update_embeddings(
 ) -> None:
     await delete_embeddings(invoice_id)
     await store_embeddings(
-        invoice_id, text, user_id,
-        item_name=item_name, company=company, price=price,
-        category=category, invoice_date=invoice_date, document_id=document_id,
+        invoice_id,
+        text,
+        user_id,
+        item_name=item_name,
+        company=company,
+        price=price,
+        category=category,
+        invoice_date=invoice_date,
+        document_id=document_id,
     )
 
 
 async def delete_embeddings(invoice_id: int) -> None:
-    conn = await asyncpg.connect(DATABASE_URL, server_settings={"search_path": f"{SCHEMA_NAME}, public"})
+    if DATABASE_URL is None:
+        raise RuntimeError("DATABASE_URL environment variable is required")
+    conn = await asyncpg.connect(
+        DATABASE_URL, server_settings={"search_path": f"{SCHEMA_NAME}, public"}
+    )
     try:
         await conn.execute(
             f"DELETE FROM {TABLE_NAME} WHERE langchain_metadata->>'invoice_id' = $1",

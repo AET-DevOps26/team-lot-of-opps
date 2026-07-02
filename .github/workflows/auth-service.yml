@@ -1,0 +1,60 @@
+name: Auth-service Test
+
+on:
+  pull_request:
+    paths:
+      - 'services/auth-service/**'
+      - '.github/workflows/auth-service.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/auth-service/**'
+      - '.github/workflows/auth-service.yml'
+
+jobs:
+
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/auth-service
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+
+      - name: Run Test
+        run: pytest tests/
+        
+  lint-type:
+    name: Lint and type check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/auth-service
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tox
+        run: tox -e lint,type
+
