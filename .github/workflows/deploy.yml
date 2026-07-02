@@ -23,6 +23,12 @@ permissions:
   contents: read
   packages: write
 
+# Two pushes to main in quick succession must not run helm upgrade concurrently
+# against the same cluster; later run supersedes the queued one.
+concurrency:
+  group: deploy-app
+  cancel-in-progress: false
+
 env:
   # Deterministic Azure DNS name (Terraform domain_name_label = vm_name); stable
   # across IP recreates, so no AZURE_VM_IP variable to maintain.
@@ -134,6 +140,12 @@ jobs:
           kubectl describe pods -n taxforward || true
           echo "===== EVENTS ====="; kubectl get events -n taxforward --sort-by=.lastTimestamp || true
           echo "===== HELM ====="; helm status taxforward -n taxforward || true
+
+      # --atomic only proves pods became ready; this proves Traefik actually
+      # routes traffic end-to-end on the VM (aet has no stable public URL here).
+      - name: Smoke test
+        if: steps.vars.outputs.target == 'vm'
+        run: curl -fsS --retry 5 --retry-delay 10 --retry-all-errors -o /dev/null "http://${VM_HOST}/" && echo "smoke test passed"
 
       - name: Print application URL
         run: |
