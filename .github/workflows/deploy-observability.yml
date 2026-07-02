@@ -1,21 +1,9 @@
 name: Deploy Observability Stack
 
 # The ONLY place the monitoring chart (Prometheus + Grafana + Loki) is deployed.
-# Pushes that touch infra/monitoring auto-deploy to the AET cluster; use the
-# manual trigger to (re)deploy to the VM's k3s.
+# Manual trigger only — no auto-deploy on push.
 on:
   workflow_dispatch:
-    inputs:
-      target:
-        description: Cluster to deploy monitoring to
-        type: choice
-        options: [aet, vm]
-        default: aet
-  push:
-    branches: [main]
-    paths:
-      - infra/monitoring/**
-      - .github/workflows/deploy-observability.yml
 
 env:
   # Deterministic Azure DNS name (Terraform domain_name_label = vm_name).
@@ -37,13 +25,8 @@ jobs:
       - name: Resolve target config
         id: vars
         run: |
-          TARGET="${{ github.event_name == 'push' && 'aet' || inputs.target }}"
-          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
-          if [ "$TARGET" = "vm" ]; then
-            echo "storage_class=local-path" >> "$GITHUB_OUTPUT"
-          else
-            echo "storage_class=csi-rbd-sc" >> "$GITHUB_OUTPUT"
-          fi
+          echo "target=vm" >> "$GITHUB_OUTPUT"
+          echo "storage_class=local-path" >> "$GITHUB_OUTPUT"
 
       - name: Resolve kube context
         uses: ./.github/actions/kube-context
