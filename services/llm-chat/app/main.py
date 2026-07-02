@@ -7,6 +7,8 @@ from app.vector_store import store_embeddings, update_embeddings, delete_embeddi
 from app.agent import run_agent_streaming
 from starlette.responses import StreamingResponse
 from openai import AsyncOpenAI
+from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_client import Info
 import os
 import json
 import logging
@@ -27,8 +29,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="LLM Chat service", version="1.0.0", lifespan=lifespan)
 
-from prometheus_fastapi_instrumentator import Instrumentator
-from prometheus_client import Info
 Instrumentator().instrument(app).expose(app)
 Info("build", "Service build info").info({"version": "1.0.0", "service": "llm-chat"})
 

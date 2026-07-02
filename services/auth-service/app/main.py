@@ -5,6 +5,8 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_client import Info
 
 logger = logging.getLogger("auth-service")
 
@@ -26,8 +28,6 @@ else:
 
 app = FastAPI(title="Auth service", version="1.0.0")
 
-from prometheus_fastapi_instrumentator import Instrumentator
-from prometheus_client import Info
 Instrumentator().instrument(app).expose(app)
 Info("build", "Service build info").info({"version": "1.0.0", "service": "auth-service"})
 
