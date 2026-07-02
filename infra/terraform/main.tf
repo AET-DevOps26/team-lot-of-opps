@@ -5,6 +5,10 @@ terraform {
       version = "~> 3.0"
     }
   }
+
+  backend "azurerm" {
+    # values passed via -backend-config in CI (see provision-vm.yml)
+  }
 }
 
 provider "azurerm" {
@@ -70,30 +74,6 @@ resource "azurerm_network_security_group" "main" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
-
-  security_rule {
-    name                       = "Backend"
-    priority                   = 130
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "8080"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-
-  security_rule {
-    name                       = "AI"
-    priority                   = 140
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "8081"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
 }
 
 resource "azurerm_subnet_network_security_group_association" "main" {
@@ -107,6 +87,9 @@ resource "azurerm_public_ip" "main" {
   resource_group_name = azurerm_resource_group.main.name
   allocation_method   = "Static"
   sku                 = "Standard"
+  # Stable DNS name: <vm_name>.<location>.cloudapp.azure.com — deterministic and
+  # survives IP recreates, so deploy workflows reference it instead of the raw IP.
+  domain_name_label = var.vm_name
 }
 
 resource "azurerm_network_interface" "main" {

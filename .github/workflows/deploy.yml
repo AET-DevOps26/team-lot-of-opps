@@ -1,0 +1,150 @@
+name: Deploy
+
+# One app deploy for both targets (both run k3s/Helm):
+#   push to main          -> auto-deploy to the Azure VM (k3s)
+#   workflow_dispatch     -> choose target: aet (AET cluster) or vm
+# Monitoring is NOT deployed here — see deploy-observability.yml.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Cluster to deploy to
+        type: choice
+        options: [aet, vm]
+        default: aet
+      image_tag:
+        description: Deploy an already-built tag (e.g. sha-abc1234). Leave empty to build from this commit.
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  # Deterministic Azure DNS name (Terraform domain_name_label = vm_name); stable
+  # across IP recreates, so no AZURE_VM_IP variable to maintain.
+  VM_HOST: lot-of-opps-vm.germanywestcentral.cloudapp.azure.com
+
+jobs:
+  build:
+    # Skip building only when a manual run pins an existing tag.
+    if: ${{ github.event_name == 'push' || inputs.image_tag == '' }}
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+
+  deploy:
+    needs: build
+    if: ${{ always() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v3
+        with:
+          version: v3.14.0
+
+      - name: Resolve target and image tag
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "target=vm" >> "$GITHUB_OUTPUT"
+          else
+            echo "target=${{ inputs.target }}" >> "$GITHUB_OUTPUT"
+          fi
+          TAG="${{ inputs.image_tag }}"
+          [ -n "$TAG" ] || TAG="${{ needs.build.outputs.image_tag }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve kube context
+        uses: ./.github/actions/kube-context
+        with:
+          target: ${{ steps.vars.outputs.target }}
+          vm_ip: ${{ env.VM_HOST }}
+          kube_config: ${{ secrets.KUBE_CONFIG }}
+          ssh_private_key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          ssh_known_hosts: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
+
+      - name: Create GHCR image pull secret
+        env:
+          GH_ACTOR: ${{ github.actor }}
+          # GITHUB_TOKEN expires when this job ends, which would break image
+          # pulls on later pod restarts/rollouts — use a long-lived read-only
+          # GHCR PAT instead.
+          GH_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+        run: |
+          kubectl create namespace taxforward --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret docker-registry ghcr-pull-secret \
+            --namespace taxforward \
+            --docker-server=ghcr.io \
+            --docker-username="$GH_ACTOR" \
+            --docker-password="$GH_TOKEN" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Write Firebase service account file
+        run: echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" | base64 -d > firebase-sa.json
+
+      - name: Helm upgrade --install
+        run: |
+          REGISTRY=ghcr.io/aet-devops26/taxforward
+          TAG="${{ steps.vars.outputs.tag }}"
+
+          # The VM's single-node k3s has no Ceph storage class and no external
+          # LB; use built-in local-path PVs and klipper-lb to bind host :80.
+          EXTRA=""
+          if [ "${{ steps.vars.outputs.target }}" = "vm" ]; then
+            EXTRA="--set persistence.storageClassName=local-path --set traefik.service.type=LoadBalancer"
+          fi
+
+          helm upgrade --install taxforward ./infra/helm \
+            --namespace taxforward --create-namespace \
+            --atomic \
+            --timeout 10m \
+            -f infra/helm/values.yaml \
+            --set llm.url="${{ vars.LLM_URL }}" \
+            --set llm.model="${{ vars.LLM_MODEL }}" \
+            --set llm.apiKey="${{ secrets.LLM_API_KEY }}" \
+            --set firebase.projectId="${{ secrets.FIREBASE_PROJECT_ID }}" \
+            --set db.password="${{ secrets.DB_PASSWORD }}" \
+            --set images.authService.repository="${REGISTRY}/auth-service" \
+            --set images.authService.tag="${TAG}" \
+            --set images.invoiceService.repository="${REGISTRY}/invoice-service" \
+            --set images.invoiceService.tag="${TAG}" \
+            --set images.llmChat.repository="${REGISTRY}/llm-chat" \
+            --set images.llmChat.tag="${TAG}" \
+            --set images.client.repository="${REGISTRY}/client" \
+            --set images.client.tag="${TAG}" \
+            --set images.suggestionsService.repository="${REGISTRY}/suggestions-service" \
+            --set images.suggestionsService.tag="${TAG}" \
+            --set-file firebase.serviceAccountJson=firebase-sa.json \
+            --set-file db.initSql=infra/postgres/init.sql \
+            $EXTRA
+
+      - name: Diagnose on failure
+        if: failure()
+        run: |
+          echo "===== PVC ====="; kubectl get pvc -n taxforward -o wide || true
+          kubectl describe pvc -n taxforward || true
+          echo "===== PODS ====="; kubectl get pods -n taxforward -o wide || true
+          kubectl describe pods -n taxforward || true
+          echo "===== EVENTS ====="; kubectl get events -n taxforward --sort-by=.lastTimestamp || true
+          echo "===== HELM ====="; helm status taxforward -n taxforward || true
+
+      - name: Print application URL
+        run: |
+          if [ "${{ steps.vars.outputs.target }}" = "vm" ]; then
+            echo "App reachable at: http://${{ env.VM_HOST }}/"
+          else
+            NODE_PORT=$(kubectl get svc taxforward-tax-forward-traefik \
+              --namespace taxforward \
+              -o jsonpath='{.spec.ports[0].nodePort}')
+            NODE_IP=$(kubectl get nodes \
+              -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
+            echo "App reachable at: http://${NODE_IP}:${NODE_PORT}"
+          fi
+
+      - name: Clean up Firebase service account
+        if: always()
+        run: rm -f firebase-sa.json

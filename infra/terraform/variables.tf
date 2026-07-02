@@ -23,7 +23,7 @@ variable "vm_size" {
 }
 
 variable "admin_username" {
-  description = "Admin username for the VM (must match GitHub secret AZURE_VM_USER)"
+  description = "Admin username for the VM"
   type        = string
   default     = "azureuser"
 }
