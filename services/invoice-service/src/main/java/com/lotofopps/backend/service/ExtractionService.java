@@ -24,8 +24,6 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -96,22 +94,25 @@ Use the VISUAL LAYOUT to identify sections:
     private final String llmApiKey;
     private final InvoiceRepository invoiceRepository;
     private final RestTemplate restTemplate;
+    private final DocumentStorageService documentStorageService;
 
     public ExtractionService(
             @Value("${llm.url}") String llmUrl,
             @Value("${llm.model}") String llmModel,
             @Value("${llm.api-key}") String llmApiKey,
             InvoiceRepository invoiceRepository,
-            RestTemplate restTemplate) {
+            RestTemplate restTemplate,
+            DocumentStorageService documentStorageService) {
         this.llmUrl = llmUrl.endsWith("/") ? llmUrl.substring(0, llmUrl.length() - 1) : llmUrl;
         this.llmModel = llmModel;
         this.llmApiKey = llmApiKey;
         this.invoiceRepository = invoiceRepository;
         this.restTemplate = restTemplate;
+        this.documentStorageService = documentStorageService;
     }
 
     public List<Invoice> extractAndStore(Document document) throws IOException {
-        byte[] fileBytes = Files.readAllBytes(Paths.get(document.getStoragePath()));
+        byte[] fileBytes = documentStorageService.loadBytes(document.getStoragePath());
         List<ExtractionItem> items = extractItems(fileBytes, document.getContentType(), document.getFilename());
         log.info("Extracted {} item(s) from document {}", items.size(), document.getStoragePath());
 

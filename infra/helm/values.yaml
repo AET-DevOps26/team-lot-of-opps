@@ -38,8 +38,15 @@ firebase:
   serviceAccountJson: ""
 
 invoice:
-  storageLocation: "/app/uploads"
   uploadMaxSizeBytes: "10485760"
+
+seaweedfs:
+  image: "chrislusf/seaweedfs"
+  tag: "4.37"
+  bucket: "invoices"
+  accessKey: "devkey"
+  secretKey: "devsecret"
+  region: "us-east-1"
 suggestions:
   invoiceLimit: "5"
 
@@ -57,6 +64,8 @@ persistence:
   storageClassName: "csi-rbd-sc"   # cluster default; set explicitly to avoid ambiguity
   db:
     size: "10Gi"
+  seaweedfs:
+    size: "10Gi"
 
 # ─── TLS / Ingress ───────────────────────────────────────────────────────────
 # Cluster uses nginx ingress class + cert-manager with letsencrypt-prod.
@@ -66,9 +75,8 @@ tls:
   clusterIssuer: "letsencrypt-prod"
 
 # ─── Resource limits / requests ──────────────────────────────────────────────
-# Total limits must stay within the app's slice of the Rancher project quota
-# (4 vCPU / 6 Gi total, now shared with the taxforward-observ monitoring stack
-# which takes ~1.2 CPU / ~2.7Gi). App totals: CPU 2500m, memory 3328Mi.
+# Total limits must stay within the Rancher project quota: 4 vCPU / 6 Gi.
+# App totals: CPU 3400m, memory 4864Mi.
 resources:
   traefik:
     requests:
@@ -89,8 +97,8 @@ resources:
       cpu: "250m"
       memory: "512Mi"
     limits:
-      cpu: "450m"
-      memory: "512Mi"
+      cpu: "700m"
+      memory: "768Mi"
   # llm-chat loads a sentence-transformers embedding model into memory.
   llmChat:
     requests:
@@ -98,14 +106,14 @@ resources:
       memory: "1Gi"
     limits:
       cpu: "800m"
-      memory: "1280Mi"
+      memory: "2Gi"
   suggestionsService:
     requests:
       cpu: "250m"
       memory: "512Mi"
     limits:
-      cpu: "450m"
-      memory: "512Mi"
+      cpu: "700m"
+      memory: "768Mi"
   client:
     requests:
       cpu: "50m"
@@ -118,8 +126,15 @@ resources:
       cpu: "150m"
       memory: "384Mi"
     limits:
-      cpu: "300m"
+      cpu: "500m"
       memory: "512Mi"
+  seaweedfs:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
 
 # ─── Replica counts ──────────────────────────────────────────────────────────
 replicaCount:

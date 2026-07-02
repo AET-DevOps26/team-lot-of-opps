@@ -1,0 +1,14 @@
+{
+  "identities": [
+    {
+      "name": "invoice-service",
+      "credentials": [
+        {
+          "accessKey": "devkey",
+          "secretKey": "devsecret"
+        }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

@@ -26,7 +26,6 @@ WORKDIR /app
 COPY --from=builder /app/build/libs/*.jar app.jar
 
 RUN chown 1000 app.jar
-RUN mkdir -p /app/uploads && chown 1000:1000 /app/uploads
 
 USER 1000
 
