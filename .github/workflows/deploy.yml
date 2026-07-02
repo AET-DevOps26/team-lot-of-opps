@@ -26,7 +26,7 @@ permissions:
 env:
   # Deterministic Azure DNS name (Terraform domain_name_label = vm_name); stable
   # across IP recreates, so no AZURE_VM_IP variable to maintain.
-  VM_HOST: lot-of-opps-vm.germanywestcentral.cloudapp.azure.com
+  VM_HOST: ${{ vars.VM_HOST }}
 
 jobs:
   build:
@@ -46,14 +46,24 @@ jobs:
         with:
           version: v3.14.0
 
-      - name: Resolve target and image tag
+      # Single place mapping target -> per-target config. The VM's single-node
+      # k3s has no Ceph storage class and no external LB; use built-in
+      # local-path PVs and klipper-lb to bind host :80.
+      - name: Resolve target config and image tag
         id: vars
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "target=vm" >> "$GITHUB_OUTPUT"
-          else
-            echo "target=${{ inputs.target }}" >> "$GITHUB_OUTPUT"
-          fi
+          TARGET="${{ github.event_name == 'push' && 'vm' || inputs.target }}"
+          case "$TARGET" in
+            vm)
+              echo "storage_class=local-path"
+              echo "traefik_service_type=LoadBalancer"
+              ;;
+            aet)
+              echo "storage_class=csi-rbd-sc"
+              echo "traefik_service_type=NodePort"
+              ;;
+          esac >> "$GITHUB_OUTPUT"
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
           TAG="${{ inputs.image_tag }}"
           [ -n "$TAG" ] || TAG="${{ needs.build.outputs.image_tag }}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -62,10 +72,9 @@ jobs:
         uses: ./.github/actions/kube-context
         with:
           target: ${{ steps.vars.outputs.target }}
-          vm_ip: ${{ env.VM_HOST }}
+          vm_host: ${{ env.VM_HOST }}
           kube_config: ${{ secrets.KUBE_CONFIG }}
           ssh_private_key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          ssh_known_hosts: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
 
       - name: Create GHCR image pull secret
         env:
@@ -91,13 +100,6 @@ jobs:
           REGISTRY=ghcr.io/aet-devops26/taxforward
           TAG="${{ steps.vars.outputs.tag }}"
 
-          # The VM's single-node k3s has no Ceph storage class and no external
-          # LB; use built-in local-path PVs and klipper-lb to bind host :80.
-          EXTRA=""
-          if [ "${{ steps.vars.outputs.target }}" = "vm" ]; then
-            EXTRA="--set persistence.storageClassName=local-path --set traefik.service.type=LoadBalancer"
-          fi
-
           helm upgrade --install taxforward ./infra/helm \
             --namespace taxforward --create-namespace \
             --atomic \
@@ -120,7 +122,8 @@ jobs:
             --set images.suggestionsService.tag="${TAG}" \
             --set-file firebase.serviceAccountJson=firebase-sa.json \
             --set-file db.initSql=infra/postgres/init.sql \
-            $EXTRA
+            --set persistence.storageClassName="${{ steps.vars.outputs.storage_class }}" \
+            --set traefik.service.type="${{ steps.vars.outputs.traefik_service_type }}"
 
       - name: Diagnose on failure
         if: failure()
@@ -135,7 +138,7 @@ jobs:
       - name: Print application URL
         run: |
           if [ "${{ steps.vars.outputs.target }}" = "vm" ]; then
-            echo "App reachable at: http://${{ env.VM_HOST }}/"
+            echo "App reachable at: http://${VM_HOST}/"
           else
             NODE_PORT=$(kubectl get svc taxforward-tax-forward-traefik \
               --namespace taxforward \

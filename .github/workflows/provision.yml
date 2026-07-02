@@ -1,22 +1,54 @@
 name: Provision and Configure Azure VM
 
+# Terraform plan on PRs touching the infra, apply + Ansible on merge to main;
+# workflow_dispatch stays as a manual escape hatch.
+#
+# Azure auth is GitHub OIDC — no stored client secret. One-time setup on the
+# app registration (appId = value of the ARM_CLIENT_ID secret):
+#   az ad app federated-credential create --id "$APP_ID" --parameters '{
+#     "name": "gh-main", "issuer": "https://token.actions.githubusercontent.com",
+#     "subject": "repo:AET-DevOps26/team-lot-of-opps:ref:refs/heads/main",
+#     "audiences": ["api://AzureADTokenExchange"]}'
+#   az ad app federated-credential create --id "$APP_ID" --parameters '{
+#     "name": "gh-pr", "issuer": "https://token.actions.githubusercontent.com",
+#     "subject": "repo:AET-DevOps26/team-lot-of-opps:pull_request",
+#     "audiences": ["api://AzureADTokenExchange"]}'
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - infra/terraform/**
+      - .github/workflows/provision.yml
+  push:
+    branches: [main]
+    paths:
+      - infra/terraform/**
+      - infra/ansible/**
+      - .github/workflows/provision.yml
+
+# Never run two applies (or a plan against a moving state) at once.
+concurrency:
+  group: provision
+  cancel-in-progress: false
 
 permissions:
   contents: read
+  id-token: write
+
+env:
+  VM_HOST: ${{ vars.VM_HOST }}
 
 jobs:
   provision:
     name: Terraform — create VM
     runs-on: ubuntu-latest
-    outputs:
-      vm_ip: ${{ steps.output.outputs.vm_ip }}
     env:
       ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      # Provider AND azurerm backend exchange the ambient GitHub OIDC token;
+      # no azure/login step and no ARM_CLIENT_SECRET needed.
+      ARM_USE_OIDC: "true"
 
     steps:
       - uses: actions/checkout@v4
@@ -34,34 +66,38 @@ jobs:
             -backend-config="container_name=${{ vars.TFSTATE_CONTAINER }}" \
             -backend-config="key=vm.tfstate"
 
+      - name: Terraform Plan
+        if: github.event_name == 'pull_request'
+        working-directory: infra/terraform
+        run: |
+          terraform plan -no-color \
+            -var="ssh_public_key=${{ secrets.VM_SSH_PUBLIC_KEY }}"
+
       - name: Terraform Apply
+        if: github.event_name != 'pull_request'
         working-directory: infra/terraform
         run: |
           terraform apply -auto-approve \
             -var="ssh_public_key=${{ secrets.VM_SSH_PUBLIC_KEY }}"
 
-      - name: Get VM IP
-        id: output
-        working-directory: infra/terraform
-        run: echo "vm_ip=$(terraform output -raw vm_public_ip)" >> $GITHUB_OUTPUT
-
-      # The deploy workflows hardcode VM_HOST. Fail loudly here if Terraform's
-      # actual FQDN drifts from it (e.g. vm_name or location changed).
+      # Deploy workflows and infra/ansible/inventory.ini use the VM_HOST repo
+      # variable. Fail loudly if Terraform's actual FQDN drifts from it
+      # (e.g. vm_name or location changed).
       - name: Verify deploy host matches Terraform
+        if: github.event_name != 'pull_request'
         working-directory: infra/terraform
         run: |
-          EXPECTED="lot-of-opps-vm.germanywestcentral.cloudapp.azure.com"
           ACTUAL=$(terraform output -raw vm_fqdn)
-          if [ "$ACTUAL" != "$EXPECTED" ]; then
-            echo "::error::VM_HOST in deploy workflows ($EXPECTED) != terraform vm_fqdn ($ACTUAL). Update env.VM_HOST."
+          if [ "$ACTUAL" != "$VM_HOST" ]; then
+            echo "::error::VM_HOST repo variable ($VM_HOST) != terraform vm_fqdn ($ACTUAL). Update the variable and infra/ansible/inventory.ini."
             exit 1
           fi
-
 
   configure:
     name: Ansible — configure VM
     runs-on: ubuntu-latest
     needs: provision
+    if: github.event_name != 'pull_request'
 
     steps:
       - uses: actions/checkout@v4
@@ -75,31 +111,48 @@ jobs:
           echo "${{ secrets.VM_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
+      # accept-new is trust-on-first-use: unavoidable for a VM that may have
+      # just been created, but unlike '=no' it still fails if a known host's
+      # key changes mid-run. Ansible then reuses the recorded ~/.ssh/known_hosts.
       - name: Wait for VM to be ready
         run: |
           echo "Waiting for SSH to become available..."
           for i in $(seq 1 20); do
-            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
-              -i ~/.ssh/id_rsa azureuser@${{ needs.provision.outputs.vm_ip }} \
+            ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 \
+              -i ~/.ssh/id_rsa "azureuser@$VM_HOST" \
               "echo ok" && break || sleep 15
           done
 
-      - name: Add VM to known hosts
-        run: ssh-keyscan ${{ needs.provision.outputs.vm_ip }} >> ~/.ssh/known_hosts
-
       - name: Run Ansible playbook
         working-directory: infra/ansible
+        run: ansible-playbook -i inventory.ini playbook.yml
+
+      # Deploy workflows pin host keys via the committed infra/known_hosts.
+      # If the VM was recreated its keys changed — fail with the fresh scan
+      # so it gets committed (host public keys are not secret).
+      - name: Check committed host keys
         run: |
-          sed "s/<VM_IP>/${{ needs.provision.outputs.vm_ip }}/" inventory.ini > inventory.tmp.ini
-          ansible-playbook -i inventory.tmp.ini playbook.yml
+          ssh-keyscan -t rsa,ecdsa,ed25519 "$VM_HOST" 2>/dev/null | sort > /tmp/fresh
+          grep -Ev '^\s*(#|$)' infra/known_hosts | sort > /tmp/pinned || true
+          if ! diff -u /tmp/pinned /tmp/fresh; then
+            {
+              echo "### infra/known_hosts is stale (VM recreated?)"
+              echo ""
+              echo "Replace its key lines with:"
+              echo '```'
+              cat /tmp/fresh
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::infra/known_hosts does not match the VM's current host keys — commit the scan from the step summary."
+            exit 1
+          fi
 
       - name: Summary
         run: |
           {
             echo "### VM ready — k3s installed"
             echo ""
-            echo "- IP: \`${{ needs.provision.outputs.vm_ip }}\`"
-            echo "- Deploy host (stable DNS): \`lot-of-opps-vm.germanywestcentral.cloudapp.azure.com\`"
+            echo "- Host (stable DNS): \`$VM_HOST\`"
             echo ""
             echo "No further setup — deploy.yml and deploy-observability.yml reach the VM"
             echo "via that DNS name automatically."
