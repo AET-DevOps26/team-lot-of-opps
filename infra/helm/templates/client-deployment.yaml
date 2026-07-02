@@ -24,8 +24,6 @@ spec:
         runAsNonRoot: true
         runAsUser: 101
         fsGroup: 101
-      imagePullSecrets:
-        - name: ghcr-pull-secret
       containers:
         - name: client
           image: "{{ .Values.images.client.repository }}:{{ .Values.images.client.tag }}"
