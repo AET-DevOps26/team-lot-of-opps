@@ -59,8 +59,11 @@ jobs:
           helm repo add grafana https://grafana.github.io/helm-charts
           helm repo update
           helm dependency update infra/monitoring
+          # CRDs are cluster-scoped; the student account can't create them, so
+          # rely on the ones already installed on the AET cluster.
           helm upgrade --install monitoring infra/monitoring \
             --namespace taxforward-observ --create-namespace \
+            --skip-crds \
             --atomic --timeout 10m \
             --set "kube-prometheus-stack.grafana.persistence.storageClassName=${{ steps.vars.outputs.storage_class }}" \
             --set "kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=${{ steps.vars.outputs.storage_class }}" \
