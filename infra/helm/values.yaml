@@ -66,8 +66,9 @@ tls:
   clusterIssuer: "letsencrypt-prod"
 
 # ─── Resource limits / requests ──────────────────────────────────────────────
-# Total limits must stay within the Rancher project quota: 4 vCPU / 6 Gi.
-# Current totals: CPU 3900m, memory 5248Mi.
+# Total limits must stay within the app's slice of the Rancher project quota
+# (4 vCPU / 6 Gi total, now shared with the taxforward-observ monitoring stack
+# which takes ~1.2 CPU / ~2.7Gi). App totals: CPU 2500m, memory 3328Mi.
 resources:
   traefik:
     requests:
@@ -88,8 +89,8 @@ resources:
       cpu: "250m"
       memory: "512Mi"
     limits:
-      cpu: "700m"
-      memory: "768Mi"
+      cpu: "450m"
+      memory: "512Mi"
   # llm-chat loads a sentence-transformers embedding model into memory.
   llmChat:
     requests:
@@ -97,14 +98,14 @@ resources:
       memory: "1Gi"
     limits:
       cpu: "800m"
-      memory: "2Gi"
+      memory: "1280Mi"
   suggestionsService:
     requests:
       cpu: "250m"
       memory: "512Mi"
     limits:
-      cpu: "700m"
-      memory: "768Mi"
+      cpu: "450m"
+      memory: "512Mi"
   client:
     requests:
       cpu: "50m"
@@ -117,7 +118,7 @@ resources:
       cpu: "150m"
       memory: "384Mi"
     limits:
-      cpu: "500m"
+      cpu: "300m"
       memory: "512Mi"
 
 # ─── Replica counts ──────────────────────────────────────────────────────────
