@@ -7,7 +7,7 @@ variable "resource_group_name" {
 variable "location" {
   description = "Azure region"
   type        = string
-  default     = "germanywestcentral"
+  default     = "swedencentral"
 }
 
 variable "vm_name" {
