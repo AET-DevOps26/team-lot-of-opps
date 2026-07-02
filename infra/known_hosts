@@ -1,0 +1,7 @@
+# Pinned SSH host keys for the Azure VM (see infra/terraform: domain_name_label).
+# Host public keys are not secret; committing them gives auditable host pinning
+# instead of a hand-maintained VM_SSH_KNOWN_HOSTS secret.
+#
+# Populate/refresh after (re)provisioning the VM — the provision workflow fails
+# with the fresh scan in its step summary when this file is stale, or run:
+#   ssh-keyscan -t rsa,ecdsa,ed25519 lot-of-opps-vm.germanywestcentral.cloudapp.azure.com | sort
