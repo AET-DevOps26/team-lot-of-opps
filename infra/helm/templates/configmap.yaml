@@ -8,6 +8,9 @@ data:
   FIREBASE_PROJECT_ID: {{ .Values.firebase.projectId | quote }}
   LLM_URL: {{ .Values.llm.url | quote }}
   LLM_MODEL: {{ .Values.llm.model | quote }}
-  STORAGE_LOCATION: {{ .Values.invoice.storageLocation | quote }}
+  STORAGE_S3_ENDPOINT: "http://{{ include "taxforward.fullname" . }}-seaweedfs:8333"
+  STORAGE_S3_BUCKET: {{ .Values.seaweedfs.bucket | quote }}
+  STORAGE_S3_ACCESS_KEY: {{ .Values.seaweedfs.accessKey | quote }}
+  STORAGE_S3_REGION: {{ .Values.seaweedfs.region | quote }}
   UPLOAD_MAX_SIZE_BYTES: {{ .Values.invoice.uploadMaxSizeBytes | quote }}
   SUGGESTIONS_INVOICE_LIMIT: {{ .Values.suggestions.invoiceLimit | quote }}

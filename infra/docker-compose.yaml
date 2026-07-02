@@ -56,6 +56,20 @@ services:
       start_period: 120s
     restart: unless-stopped
 
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.37
+    container_name: seaweedfs
+    # Credentials in s3.json must match STORAGE_S3_ACCESS_KEY/SECRET_KEY.
+    command: server -dir=/data -ip=seaweedfs -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+    ports:
+      - "8333:8333"
+    volumes:
+      - seaweedfs_data:/data
+      - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+    networks:
+      - network
+    restart: unless-stopped
+
   invoice-service:
     platform: linux/amd64
     build:
@@ -70,7 +84,11 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/taxforward?currentSchema=invoice
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - STORAGE_LOCATION=${STORAGE_LOCATION:-/app/uploads}
+      - STORAGE_S3_ENDPOINT=http://seaweedfs:8333
+      - STORAGE_S3_BUCKET=${STORAGE_S3_BUCKET:-invoices}
+      - STORAGE_S3_ACCESS_KEY=${STORAGE_S3_ACCESS_KEY:-devkey}
+      - STORAGE_S3_SECRET_KEY=${STORAGE_S3_SECRET_KEY:-devsecret}
+      - STORAGE_S3_REGION=${STORAGE_S3_REGION:-us-east-1}
       - UPLOAD_MAX_SIZE_BYTES=${UPLOAD_MAX_SIZE_BYTES}
       - LLM_URL=${LLM_URL}
       - LLM_MODEL=${LLM_MODEL}
@@ -79,7 +97,6 @@ services:
       - OPENAPI_SPEC_PATH=/api/openapi.yaml
     volumes:
       - ../services/invoice-service/src:/app/src
-      - invoice_uploads:/app/uploads
       - ../api/openapi.yaml:/api/openapi.yaml:ro
     networks:
       - network
@@ -94,6 +111,8 @@ services:
         condition: service_healthy
       llm-chat:
         condition: service_healthy
+      seaweedfs:
+        condition: service_started
     restart: unless-stopped
 
   suggestions-service:
@@ -247,7 +266,7 @@ services:
 
 volumes:
   postgres_data:
-  invoice_uploads:
+  seaweedfs_data:
   prometheus_data:
   grafana_data:
 

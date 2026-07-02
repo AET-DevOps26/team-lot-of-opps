@@ -1,19 +1,23 @@
 package com.lotofopps.backend.service;
 
-import com.lotofopps.backend.exception.DuplicateDocumentException;
 import com.lotofopps.backend.model.Document;
 import com.lotofopps.backend.repository.DocumentRepository;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.sync.ResponseTransformer;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.net.URI;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
@@ -21,58 +25,80 @@ import java.util.UUID;
 @Service
 public class DocumentStorageService {
 
-    private final Path storageRoot;
+    private final S3Client s3;
+    private final String bucket;
     private final DocumentRepository documentRepository;
+    private volatile boolean bucketEnsured = false;
 
     public DocumentStorageService(
-            @Value("${storage.location:./uploads}") String storageLocation,
-            DocumentRepository documentRepository) throws IOException {
-        this.storageRoot = Paths.get(storageLocation).toAbsolutePath().normalize();
+            @Value("${storage.s3.endpoint:http://localhost:8333}") String endpoint,
+            @Value("${storage.s3.bucket:invoices}") String bucket,
+            @Value("${storage.s3.access-key:devkey}") String accessKey,
+            @Value("${storage.s3.secret-key:devsecret}") String secretKey,
+            @Value("${storage.s3.region:us-east-1}") String region,
+            DocumentRepository documentRepository) {
+        this.bucket = bucket;
         this.documentRepository = documentRepository;
-        Files.createDirectories(this.storageRoot);
+        this.s3 = S3Client.builder()
+                .endpointOverride(URI.create(endpoint))
+                .region(Region.of(region))
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(accessKey, secretKey)))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(true)
+                        .build())
+                .build();
     }
 
     public Document store(MultipartFile file, String userId) throws IOException {
+        ensureBucket();
         byte[] bytes = file.getBytes();
         String hash = sha256Hex(bytes);
-
-        // documentRepository.findByContentHashAndUserId(hash, userId).ifPresent(existing -> {
-        //     throw new DuplicateDocumentException(existing);
-        // });
 
         String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
         String extension = originalFilename.contains(".")
                 ? originalFilename.substring(originalFilename.lastIndexOf('.'))
                 : "";
-        String storedFilename = UUID.randomUUID() + extension;
-        Path destination = storageRoot.resolve(storedFilename);
+        String key = UUID.randomUUID() + extension;
 
-        Files.write(destination, bytes);
+        s3.putObject(b -> b.bucket(bucket).key(key)
+                        .contentType(file.getContentType()),
+                RequestBody.fromBytes(bytes));
 
         Document document = new Document(
                 originalFilename,
                 file.getContentType(),
                 file.getSize(),
-                destination.toString()
+                key
         );
         document.setUserId(userId);
         document.setContentHash(hash);
         return documentRepository.save(document);
     }
 
-    public Resource load(String storagePath) throws MalformedURLException {
-        Path file = Paths.get(storagePath);
-        Resource resource = new UrlResource(file.toUri());
-        if (!resource.exists() || !resource.isReadable()) {
-            throw new IllegalArgumentException("File not found: " + storagePath);
-        }
-        return resource;
+    public Resource load(String key) {
+        return new ByteArrayResource(loadBytes(key));
     }
 
-    public void deleteFile(String storagePath) throws IOException {
-        if (storagePath != null) {
-            Files.deleteIfExists(Paths.get(storagePath));
+    public byte[] loadBytes(String key) {
+        return s3.getObject(b -> b.bucket(bucket).key(key), ResponseTransformer.toBytes())
+                .asByteArray();
+    }
+
+    public void deleteFile(String key) {
+        if (key != null) {
+            s3.deleteObject(b -> b.bucket(bucket).key(key));
         }
+    }
+
+    private void ensureBucket() {
+        if (bucketEnsured) return;
+        try {
+            s3.headBucket(b -> b.bucket(bucket));
+        } catch (NoSuchBucketException e) {
+            s3.createBucket(b -> b.bucket(bucket));
+        }
+        bucketEnsured = true;
     }
 
     private static String sha256Hex(byte[] data) throws IOException {
