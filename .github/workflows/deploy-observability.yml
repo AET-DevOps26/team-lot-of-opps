@@ -60,7 +60,7 @@ jobs:
           helm repo update
           helm dependency update infra/monitoring
           helm upgrade --install monitoring infra/monitoring \
-            --namespace monitoring --create-namespace \
+            --namespace taxforward-observ --create-namespace \
             --atomic --timeout 10m \
             --set "kube-prometheus-stack.grafana.persistence.storageClassName=${{ steps.vars.outputs.storage_class }}" \
             --set "kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=${{ steps.vars.outputs.storage_class }}" \
