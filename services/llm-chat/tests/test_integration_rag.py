@@ -1,11 +1,19 @@
 """
 Integration tests for the RAG pipeline (embed → search → chat → delete).
-Requires: AI service running on localhost:8081, PostgreSQL connected.
-Run with: pytest tests/test_integration_rag.py -v -s
+Requires: AI service running on localhost:8081, PostgreSQL connected, and a
+real LLM reachable at LLM_URL.
+
+Not part of the default `pytest tests/` run (see the `integration` marker) —
+CI does not stand up these dependencies, so this suite must be run manually:
+
+    docker compose up -d llm-chat postgres   # or your local equivalent
+    pytest tests/test_integration_rag.py -v -s -m integration
 """
 
 import pytest
 import requests
+
+pytestmark = pytest.mark.integration
 
 BASE_URL = "http://localhost:8081"
 TEST_INVOICE_ID = 9999
@@ -16,9 +24,9 @@ def check_service():
     try:
         r = requests.get(f"{BASE_URL}/health", timeout=5)
         if r.status_code != 200:
-            pytest.skip("AI service not available")
-    except Exception:
-        pytest.skip("AI service not available")
+            pytest.fail("AI service not available at " + BASE_URL)
+    except Exception as e:
+        pytest.fail(f"AI service not available at {BASE_URL}: {e}")
 
 
 @pytest.fixture(autouse=True)

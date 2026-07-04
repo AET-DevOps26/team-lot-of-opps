@@ -1,3 +1,8 @@
+[tool.pytest.ini_options]
+markers = [
+    "integration: requires a running llm-chat service, Postgres, and a real LLM; not run by default (see tests/test_integration_rag.py)",
+]
+
 [tool.ruff]
 line-length = 100
 

@@ -198,8 +198,8 @@ def _build_agent(user_id: str, referenced: list[dict]):
 
 async def run_agent_streaming(question: str, user_id: str) -> AsyncIterator[dict]:
     referenced_invoices: list[dict] = []
-    agent = _build_agent(user_id, referenced_invoices)
     try:
+        agent = _build_agent(user_id, referenced_invoices)
         async for event in agent.astream_events(
             {"messages": [{"role": "user", "content": question}]},
             version="v2",
