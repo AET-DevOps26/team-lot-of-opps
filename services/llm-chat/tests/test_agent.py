@@ -137,7 +137,9 @@ class TestSuggestMissingDocumentsAsync:
 
 class TestRunAgentStreaming:
     def test_yields_tokens_and_deduplicated_references(self, monkeypatch):
-        monkeypatch.setattr(agent, "_build_agent", lambda user_id, referenced: _FakeAgent(referenced))
+        monkeypatch.setattr(
+            agent, "_build_agent", lambda user_id, referenced: _FakeAgent(referenced)
+        )
 
         events = run(_collect(agent.run_agent_streaming("What did I buy?", "user-1")))
 
@@ -148,9 +150,7 @@ class TestRunAgentStreaming:
         assert reference_events[0]["invoices"] == [{"invoice_id": 1}]
 
     def test_streaming_error_yields_error_event(self, monkeypatch):
-        monkeypatch.setattr(
-            agent, "_build_agent", lambda user_id, referenced: _FailingAgent()
-        )
+        monkeypatch.setattr(agent, "_build_agent", lambda user_id, referenced: _FailingAgent())
 
         events = run(_collect(agent.run_agent_streaming("question", "user-1")))
 
