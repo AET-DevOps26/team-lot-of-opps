@@ -1,116 +1,11 @@
 <mxfile host="app.diagrams.net">
   <diagram name="Page-1" id="H6Xy_OpUD7zMoSwBAYtF">
-    <mxGraphModel dx="2054" dy="1064" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="4108" dy="1091" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="WPp5HrSlAYrurA-F_prL-1" edge="1" parent="1" source="WPp5HrSlAYrurA-F_prL-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=classic;startFill=1;" target="WPp5HrSlAYrurA-F_prL-15">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-2" connectable="0" parent="WPp5HrSlAYrurA-F_prL-1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="REST" vertex="1">
-          <mxGeometry relative="1" x="0.2308" y="-1" as="geometry">
-            <mxPoint x="-18" y="-1" as="offset" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-3" edge="1" parent="1" source="WPp5HrSlAYrurA-F_prL-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="WPp5HrSlAYrurA-F_prL-22">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="500" y="650" />
-              <mxPoint x="730" y="650" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-4" connectable="0" parent="WPp5HrSlAYrurA-F_prL-3" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="REST API" vertex="1">
-          <mxGeometry relative="1" x="-0.184" y="-1" as="geometry">
-            <mxPoint as="offset" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Suggestion Service (SpringBoot)" vertex="1">
-          <mxGeometry height="60" width="120" x="440" y="700" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-6" edge="1" parent="1" source="WPp5HrSlAYrurA-F_prL-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="WPp5HrSlAYrurA-F_prL-22">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="970" y="650" />
-              <mxPoint x="730" y="650" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-7" connectable="0" parent="WPp5HrSlAYrurA-F_prL-6" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="&lt;div&gt;SSE&lt;/div&gt;" vertex="1">
-          <mxGeometry relative="1" x="-0.0116" y="2" as="geometry">
-            <mxPoint as="offset" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="RAG with LLM-Chat (Python)" vertex="1">
-          <mxGeometry height="60" width="120" x="910" y="700" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Gemme4-E2B" vertex="1">
-          <mxGeometry height="60" width="120" x="1290" y="590" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-10" edge="1" parent="1" source="WPp5HrSlAYrurA-F_prL-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint x="1110" y="620" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-11" parent="1" style="swimlane;whiteSpace=wrap;html=1;" value="Self-Hosted LLM Service" vertex="1">
-          <mxGeometry height="200" width="200" x="1250" y="520" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-12" parent="1" style="swimlane;whiteSpace=wrap;html=1;" value="TaxForwad App" vertex="1">
-          <mxGeometry height="750" width="740" x="370" y="270" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-13" edge="1" parent="WPp5HrSlAYrurA-F_prL-12" source="WPp5HrSlAYrurA-F_prL-15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="WPp5HrSlAYrurA-F_prL-22">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-14" connectable="0" parent="WPp5HrSlAYrurA-F_prL-13" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="REST API" vertex="1">
-          <mxGeometry relative="1" x="-0.4333" y="2" as="geometry">
-            <mxPoint as="offset" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-15" parent="WPp5HrSlAYrurA-F_prL-12" style="rounded=0;whiteSpace=wrap;html=1;" value="Invoice Service (SpringBoot)" vertex="1">
-          <mxGeometry height="60" width="120" x="300" y="430" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-16" edge="1" parent="WPp5HrSlAYrurA-F_prL-12" source="WPp5HrSlAYrurA-F_prL-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="WPp5HrSlAYrurA-F_prL-15">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-17" parent="WPp5HrSlAYrurA-F_prL-12" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/databases/Azure_Database_PostgreSQL_Server.svg;" value="" vertex="1">
-          <mxGeometry height="66.67" width="50" x="335" y="570" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-18" parent="WPp5HrSlAYrurA-F_prL-12" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/databases/Azure_Database_PostgreSQL_Server.svg;" value="PGVector" vertex="1">
-          <mxGeometry height="66.67" width="50" x="575" y="570" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-19" parent="WPp5HrSlAYrurA-F_prL-12" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/databases/Azure_Database_PostgreSQL_Server.svg;" value="" vertex="1">
-          <mxGeometry height="66.67" width="50" x="105" y="570" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-20" edge="1" parent="WPp5HrSlAYrurA-F_prL-12" source="WPp5HrSlAYrurA-F_prL-22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="WPp5HrSlAYrurA-F_prL-23">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-21" connectable="0" parent="WPp5HrSlAYrurA-F_prL-20" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="REST API" vertex="1">
-          <mxGeometry relative="1" x="-0.4848" as="geometry">
-            <mxPoint y="-22" as="offset" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-22" parent="WPp5HrSlAYrurA-F_prL-12" style="rounded=0;whiteSpace=wrap;html=1;" value="API Gateway&lt;br&gt;(Traefik, FastAPI)" vertex="1">
-          <mxGeometry height="60" width="120" x="300" y="270" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-23" parent="WPp5HrSlAYrurA-F_prL-12" style="rounded=0;whiteSpace=wrap;html=1;" value="&lt;div&gt;Client (ReactJS)&lt;/div&gt;" vertex="1">
-          <mxGeometry height="60" width="120" x="300" y="100" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-24" edge="1" parent="1" source="WPp5HrSlAYrurA-F_prL-18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="WPp5HrSlAYrurA-F_prL-8">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-25" edge="1" parent="1" source="WPp5HrSlAYrurA-F_prL-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="WPp5HrSlAYrurA-F_prL-5">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-26" edge="1" parent="1" source="WPp5HrSlAYrurA-F_prL-15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;startArrow=classic;startFill=1;" target="WPp5HrSlAYrurA-F_prL-8">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-27" connectable="0" parent="WPp5HrSlAYrurA-F_prL-26" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="REST" vertex="1">
-          <mxGeometry relative="1" x="0.3167" as="geometry">
-            <mxPoint x="-19" as="offset" />
-          </mxGeometry>
-        </mxCell>
         <mxCell id="WPp5HrSlAYrurA-F_prL-54" parent="1" style="swimlane;whiteSpace=wrap;html=1;" value="TaxForwad App" vertex="1">
-          <mxGeometry height="920" width="1090" x="400" y="1360" as="geometry" />
+          <mxGeometry height="1120" width="1090" x="400" y="1360" as="geometry" />
         </mxCell>
         <mxCell id="WPp5HrSlAYrurA-F_prL-133" edge="1" parent="WPp5HrSlAYrurA-F_prL-54" source="WPp5HrSlAYrurA-F_prL-42" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;">
           <mxGeometry relative="1" as="geometry">
@@ -425,6 +320,38 @@
         <mxCell id="WPp5HrSlAYrurA-F_prL-163" parent="WPp5HrSlAYrurA-F_prL-54" style="ellipse;whiteSpace=wrap;html=1;align=center;aspect=fixed;fillColor=none;strokeColor=none;resizable=0;perimeter=centerPerimeter;rotatable=0;allowArrows=0;points=[];outlineConnect=1;" value="" vertex="1">
           <mxGeometry height="10" width="10" x="715" y="577" as="geometry" />
         </mxCell>
+        <mxCell id="iVBez1LjcF5sKlb1B5E0-1" parent="WPp5HrSlAYrurA-F_prL-54" style="html=1;dropTarget=0;whiteSpace=wrap;" value="&lt;div&gt;«component»&lt;/div&gt;&lt;div&gt;&lt;b&gt;SeaweedFS / S3&lt;/b&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="90" width="180" x="455" y="980" as="geometry" />
+        </mxCell>
+        <mxCell id="iVBez1LjcF5sKlb1B5E0-2" parent="iVBez1LjcF5sKlb1B5E0-1" style="shape=module;jettyWidth=8;jettyHeight=4;" value="" vertex="1">
+          <mxGeometry height="20" relative="1" width="20" x="1" as="geometry">
+            <mxPoint x="-27" y="7" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iVBez1LjcF5sKlb1B5E0-10" edge="1" parent="WPp5HrSlAYrurA-F_prL-54" source="WPp5HrSlAYrurA-F_prL-44" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=halfCircle;endFill=0;endSize=6;strokeWidth=1;sketch=0;exitX=0.75;exitY=1;exitDx=0;exitDy=0;edgeStyle=orthogonalEdgeStyle;" target="iVBez1LjcF5sKlb1B5E0-12" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="590" y="650" />
+              <mxPoint x="730" y="650" />
+              <mxPoint x="730" y="900" />
+              <mxPoint x="545" y="900" />
+            </Array>
+            <mxPoint x="545" y="929.9991836734694" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iVBez1LjcF5sKlb1B5E0-14" connectable="0" parent="iVBez1LjcF5sKlb1B5E0-10" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="S3 API" vertex="1">
+          <mxGeometry relative="1" x="-0.037" y="-1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iVBez1LjcF5sKlb1B5E0-11" edge="1" parent="WPp5HrSlAYrurA-F_prL-54" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=oval;endFill=0;sketch=0;sourcePerimeterSpacing=0;targetPerimeterSpacing=0;endSize=10;" target="iVBez1LjcF5sKlb1B5E0-12" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="545" y="979.9991836734694" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iVBez1LjcF5sKlb1B5E0-12" parent="WPp5HrSlAYrurA-F_prL-54" style="ellipse;whiteSpace=wrap;html=1;align=center;aspect=fixed;fillColor=none;strokeColor=none;resizable=0;perimeter=centerPerimeter;rotatable=0;allowArrows=0;points=[];outlineConnect=1;" value="" vertex="1">
+          <mxGeometry height="10" width="10" x="540" y="949.9991836734694" as="geometry" />
+        </mxCell>
         <mxCell id="WPp5HrSlAYrurA-F_prL-171" edge="1" parent="1" source="WPp5HrSlAYrurA-F_prL-165" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
@@ -438,8 +365,8 @@
             <mxPoint as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="WPp5HrSlAYrurA-F_prL-165" parent="1" style="html=1;dropTarget=0;whiteSpace=wrap;" value="&lt;div&gt;«component»&lt;/div&gt;&lt;div&gt;&lt;b&gt;Auth Service&lt;/b&gt;&lt;/div&gt;" vertex="1">
-          <mxGeometry height="90" width="180" x="130" y="1900" as="geometry" />
+        <mxCell id="WPp5HrSlAYrurA-F_prL-165" parent="1" style="html=1;dropTarget=0;whiteSpace=wrap;" value="&lt;div&gt;«component»&lt;/div&gt;&lt;div&gt;&lt;b&gt;LLM Service&lt;/b&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="90" width="180" x="110" y="1900" as="geometry" />
         </mxCell>
         <mxCell id="WPp5HrSlAYrurA-F_prL-166" parent="WPp5HrSlAYrurA-F_prL-165" style="shape=module;jettyWidth=8;jettyHeight=4;" value="" vertex="1">
           <mxGeometry height="20" relative="1" width="20" x="1" as="geometry">
