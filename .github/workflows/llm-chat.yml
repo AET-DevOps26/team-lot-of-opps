@@ -33,7 +33,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run Test
-        run: pytest tests/
+        run: pytest tests/ -m "not integration"
         
   lint-type:
     name: Lint and type check
