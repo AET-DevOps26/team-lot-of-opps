@@ -1,0 +1,7 @@
+# Local Terraform working files — never commit the plugin cache or state.
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Keep .terraform.lock.hcl tracked (committed on purpose for reproducible CI).
