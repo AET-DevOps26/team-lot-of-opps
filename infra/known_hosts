@@ -4,4 +4,7 @@
 #
 # Populate/refresh after (re)provisioning the VM — the provision workflow fails
 # with the fresh scan in its step summary when this file is stale, or run:
-#   ssh-keyscan -t rsa,ecdsa,ed25519 lot-of-opps-vm.germanywestcentral.cloudapp.azure.com | sort
+#   ssh-keyscan -t rsa,ecdsa,ed25519 lot-of-opps-vm.swedencentral.cloudapp.azure.com | sort
+lot-of-opps-vm.swedencentral.cloudapp.azure.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBOEuNSOJrLKWVn8INWr29UieO0cq9emZvK7WVSaLyRM3sEqHIgZp2BvuEJdGJ6RtXuzOUJarjfjuyLWsqnI9eBE=
+lot-of-opps-vm.swedencentral.cloudapp.azure.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPNEyTqOhrX4UT/w3HuRMNEADfksV1NvKtS5Q8Pmbnxk
+lot-of-opps-vm.swedencentral.cloudapp.azure.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC4wG1MaveE9ZMZyCILDUOrA9sZ4Vsd6UMczGTUSP9ilr9lAfV+WoOfvfDAm6iFaxbZX4YmUa1bUn+SXLLsrPqVK99lNZnpUtp8cMOgURiQhVeksuBAptx6TEVPq4v4mD0SXnI5ACClcRs0CABw3QP7umHE3JU3nFd0bTnFvfttywTySSHlo8+t+lxxJ4YXJjogKY66h7gipRjDAzvfrzDyMgLd3yrGrRvyfy9Kgk/WHmO0A1I4q913+LH+DhAQlPKSnpKy0YwmM/acQ/CmPfU/MQxcMbXvjuEjsDNeNKDayjvuYV2zm6Vk1wn3jh/nc3UJmjj+5Cm/suK0AiMRaPZ+mqmCc8c3JJW4d5k8WvBbPc2X4HZABspUb5saV7/8WBP98WJanmvfiPKplKdeMLW/RVRf31bnv/CsqVjDGkCJFNQgbjJsDMQl/+IOLzfh7B3BrdkHeGqcS7MlGWot/rrmdfQKJX3uNmYVgFlLB98NXdEKNoOWNhTxvZwu+ei9TQ0=
