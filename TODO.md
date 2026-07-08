@@ -17,5 +17,12 @@
   `infra/postgres/init.sql`, and leave llm-chat's library-managed pgvector table
   (`langchain_postgres`) out of scope. Verify `ddl-auto=validate` passes from a clean
   volume before merging.
+- Wire an Alertmanager receiver. Alertmanager is enabled (`infra/monitoring/values.yaml`)
+  and the `taxforward` PrometheusRule now loads and fires, but there is no receiver/route, so
+  alerts only surface in the Prometheus/Alertmanager UI and notify nowhere. Add a receiver
+  under `kube-prometheus-stack.alertmanager.config` (easiest: a Slack/Discord incoming-webhook
+  URL, or email via an SMTP relay such as a Gmail app-password). Keep the secret out of git by
+  injecting it via `--set` from a GitHub secret in `.github/workflows/deploy-observability.yml`,
+  mirroring how the storage-class values are already set.
 - Presentation
 - Github Actions workflows to execute the tests for each micorservice.

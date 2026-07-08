@@ -33,6 +33,12 @@ kube-prometheus-stack:
       serviceMonitorSelectorNilUsesHelmValues: false
       serviceMonitorNamespaceSelector: {}
       serviceMonitorSelector: {}
+      # Same for PrometheusRules — the default (nil) only selects rules labeled
+      # release=monitoring, which the app chart's rule doesn't carry, so its alerts
+      # would never load. Discover rules from all namespaces instead.
+      ruleSelectorNilUsesHelmValues: false
+      ruleNamespaceSelector: {}
+      ruleSelector: {}
       resources:
         requests:
           cpu: "200m"
