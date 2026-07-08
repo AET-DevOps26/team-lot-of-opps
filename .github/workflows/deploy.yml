@@ -1,8 +1,8 @@
 name: Deploy
 
 # One app deploy for both targets (both run k3s/Helm):
-#   push to main          -> auto-deploy to the AET cluster
-#   workflow_dispatch     -> choose target: aet (AET cluster) or vm
+#   push to main          -> auto-deploy to the VM
+#   workflow_dispatch     -> choose target: vm or aet (AET cluster)
 # Monitoring is NOT deployed here — see deploy-observability.yml.
 on:
   push:
@@ -12,8 +12,8 @@ on:
       target:
         description: Cluster to deploy to
         type: choice
-        options: [aet, vm]
-        default: aet
+        options: [vm, aet]
+        default: vm
       image_tag:
         description: Deploy an already-built tag (e.g. sha-abc1234). Leave empty to build from this commit.
         type: string
@@ -58,7 +58,7 @@ jobs:
       - name: Resolve target config and image tag
         id: vars
         run: |
-          TARGET="${{ github.event_name == 'push' && 'aet' || inputs.target }}"
+          TARGET="${{ github.event_name == 'push' && 'vm' || inputs.target }}"
           case "$TARGET" in
             vm)
               echo "storage_class=local-path"
