@@ -12,6 +12,28 @@ on:
       - '.github/workflows/e2e.yml'
 
 jobs:
+  typecheck:
+    name: Typecheck (tsc)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
   unit:
     name: Unit & component (Vitest)
     runs-on: ubuntu-latest
