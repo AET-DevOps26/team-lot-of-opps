@@ -19,14 +19,15 @@ public class Suggestion {
 
     // Language the suggestion text was generated in (e.g. "en", "de").
     // Nullable so rows created before this column existed are treated as stale.
-    @Column
-    private String language;
+    @Column private String language;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
-    protected void onCreate() { this.createdAt = LocalDateTime.now(); }
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 
     public Suggestion() {}
 
@@ -36,12 +37,35 @@ public class Suggestion {
         this.language = language;
     }
 
-    public Long getId() { return id; }
-    public String getUserId() { return userId; }
-    public void setUserId(String userId) { this.userId = userId; }
-    public String getSuggestion() { return suggestion; }
-    public void setSuggestion(String suggestion) { this.suggestion = suggestion; }
-    public String getLanguage() { return language; }
-    public void setLanguage(String language) { this.language = language; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
+    public Long getId() {
+        return id;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    public String getSuggestion() {
+        return suggestion;
+    }
+
+    public void setSuggestion(String suggestion) {
+        this.suggestion = suggestion;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
 }

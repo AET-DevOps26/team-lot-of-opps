@@ -8,9 +8,9 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
 /**
- * Backfills the {@code status} column for invoices created before the review feature
- * existed. Such rows have a null status; we mark them {@link InvoiceStatus#ACCEPTED} so
- * they keep showing in the list. Runs once on startup and is a no-op afterwards.
+ * Backfills the {@code status} column for invoices created before the review feature existed. Such
+ * rows have a null status; we mark them {@link InvoiceStatus#ACCEPTED} so they keep showing in the
+ * list. Runs once on startup and is a no-op afterwards.
  */
 @Component
 public class InvoiceStatusBackfill implements CommandLineRunner {

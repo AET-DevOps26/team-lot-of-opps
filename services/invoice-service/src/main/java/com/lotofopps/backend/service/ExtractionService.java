@@ -8,6 +8,13 @@ import com.lotofopps.backend.model.Invoice;
 import com.lotofopps.backend.model.InvoiceCategory;
 import com.lotofopps.backend.model.InvoiceStatus;
 import com.lotofopps.backend.repository.InvoiceRepository;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.*;
+import javax.imageio.ImageIO;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
@@ -19,14 +26,6 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.*;
-
 @Service
 public class ExtractionService {
 
@@ -34,7 +33,8 @@ public class ExtractionService {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     // Ported verbatim from src/ai-components/app/main.py
-    private static final String ITEM_FIELDS = """
+    private static final String ITEM_FIELDS =
+            """
 Return a JSON object with a single key "items" containing a list. Each element represents one line item and has:
 - product_name: name of the item or service
 - company: name of the SELLER who issued this invoice — the business or person who will receive payment. THE SELLER'S NAME IS ALMOST ALWAYS THE VERY FIRST WORD(S) AT THE TOP OF THE DOCUMENT, directly attached to the heading, e.g. "Kraushaar INVOICE" → seller is "Kraushaar"; "Süßebier INVOICE" → seller is "Süßebier"; "Margraf Koch II e.G. INVOICE" → seller is "Margraf Koch II e.G.". Look there FIRST. Return ONLY that short name. Rules — do NOT return any of the following, even though they look like company names: (1) the name in the BILL TO / TO / An / Empfänger block — that is the BUYER, a different person; (2) the company name written next to the word "Bank" in the PAYMENT DETAILS / BANK / IBAN section near the bottom — that is the seller's BANK, not the seller, even if it has a suffix like GmbH/AG/e.G.; (3) email addresses, phone numbers, VAT/tax IDs, IBAN numbers (2 letters + digits), street addresses, or the words INVOICE/RECHNUNG. Use the same seller value for every item.
@@ -59,14 +59,16 @@ Category values:
   SONSTIGE_AUSGABEN
 """;
 
-    private static final String VISION_LAYOUT_HINT = """
+    private static final String VISION_LAYOUT_HINT =
+            """
 Use the VISUAL LAYOUT to identify sections:
 - The SELLER (Absender/Von) is typically in the top-right corner or letterhead — this is who sent the invoice
 - The BUYER (Empfänger/An) is typically in the middle-left address block — this is who received it
 - Do NOT confuse the two
 """;
 
-    private static final String INVOICE_LIST_SCHEMA = """
+    private static final String INVOICE_LIST_SCHEMA =
+            """
 {
   "type": "object",
   "properties": {
@@ -113,36 +115,51 @@ Use the VISUAL LAYOUT to identify sections:
 
     public List<Invoice> extractAndStore(Document document) throws IOException {
         byte[] fileBytes = documentStorageService.loadBytes(document.getStoragePath());
-        List<ExtractionItem> items = extractItems(fileBytes, document.getContentType(), document.getFilename());
+        List<ExtractionItem> items =
+                extractItems(fileBytes, document.getContentType(), document.getFilename());
         log.info("Extracted {} item(s) from document {}", items.size(), document.getStoragePath());
 
-        List<Invoice> invoices = items.stream().map(item -> {
-            Invoice invoice = new Invoice(
-                    item.product_name(),
-                    item.company(),
-                    BigDecimal.valueOf(item.value()));
-            if (item.invoice_date() != null && !item.invoice_date().isBlank()) {
-                try {
-                    invoice.setInvoiceDate(LocalDate.parse(item.invoice_date()));
-                } catch (Exception e) {
-                    log.warn("Could not parse date '{}': {}", item.invoice_date(), e.getMessage());
-                }
-            }
-            invoice.setCategory(parseCategory(item.category()));
-            invoice.setUserId(document.getUserId());
-            invoice.setDocument(document);
-            // Extracted invoices start under review — they are not embedded for chat RAG
-            // or counted until the user keeps (accepts) them via the review flow.
-            invoice.setStatus(InvoiceStatus.PENDING);
-            return invoice;
-        }).toList();
+        List<Invoice> invoices =
+                items.stream()
+                        .map(
+                                item -> {
+                                    Invoice invoice =
+                                            new Invoice(
+                                                    item.product_name(),
+                                                    item.company(),
+                                                    BigDecimal.valueOf(item.value()));
+                                    if (item.invoice_date() != null
+                                            && !item.invoice_date().isBlank()) {
+                                        try {
+                                            invoice.setInvoiceDate(
+                                                    LocalDate.parse(item.invoice_date()));
+                                        } catch (Exception e) {
+                                            log.warn(
+                                                    "Could not parse date '{}': {}",
+                                                    item.invoice_date(),
+                                                    e.getMessage());
+                                        }
+                                    }
+                                    invoice.setCategory(parseCategory(item.category()));
+                                    invoice.setUserId(document.getUserId());
+                                    invoice.setDocument(document);
+                                    // Extracted invoices start under review — they are not embedded
+                                    // for chat RAG
+                                    // or counted until the user keeps (accepts) them via the review
+                                    // flow.
+                                    invoice.setStatus(InvoiceStatus.PENDING);
+                                    return invoice;
+                                })
+                        .toList();
 
         return invoiceRepository.saveAll(invoices);
     }
 
-    private List<ExtractionItem> extractItems(byte[] fileBytes, String contentType, String filename) throws IOException {
-        boolean isPdf = "application/pdf".equals(contentType)
-                || (filename != null && filename.toLowerCase().endsWith(".pdf"));
+    private List<ExtractionItem> extractItems(byte[] fileBytes, String contentType, String filename)
+            throws IOException {
+        boolean isPdf =
+                "application/pdf".equals(contentType)
+                        || (filename != null && filename.toLowerCase().endsWith(".pdf"));
 
         if (isPdf) {
             String text = pdfToText(fileBytes);
@@ -153,8 +170,13 @@ Use the VISUAL LAYOUT to identify sections:
             log.info("PDF has no extractable text, falling back to vision");
             return callLlmVision(pdfToBase64Images(fileBytes));
         } else {
-            String mime = (contentType != null && contentType.startsWith("image/")) ? contentType : "image/png";
-            List<String[]> images = Collections.singletonList(new String[]{mime, Base64.getEncoder().encodeToString(fileBytes)});
+            String mime =
+                    (contentType != null && contentType.startsWith("image/"))
+                            ? contentType
+                            : "image/png";
+            List<String[]> images =
+                    Collections.singletonList(
+                            new String[] {mime, Base64.getEncoder().encodeToString(fileBytes)});
             return callLlmVision(images);
         }
     }
@@ -169,11 +191,12 @@ Use the VISUAL LAYOUT to identify sections:
     }
 
     private List<ExtractionItem> callLlmText(String text) {
-        String prompt = "You are a German tax document classifier. Extract invoice line items from the text below and return valid JSON. The invoice may be in German or English.\n"
-                + ITEM_FIELDS;
+        String prompt =
+                "You are a German tax document classifier. Extract invoice line items from the text below and return valid JSON. The invoice may be in German or English.\n"
+                        + ITEM_FIELDS;
 
-        List<Map<String, Object>> messageContent = List.of(
-                Map.of("type", "text", "text", prompt + "\n\nINVOICE TEXT:\n" + text));
+        List<Map<String, Object>> messageContent =
+                List.of(Map.of("type", "text", "text", prompt + "\n\nINVOICE TEXT:\n" + text));
         return callLlm(messageContent);
     }
 
@@ -185,22 +208,31 @@ Use the VISUAL LAYOUT to identify sections:
                 BufferedImage img = renderer.renderImageWithDPI(i, 96);
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 ImageIO.write(img, "PNG", baos);
-                images.add(new String[]{"image/png", Base64.getEncoder().encodeToString(baos.toByteArray())});
+                images.add(
+                        new String[] {
+                            "image/png", Base64.getEncoder().encodeToString(baos.toByteArray())
+                        });
             }
         }
         return images;
     }
 
     private List<ExtractionItem> callLlmVision(List<String[]> images) {
-        String prompt = "You are a German tax document classifier. Extract invoice line items from the images below and return valid JSON. The invoice may be in German or English.\n"
-                + VISION_LAYOUT_HINT + "\n" + ITEM_FIELDS;
+        String prompt =
+                "You are a German tax document classifier. Extract invoice line items from the images below and return valid JSON. The invoice may be in German or English.\n"
+                        + VISION_LAYOUT_HINT
+                        + "\n"
+                        + ITEM_FIELDS;
 
         List<Map<String, Object>> messageContent = new ArrayList<>();
         messageContent.add(Map.of("type", "text", "text", prompt));
         for (String[] img : images) {
-            messageContent.add(Map.of(
-                    "type", "image_url",
-                    "image_url", Map.of("url", "data:" + img[0] + ";base64," + img[1])));
+            messageContent.add(
+                    Map.of(
+                            "type",
+                            "image_url",
+                            "image_url",
+                            Map.of("url", "data:" + img[0] + ";base64," + img[1])));
         }
         return callLlm(messageContent);
     }
@@ -210,11 +242,16 @@ Use the VISUAL LAYOUT to identify sections:
 
         Map<String, Object> responseFormat;
         try {
-            responseFormat = Map.of(
-                    "type", "json_schema",
-                    "json_schema", Map.of(
-                            "name", "InvoiceList",
-                            "schema", MAPPER.readValue(INVOICE_LIST_SCHEMA, Map.class)));
+            responseFormat =
+                    Map.of(
+                            "type",
+                            "json_schema",
+                            "json_schema",
+                            Map.of(
+                                    "name",
+                                    "InvoiceList",
+                                    "schema",
+                                    MAPPER.readValue(INVOICE_LIST_SCHEMA, Map.class)));
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse invoice JSON schema", e);
         }
@@ -232,39 +269,53 @@ Use the VISUAL LAYOUT to identify sections:
         for (int attempt = 0; attempt < 3; attempt++) {
             try {
                 log.info("LLM attempt {}/3 model={}", attempt + 1, llmModel);
-                ResponseEntity<String> response = restTemplate.exchange(
-                        url, HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
+                ResponseEntity<String> response =
+                        restTemplate.exchange(
+                                url,
+                                HttpMethod.POST,
+                                new HttpEntity<>(body, headers),
+                                String.class);
 
                 String responseBody = response.getBody();
                 if (responseBody == null || responseBody.isBlank()) {
                     log.warn("LLM attempt {} returned empty body", attempt + 1);
-                    if (attempt == 2) throw new RuntimeException("LLM returned empty response after 3 attempts");
+                    if (attempt == 2)
+                        throw new RuntimeException("LLM returned empty response after 3 attempts");
                     sleep2s();
                     continue;
                 }
 
                 JsonNode root = MAPPER.readTree(responseBody);
-                String responseText = root.path("choices").get(0).path("message").path("content").asText();
+                String responseText =
+                        root.path("choices").get(0).path("message").path("content").asText();
                 if (responseText.isBlank()) {
                     log.warn("LLM attempt {} returned empty content", attempt + 1);
-                    if (attempt == 2) throw new RuntimeException("LLM returned empty content after 3 attempts");
+                    if (attempt == 2)
+                        throw new RuntimeException("LLM returned empty content after 3 attempts");
                     sleep2s();
                     continue;
                 }
 
-                log.info("LLM returned {} chars: {}", responseText.length(),
-                        responseText.length() <= 200 ? responseText : responseText.substring(0, 200) + "...");
+                log.info(
+                        "LLM returned {} chars: {}",
+                        responseText.length(),
+                        responseText.length() <= 200
+                                ? responseText
+                                : responseText.substring(0, 200) + "...");
                 JsonNode itemsNode = MAPPER.readTree(responseText).path("items");
                 List<ExtractionItem> result = new ArrayList<>();
                 for (JsonNode node : itemsNode) {
-                    String invoiceDate = node.path("invoice_date").isNull() ? null
-                            : node.path("invoice_date").asText(null);
-                    result.add(new ExtractionItem(
-                            node.path("product_name").asText(""),
-                            node.path("company").asText(""),
-                            node.path("value").asDouble(0),
-                            invoiceDate,
-                            node.path("category").asText(null)));
+                    String invoiceDate =
+                            node.path("invoice_date").isNull()
+                                    ? null
+                                    : node.path("invoice_date").asText(null);
+                    result.add(
+                            new ExtractionItem(
+                                    node.path("product_name").asText(""),
+                                    node.path("company").asText(""),
+                                    node.path("value").asDouble(0),
+                                    invoiceDate,
+                                    node.path("category").asText(null)));
                 }
                 if (result.isEmpty()) log.warn("LLM returned 0 items");
                 else log.info("Parsed {} invoice items", result.size());
@@ -272,7 +323,8 @@ Use the VISUAL LAYOUT to identify sections:
 
             } catch (Exception e) {
                 log.warn("LLM attempt {} failed: {}", attempt + 1, e.getMessage());
-                if (attempt == 2) throw new RuntimeException("LLM extraction failed after 3 attempts", e);
+                if (attempt == 2)
+                    throw new RuntimeException("LLM extraction failed after 3 attempts", e);
                 sleep2s();
             }
         }
