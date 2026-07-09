@@ -32,11 +32,10 @@ for arg in "$@"; do
 done
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-REGISTRY="ghcr.io/aet-devops26/taxforward"   # matches build.yml / deploy.yml (not local's team-taxforward)
 TAG="${IMAGE_TAG:-latest}"
-RELEASE="taxforward"
-NAMESPACE="taxforward"
-OBS_NAMESPACE="taxforward-observ"
+RELEASE="taxforward"                 # Helm release name → resource names (taxforward-tax-forward-*)
+NAMESPACE="team-lot-of-opps"         # namespace in the shared AET project (distinct from release)
+OBS_NAMESPACE="team-lot-of-opps-observ"
 HELM_DIR="$REPO_ROOT/infra/helm"
 MON_DIR="$REPO_ROOT/infra/monitoring"
 
@@ -44,10 +43,24 @@ MON_DIR="$REPO_ROOT/infra/monitoring"
 # No base64 KUBE_CONFIG handling here (that's a CI concern) — use whatever
 # kubeconfig/context is active. Show it so a wrong-cluster deploy is caught early.
 CTX="$(kubectl config current-context 2>/dev/null || true)"
-echo "==> Target kube context: ${CTX:-<none>}"
+SERVER="$(kubectl config view --minify -o jsonpath='{.clusters[*].cluster.server}' 2>/dev/null || true)"
+echo "==> Target kube context: ${CTX:-<none>}  (${SERVER:-<none>})"
 echo "    App namespace: $NAMESPACE   Monitoring namespace: $OBS_NAMESPACE"
-if ! kubectl cluster-info >/dev/null 2>&1; then
-  echo "ERROR: kubectl cannot reach a cluster. Point KUBECONFIG at your AET cluster and retry."
+# Refuse to deploy anywhere but the AET Rancher cluster — otherwise a default
+# local context (orbstack/docker-desktop) silently gets the deploy.
+case "$SERVER" in
+  *ase.cit.tum.de*) : ;;   # AET Rancher — good
+  *)
+    echo "ERROR: context '$CTX' ($SERVER) is not the AET cluster."
+    echo "       Point KUBECONFIG at your AET kubeconfig and retry, e.g.:"
+    echo "         KUBECONFIG=infra/stud.yaml $0 $*"
+    exit 1
+    ;;
+esac
+# `kubectl cluster-info` needs cluster-scoped reads the namespace-scoped AET token
+# doesn't have; `auth whoami` verifies reachability + auth with what the token can do.
+if ! kubectl auth whoami >/dev/null 2>&1; then
+  echo "ERROR: kubectl cannot reach/authenticate to the cluster. Point KUBECONFIG at your AET cluster and retry."
   exit 1
 fi
 
@@ -80,7 +93,11 @@ fi
 set -a; source "$ENV_FILE"; set +a
 
 # Rancher project the auto-created namespaces are pinned into (see ensure_ns).
-PROJECT_ID="${AET_PROJECT_ID:?set AET_PROJECT_ID in infra/.env (e.g. c-f49m7:p-kk4gz)}"
+PROJECT_ID="${AET_PROJECT_ID:?set AET_PROJECT_ID in infra/.env (e.g. c-f49m7:p-rgm54)}"
+
+# Set AFTER sourcing .env so the compose REGISTRY (team-lot-of-opps) can't clobber it.
+# The AET cluster pulls images the CI publishes under .../taxforward (build.yml / deploy.yml).
+REGISTRY="ghcr.io/aet-devops26/taxforward"
 
 FIREBASE_BUILD_ARGS=(
   --build-arg "VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY:-}"
@@ -109,20 +126,22 @@ services=(
 )
 
 # ─── Build + push images (cluster pulls from GHCR) ───────────────────────────
-echo "==> Building and pushing images to $REGISTRY (tag: $TAG)..."
+# AET cluster nodes are linux/amd64; on Apple Silicon a plain `docker build`
+# produces arm64 images the cluster rejects (ImagePullBackOff: no match for
+# platform). Force amd64 for every image (CI runners are amd64 so build natively).
+PLATFORM=linux/amd64
+echo "==> Building and pushing images to $REGISTRY (tag: $TAG, platform: $PLATFORM)..."
 for entry in "${services[@]}"; do
   name="${entry%%:*}"
   context="${entry##*:}"
   image="$REGISTRY/$name:$TAG"
   echo "    docker build $name -> $image"
   if [ "$name" = "client" ]; then
-    docker build "${FIREBASE_BUILD_ARGS[@]}" -t "$image" "$context"
-  elif [ "$name" = "llm-chat" ]; then
-    docker build --platform linux/amd64 -t "$image" "$context"
+    docker build --platform "$PLATFORM" "${FIREBASE_BUILD_ARGS[@]}" -t "$image" "$context"
   elif [ "$name" = "invoice-service" ] || [ "$name" = "suggestions-service" ]; then
-    docker build --build-context "api=$REPO_ROOT/api" -t "$image" "$context"
+    docker build --platform "$PLATFORM" --build-context "api=$REPO_ROOT/api" -t "$image" "$context"
   else
-    docker build -t "$image" "$context"
+    docker build --platform "$PLATFORM" -t "$image" "$context"
   fi
   docker push "$image"
 done

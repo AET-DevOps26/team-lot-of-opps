@@ -20,8 +20,6 @@ on:
 env:
   # Deterministic Azure DNS name (Terraform domain_name_label = vm_name).
   VM_HOST: ${{ vars.VM_HOST }}
-  # Monitoring-stack namespace (same on both clusters).
-  OBS_NAMESPACE: taxforward-observ
 
 jobs:
   deploy:
@@ -41,10 +39,14 @@ jobs:
         run: |
           TARGET="${{ github.event_name == 'push' && 'aet' || inputs.target }}"
           echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+          # Namespace differs by target: VM stays 'taxforward-observ' (single-tenant k3s);
+          # AET uses a team-prefixed namespace in the shared Rancher project.
           if [ "$TARGET" = "vm" ]; then
             echo "storage_class=local-path" >> "$GITHUB_OUTPUT"
+            echo "OBS_NAMESPACE=taxforward-observ" >> "$GITHUB_ENV"
           else
             echo "storage_class=csi-rbd-sc" >> "$GITHUB_OUTPUT"
+            echo "OBS_NAMESPACE=team-lot-of-opps-observ" >> "$GITHUB_ENV"
           fi
 
       - name: Resolve kube context
