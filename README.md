@@ -75,7 +75,6 @@ middleware in front of it** — see [TODO.md](TODO.md).
 ### Prerequisites
 
 - Docker + Docker Compose
-- A Firebase project with Authentication enabled (Email/Password at minimum)
 - An OpenAI-compatible LLM server running locally (e.g. [LM Studio](https://lmstudio.ai) or [Ollama](https://ollama.com))
 
 ### 1. Configure environment
@@ -84,46 +83,31 @@ middleware in front of it** — see [TODO.md](TODO.md).
 cp infra/.env.example infra/.env
 ```
 
-Fill in the Firebase values from your Firebase project settings:
-
-```
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_STORAGE_BUCKET=...
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
-VITE_FIREBASE_APP_ID=...
-FIREBASE_PROJECT_ID=...
-```
-
-For local dev, use the Firebase Auth Emulator (see below) — no service account needed. For production, place your Firebase service account JSON at `services/auth-service/` and update `GOOGLE_APPLICATION_CREDENTIALS` in `infra/docker-compose.yaml` to point to it.
+The defaults authenticate against the bundled **Firebase Auth Emulator**, so no
+Firebase project or service account is required for local dev — just fill in the
+LLM, database, and Grafana values.
 
 ### Firebase Auth Emulator (local dev)
 
-Instead of hitting production Firebase, you can run auth locally. This requires no service account credentials and lets you create test users freely.
+Auth runs as its own container (`firebase-auth`), started automatically by
+`docker compose up`. It's an offline stand-in for production Firebase: no
+service account, no real project, and you can create test users freely.
 
-**Prerequisites (one-time):**
-```bash
-npm install -g firebase-tools
-firebase login
-# Java is also required — the Firebase CLI will prompt to install it if missing
+- Emulator UI: `http://127.0.0.1:4000/auth` — new sign-ups appear here instead
+  of the Firebase console.
+- Sign up with email/password (or the Google popup) directly in the app; the
+  emulator persists users for the container's lifetime.
+
+**To use production Firebase instead**, set the following in `infra/.env`, and
+mount a service-account JSON into the `auth-service` container at
+`GOOGLE_APPLICATION_CREDENTIALS`:
+
 ```
-
-**Start the emulator before `docker compose up`:**
-```bash
-# from the project root
-firebase emulators:start
+VITE_USE_FIREBASE_EMULATOR=false
+FIREBASE_AUTH_EMULATOR_HOST=
+FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_API_KEY=...          # plus the other VITE_FIREBASE_* values
 ```
-
-**Enable emulator mode in `infra/.env`:**
-```
-VITE_USE_FIREBASE_EMULATOR=true
-FIREBASE_AUTH_EMULATOR_HOST=host.docker.internal:9099
-```
-
-The defaults in `infra/.env.example` have both flags set to `false`/empty (production mode).
-
-Emulator UI: `http://127.0.0.1:4000/auth` — new sign-ups appear here instead of the Firebase console.
 
 ### 2. Start the stack
 

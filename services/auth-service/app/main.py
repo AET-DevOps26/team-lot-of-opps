@@ -21,8 +21,13 @@ if not DEV_AUTH:
     from firebase_admin import auth as firebase_auth, credentials
 
     project_id = os.environ["FIREBASE_PROJECT_ID"]
-    cred = credentials.Certificate(os.environ["GOOGLE_APPLICATION_CREDENTIALS"])
-    app_fb = firebase_admin.initialize_app(cred, options={"projectId": project_id})
+    if os.environ.get("FIREBASE_AUTH_EMULATOR_HOST"):
+        # Emulator mode: no signing key needed; tokens are verified against the
+        # emulator (the Admin SDK skips the signature check).
+        app_fb = firebase_admin.initialize_app(options={"projectId": project_id})
+    else:
+        cred = credentials.Certificate(os.environ["GOOGLE_APPLICATION_CREDENTIALS"])
+        app_fb = firebase_admin.initialize_app(cred, options={"projectId": project_id})
 else:
     logger.warning("DEV_AUTH enabled: Firebase token verification is DISABLED.")
 
