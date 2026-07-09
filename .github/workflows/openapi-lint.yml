@@ -29,7 +29,7 @@ jobs:
     # local linting always agree on rules and Redocly CLI version.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -51,7 +51,7 @@ jobs:
     # Regenerate with the pinned openapi-typescript and fail if it differs.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -77,7 +77,7 @@ jobs:
     name: Codegen smoke (all targets)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:

@@ -49,7 +49,7 @@ jobs:
     if: ${{ always() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: azure/setup-helm@v3
         with:
