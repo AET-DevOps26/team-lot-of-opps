@@ -5,7 +5,7 @@ pydantic
 uvicorn[standard]
 sse-starlette
 python-multipart
-openai>=1.0.0
+openai>=2.44.0
 langextract
 pytest
 requests
