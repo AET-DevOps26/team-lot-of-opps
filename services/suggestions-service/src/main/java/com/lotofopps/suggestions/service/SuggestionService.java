@@ -6,6 +6,15 @@ import com.lotofopps.suggestions.client.model.InvoiceResponse;
 import com.lotofopps.suggestions.dto.SuggestionResponse;
 import com.lotofopps.suggestions.model.Suggestion;
 import com.lotofopps.suggestions.repository.SuggestionRepository;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,16 +26,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.stream.Collectors;
-
 @Service
 public class SuggestionService {
 
@@ -34,7 +33,8 @@ public class SuggestionService {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     // Ported verbatim from src/.old/ai-components/app/main.py
-    private static final String SYSTEM_PROMPT = """
+    private static final String SYSTEM_PROMPT =
+            """
 You are a German tax expert helping students maximize their tax refund.
 Analyze the uploaded invoices and identify missing documents based on these German tax deduction pairs:
 - Hotel receipt → flight/train receipt (Reisekosten require both)
@@ -84,8 +84,9 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
             generateAndStore(userId, invoices, lang);
         }
 
-        return suggestionRepository.findByUserIdOrderByIdAsc(userId)
-                .stream().map(SuggestionResponse::from).toList();
+        return suggestionRepository.findByUserIdOrderByIdAsc(userId).stream()
+                .map(SuggestionResponse::from)
+                .toList();
     }
 
     /** The frontend only offers en/de; anything unrecognized falls back to English. */
@@ -94,22 +95,25 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
     }
 
     /**
-     * Call the LLM when invoices were uploaded after the most recent stored
-     * suggestion (so dashboard reloads don't trigger redundant generations),
-     * or when the stored suggestions are in a different language than requested.
+     * Call the LLM when invoices were uploaded after the most recent stored suggestion (so
+     * dashboard reloads don't trigger redundant generations), or when the stored suggestions are in
+     * a different language than requested.
      */
-    private boolean needsNewSuggestion(String userId, List<InvoiceResponse> invoices, String language) {
-        Optional<Suggestion> latest = suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(userId);
+    private boolean needsNewSuggestion(
+            String userId, List<InvoiceResponse> invoices, String language) {
+        Optional<Suggestion> latest =
+                suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(userId);
         if (latest.isEmpty()) {
             return true;
         }
         if (!language.equals(latest.get().getLanguage())) {
             return true;
         }
-        Optional<LocalDateTime> newestInvoice = invoices.stream()
-                .map(InvoiceResponse::getCreatedAt)
-                .filter(Objects::nonNull)
-                .max(Comparator.naturalOrder());
+        Optional<LocalDateTime> newestInvoice =
+                invoices.stream()
+                        .map(InvoiceResponse::getCreatedAt)
+                        .filter(Objects::nonNull)
+                        .max(Comparator.naturalOrder());
         return newestInvoice.map(t -> latest.get().getCreatedAt().isBefore(t)).orElse(false);
     }
 
@@ -120,56 +124,80 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
                 // Replace the previous set so each suggestion is its own row and
                 // stale suggestions don't accumulate.
                 suggestionRepository.deleteByUserId(userId);
-                suggestions.forEach(text -> suggestionRepository.save(new Suggestion(userId, text, language)));
+                suggestions.forEach(
+                        text -> suggestionRepository.save(new Suggestion(userId, text, language)));
             }
         } catch (Exception e) {
             // Fall back to previously stored suggestions; fail only if there are none.
             if (suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(userId).isEmpty()) {
                 throw new RuntimeException("Failed to generate suggestions", e);
             }
-            log.warn("Suggestion generation failed for user {}, returning stored suggestions: {}",
-                    userId, e.getMessage());
+            log.warn(
+                    "Suggestion generation failed for user {}, returning stored suggestions: {}",
+                    userId,
+                    e.getMessage());
         }
     }
 
-    /** Ask the LLM for a structured {"suggestions": [...]} object and return at most two entries. */
+    /**
+     * Ask the LLM for a structured {"suggestions": [...]} object and return at most two entries.
+     */
     private List<String> callLlm(List<InvoiceResponse> invoices, String language) throws Exception {
-        String context = invoices.stream()
-                .map(inv -> String.format("- %s | %s | %s EUR | %s | %s",
-                        Objects.toString(inv.getItemName(), ""),
-                        Objects.toString(inv.getCompany(), ""),
-                        Objects.toString(inv.getPrice(), ""),
-                        Objects.toString(inv.getCategory(), ""),
-                        Objects.toString(inv.getInvoiceDate(), "")))
-                .collect(Collectors.joining("\n"));
+        String context =
+                invoices.stream()
+                        .map(
+                                inv ->
+                                        String.format(
+                                                "- %s | %s | %s EUR | %s | %s",
+                                                Objects.toString(inv.getItemName(), ""),
+                                                Objects.toString(inv.getCompany(), ""),
+                                                Objects.toString(inv.getPrice(), ""),
+                                                Objects.toString(inv.getCategory(), ""),
+                                                Objects.toString(inv.getInvoiceDate(), "")))
+                        .collect(Collectors.joining("\n"));
 
         // Keep the German-tax domain prompt; only steer the output language.
         String languageName = "de".equals(language) ? "German" : "English";
         String systemPrompt = SYSTEM_PROMPT + "\nWrite each suggestion in " + languageName + ".";
         if ("de".equals(language)) {
             // The rest of the UI duzt the user, so keep the informal register here too.
-            systemPrompt += " Address the user informally with \"du\" (duzen), never the formal \"Sie\".";
+            systemPrompt +=
+                    " Address the user informally with \"du\" (duzen), never the formal \"Sie\".";
         }
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", llmModel);
-        body.put("messages", List.of(
-                Map.of("role", "system", "content", systemPrompt),
-                Map.of("role", "user", "content",
-                        "Here are the user's uploaded invoices:\n" + context
-                                + "\n\nWhat tax documents are missing?")));
+        body.put(
+                "messages",
+                List.of(
+                        Map.of("role", "system", "content", systemPrompt),
+                        Map.of(
+                                "role",
+                                "user",
+                                "content",
+                                "Here are the user's uploaded invoices:\n"
+                                        + context
+                                        + "\n\nWhat tax documents are missing?")));
         body.put("response_format", SUGGESTIONS_SCHEMA);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("Authorization", "Bearer " + llmApiKey);
 
-        ResponseEntity<String> response = restTemplate.exchange(
-                llmUrl + "/v1/chat/completions", HttpMethod.POST,
-                new HttpEntity<>(body, headers), String.class);
+        ResponseEntity<String> response =
+                restTemplate.exchange(
+                        llmUrl + "/v1/chat/completions",
+                        HttpMethod.POST,
+                        new HttpEntity<>(body, headers),
+                        String.class);
 
-        String content = MAPPER.readTree(response.getBody())
-                .path("choices").get(0).path("message").path("content").asText();
+        String content =
+                MAPPER.readTree(response.getBody())
+                        .path("choices")
+                        .get(0)
+                        .path("message")
+                        .path("content")
+                        .asText();
 
         List<String> suggestions = new ArrayList<>();
         for (JsonNode node : MAPPER.readTree(content).path("suggestions")) {
@@ -188,19 +216,34 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
 
     // OpenAI-compatible structured-output request that constrains the model to
     // {"suggestions": ["...", "..."]} so we never have to parse free-form text.
-    private static final Map<String, Object> SUGGESTIONS_SCHEMA = Map.of(
-            "type", "json_schema",
-            "json_schema", Map.of(
-                    "name", "tax_suggestions",
-                    "strict", true,
-                    "schema", Map.of(
-                            "type", "object",
-                            "additionalProperties", false,
-                            "required", List.of("suggestions"),
-                            "properties", Map.of(
-                                    "suggestions", Map.of(
-                                            "type", "array",
-                                            "minItems", MAX_SUGGESTIONS,
-                                            "maxItems", MAX_SUGGESTIONS,
-                                            "items", Map.of("type", "string"))))));
+    private static final Map<String, Object> SUGGESTIONS_SCHEMA =
+            Map.of(
+                    "type",
+                    "json_schema",
+                    "json_schema",
+                    Map.of(
+                            "name",
+                            "tax_suggestions",
+                            "strict",
+                            true,
+                            "schema",
+                            Map.of(
+                                    "type",
+                                    "object",
+                                    "additionalProperties",
+                                    false,
+                                    "required",
+                                    List.of("suggestions"),
+                                    "properties",
+                                    Map.of(
+                                            "suggestions",
+                                            Map.of(
+                                                    "type",
+                                                    "array",
+                                                    "minItems",
+                                                    MAX_SUGGESTIONS,
+                                                    "maxItems",
+                                                    MAX_SUGGESTIONS,
+                                                    "items",
+                                                    Map.of("type", "string"))))));
 }

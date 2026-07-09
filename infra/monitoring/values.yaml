@@ -33,6 +33,12 @@ kube-prometheus-stack:
       serviceMonitorSelectorNilUsesHelmValues: false
       serviceMonitorNamespaceSelector: {}
       serviceMonitorSelector: {}
+      # Same for PrometheusRules — the default (nil) only selects rules labeled
+      # release=monitoring, which the app chart's rule doesn't carry, so its alerts
+      # would never load. Discover rules from all namespaces instead.
+      ruleSelectorNilUsesHelmValues: false
+      ruleNamespaceSelector: {}
+      ruleSelector: {}
       resources:
         requests:
           cpu: "200m"
@@ -60,6 +66,10 @@ kube-prometheus-stack:
           memory: "128Mi"
 
   grafana:
+    # adminPassword is NOT set here (kept out of git) — injected via --set from the
+    # GRAFANA_ADMIN_PASSWORD secret in deploy-observability.yml. Without this the chart
+    # generates a random password no one knows.
+    adminUser: admin
     resources:
       requests:
         cpu: "50m"
@@ -77,6 +87,10 @@ kube-prometheus-stack:
         domain: taxforward-devops-ss26.stud.k8s.aet.cit.tum.de
         root_url: "%(protocol)s://%(domain)s/grafana/"
         serve_from_sub_path: true
+      # The /grafana route has no auth middleware in front of it, so Grafana's own login
+      # is the only gate — make sure anonymous access is off.
+      "auth.anonymous":
+        enabled: false
     sidecar:
       dashboards:
         enabled: true

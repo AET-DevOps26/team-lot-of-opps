@@ -2,6 +2,11 @@ package com.lotofopps.backend.service;
 
 import com.lotofopps.backend.model.Document;
 import com.lotofopps.backend.repository.DocumentRepository;
+import java.io.IOException;
+import java.net.URI;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -15,12 +20,6 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
-
-import java.io.IOException;
-import java.net.URI;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.UUID;
 
 @Service
 public class DocumentStorageService {
@@ -39,15 +38,16 @@ public class DocumentStorageService {
             DocumentRepository documentRepository) {
         this.bucket = bucket;
         this.documentRepository = documentRepository;
-        this.s3 = S3Client.builder()
-                .endpointOverride(URI.create(endpoint))
-                .region(Region.of(region))
-                .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(accessKey, secretKey)))
-                .serviceConfiguration(S3Configuration.builder()
-                        .pathStyleAccessEnabled(true)
-                        .build())
-                .build();
+        this.s3 =
+                S3Client.builder()
+                        .endpointOverride(URI.create(endpoint))
+                        .region(Region.of(region))
+                        .credentialsProvider(
+                                StaticCredentialsProvider.create(
+                                        AwsBasicCredentials.create(accessKey, secretKey)))
+                        .serviceConfiguration(
+                                S3Configuration.builder().pathStyleAccessEnabled(true).build())
+                        .build();
     }
 
     public Document store(MultipartFile file, String userId) throws IOException {
@@ -55,22 +55,20 @@ public class DocumentStorageService {
         byte[] bytes = file.getBytes();
         String hash = sha256Hex(bytes);
 
-        String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
-        String extension = originalFilename.contains(".")
-                ? originalFilename.substring(originalFilename.lastIndexOf('.'))
-                : "";
+        String originalFilename =
+                file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
+        String extension =
+                originalFilename.contains(".")
+                        ? originalFilename.substring(originalFilename.lastIndexOf('.'))
+                        : "";
         String key = UUID.randomUUID() + extension;
 
-        s3.putObject(b -> b.bucket(bucket).key(key)
-                        .contentType(file.getContentType()),
+        s3.putObject(
+                b -> b.bucket(bucket).key(key).contentType(file.getContentType()),
                 RequestBody.fromBytes(bytes));
 
-        Document document = new Document(
-                originalFilename,
-                file.getContentType(),
-                file.getSize(),
-                key
-        );
+        Document document =
+                new Document(originalFilename, file.getContentType(), file.getSize(), key);
         document.setUserId(userId);
         document.setContentHash(hash);
         return documentRepository.save(document);

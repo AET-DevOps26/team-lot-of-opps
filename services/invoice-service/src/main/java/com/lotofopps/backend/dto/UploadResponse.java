@@ -16,8 +16,19 @@ public class UploadResponse {
         this.invoiceIds = invoiceIds;
     }
 
-    public String getMessage() { return message; }
-    public String getFilename() { return filename; }
-    public Long getDocumentId() { return documentId; }
-    public List<Long> getInvoiceIds() { return invoiceIds; }
+    public String getMessage() {
+        return message;
+    }
+
+    public String getFilename() {
+        return filename;
+    }
+
+    public Long getDocumentId() {
+        return documentId;
+    }
+
+    public List<Long> getInvoiceIds() {
+        return invoiceIds;
+    }
 }

@@ -1,11 +1,25 @@
 package com.lotofopps.suggestions.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lotofopps.suggestions.client.model.InvoiceCategory;
 import com.lotofopps.suggestions.client.model.InvoiceResponse;
 import com.lotofopps.suggestions.dto.SuggestionResponse;
 import com.lotofopps.suggestions.model.Suggestion;
 import com.lotofopps.suggestions.repository.SuggestionRepository;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,45 +32,34 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 class SuggestionServiceTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String USER_ID = "test-user";
-    private static final String LLM_RESPONSE = """
+    private static final String LLM_RESPONSE =
+            """
             {"choices": [{"message": {"content": "{\\"suggestions\\": [\\"Upload your train ticket for the Berlin hotel.\\"]}"}}]}""";
 
-    @Mock
-    private SuggestionRepository suggestionRepository;
+    @Mock private SuggestionRepository suggestionRepository;
 
-    @Mock
-    private InvoiceClient invoiceClient;
+    @Mock private InvoiceClient invoiceClient;
 
-    @Mock
-    private RestTemplate restTemplate;
+    @Mock private RestTemplate restTemplate;
 
     private SuggestionService service;
 
     @BeforeEach
     void setUp() {
-        service = new SuggestionService("http://localhost:9999", "test-model", "EMPTY", 5,
-                suggestionRepository, invoiceClient, restTemplate);
+        service =
+                new SuggestionService(
+                        "http://localhost:9999",
+                        "test-model",
+                        "EMPTY",
+                        5,
+                        suggestionRepository,
+                        invoiceClient,
+                        restTemplate);
     }
 
     private InvoiceResponse invoice(LocalDateTime createdAt) {
@@ -94,7 +97,8 @@ class SuggestionServiceTest {
                 .thenReturn(List.of(invoice(LocalDateTime.now())));
         when(suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID))
                 .thenReturn(Optional.empty());
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+        when(restTemplate.exchange(
+                        anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(LLM_RESPONSE));
         when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID))
                 .thenReturn(List.of(storedSuggestion(LocalDateTime.now())));
@@ -107,17 +111,28 @@ class SuggestionServiceTest {
 
     @Test
     void storesEachStructuredSuggestionAsSeparateRowAndReplacesOldSet() {
-        String content = "{\"suggestions\": ["
-                + "\"Upload your train ticket for the Berlin hotel.\","
-                + "\"Add the internet bill for your home office claim.\"]}";
-        String twoSuggestions = MAPPER.createObjectNode().set("choices",
-                MAPPER.createArrayNode().add(MAPPER.createObjectNode().set("message",
-                        MAPPER.createObjectNode().put("content", content)))).toString();
+        String content =
+                "{\"suggestions\": ["
+                        + "\"Upload your train ticket for the Berlin hotel.\","
+                        + "\"Add the internet bill for your home office claim.\"]}";
+        String twoSuggestions =
+                MAPPER.createObjectNode()
+                        .set(
+                                "choices",
+                                MAPPER.createArrayNode()
+                                        .add(
+                                                MAPPER.createObjectNode()
+                                                        .set(
+                                                                "message",
+                                                                MAPPER.createObjectNode()
+                                                                        .put("content", content))))
+                        .toString();
         when(invoiceClient.fetchLatestInvoices(USER_ID, 5))
                 .thenReturn(List.of(invoice(LocalDateTime.now())));
         when(suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID))
                 .thenReturn(Optional.empty());
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+        when(restTemplate.exchange(
+                        anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(twoSuggestions));
         when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID)).thenReturn(List.of());
 
@@ -126,8 +141,10 @@ class SuggestionServiceTest {
         verify(suggestionRepository).deleteByUserId(USER_ID);
         ArgumentCaptor<Suggestion> captor = ArgumentCaptor.forClass(Suggestion.class);
         verify(suggestionRepository, times(2)).save(captor.capture());
-        assertThat(captor.getAllValues()).extracting(Suggestion::getSuggestion)
-                .containsExactly("Upload your train ticket for the Berlin hotel.",
+        assertThat(captor.getAllValues())
+                .extracting(Suggestion::getSuggestion)
+                .containsExactly(
+                        "Upload your train ticket for the Berlin hotel.",
                         "Add the internet bill for your home office claim.");
     }
 
@@ -144,7 +161,8 @@ class SuggestionServiceTest {
         List<SuggestionResponse> result = service.getSuggestions(USER_ID, "en");
 
         assertThat(result).hasSize(1);
-        verify(restTemplate, never()).exchange(anyString(), any(HttpMethod.class), any(), eq(String.class));
+        verify(restTemplate, never())
+                .exchange(anyString(), any(HttpMethod.class), any(), eq(String.class));
         verify(suggestionRepository, never()).save(any());
     }
 
@@ -154,7 +172,8 @@ class SuggestionServiceTest {
                 .thenReturn(List.of(invoice(LocalDateTime.now())));
         when(suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID))
                 .thenReturn(Optional.of(storedSuggestion(LocalDateTime.now().minusDays(1))));
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+        when(restTemplate.exchange(
+                        anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(LLM_RESPONSE));
         when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID))
                 .thenReturn(List.of(storedSuggestion(LocalDateTime.now())));
@@ -172,7 +191,8 @@ class SuggestionServiceTest {
                 .thenReturn(List.of(invoice(LocalDateTime.now().minusDays(1))));
         when(suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID))
                 .thenReturn(Optional.of(storedSuggestion(LocalDateTime.now(), "en")));
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+        when(restTemplate.exchange(
+                        anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(LLM_RESPONSE));
         when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID))
                 .thenReturn(List.of(storedSuggestion(LocalDateTime.now(), "de")));
@@ -190,7 +210,8 @@ class SuggestionServiceTest {
                 .thenReturn(List.of(invoice(LocalDateTime.now())));
         when(suggestionRepository.findFirstByUserIdOrderByCreatedAtDesc(USER_ID))
                 .thenReturn(Optional.of(storedSuggestion(LocalDateTime.now().minusDays(1))));
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+        when(restTemplate.exchange(
+                        anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
                 .thenThrow(new RuntimeException("LLM down"));
         when(suggestionRepository.findByUserIdOrderByIdAsc(USER_ID))
                 .thenReturn(List.of(storedSuggestion(LocalDateTime.now().minusDays(1))));

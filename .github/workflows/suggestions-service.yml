@@ -32,6 +32,6 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Run tests
-        run: ./gradlew test
+      - name: Run checks (tests + spotless)
+        run: ./gradlew check
 

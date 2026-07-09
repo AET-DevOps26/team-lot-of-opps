@@ -192,7 +192,7 @@ services:
     networks:
       - network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U appuser -d taxforward"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d taxforward"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -259,7 +259,7 @@ services:
     restart: unless-stopped
 
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:2.9.0
     container_name: promtail
     volumes:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -272,7 +272,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana-oss:latest
+    image: grafana/grafana-oss:11.4.0
     container_name: grafana
     ports:
       - "3001:3000"

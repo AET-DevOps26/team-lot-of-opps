@@ -3,6 +3,7 @@ plugins {
 	id 'org.springframework.boot' version '4.0.6'
 	id 'io.spring.dependency-management' version '1.1.7'
 	id 'org.openapi.generator' version '7.16.0'
+	id 'com.diffplug.spotless' version '7.2.1'
 }
 
 group = 'com.lotofopps'
@@ -42,6 +43,16 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+spotless {
+	java {
+		target 'src/**/*.java'          // src only → excludes OpenAPI-generated code under build/
+		googleJavaFormat().aosp()       // AOSP = 4-space indent, matches existing style
+		removeUnusedImports()
+		trimTrailingWhitespace()
+		endWithNewline()
+	}
 }
 
 openApiGenerate {

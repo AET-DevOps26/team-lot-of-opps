@@ -25,8 +25,7 @@ public class Document {
 
     private String storagePath;
 
-    @Column
-    private String userId;
+    @Column private String userId;
 
     @Column(name = "content_hash", length = 64)
     private String contentHash;
@@ -45,18 +44,59 @@ public class Document {
         this.storagePath = storagePath;
     }
 
-    public Long getId() { return id; }
-    public String getFilename() { return filename; }
-    public void setFilename(String filename) { this.filename = filename; }
-    public String getContentType() { return contentType; }
-    public void setContentType(String contentType) { this.contentType = contentType; }
-    public Long getSizeBytes() { return sizeBytes; }
-    public void setSizeBytes(Long sizeBytes) { this.sizeBytes = sizeBytes; }
-    public LocalDateTime getUploadedAt() { return uploadedAt; }
-    public String getStoragePath() { return storagePath; }
-    public void setStoragePath(String storagePath) { this.storagePath = storagePath; }
-    public String getUserId() { return userId; }
-    public void setUserId(String userId) { this.userId = userId; }
-    public String getContentHash() { return contentHash; }
-    public void setContentHash(String contentHash) { this.contentHash = contentHash; }
+    public Long getId() {
+        return id;
+    }
+
+    public String getFilename() {
+        return filename;
+    }
+
+    public void setFilename(String filename) {
+        this.filename = filename;
+    }
+
+    public String getContentType() {
+        return contentType;
+    }
+
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
+    }
+
+    public Long getSizeBytes() {
+        return sizeBytes;
+    }
+
+    public void setSizeBytes(Long sizeBytes) {
+        this.sizeBytes = sizeBytes;
+    }
+
+    public LocalDateTime getUploadedAt() {
+        return uploadedAt;
+    }
+
+    public String getStoragePath() {
+        return storagePath;
+    }
+
+    public void setStoragePath(String storagePath) {
+        this.storagePath = storagePath;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    public String getContentHash() {
+        return contentHash;
+    }
+
+    public void setContentHash(String contentHash) {
+        this.contentHash = contentHash;
+    }
 }

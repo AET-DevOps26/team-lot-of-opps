@@ -36,4 +36,26 @@ spec:
             severity: warning
           annotations:
             summary: "P99 latency > 2s on {{ "{{" }} $labels.job {{ "}}" }}"
+
+        # FastAPI services (auth-service, llm-chat) expose http_request_duration_seconds_*
+        # instead of Spring's http_server_requests_seconds_* — sibling rules cover them.
+        # The status label is grouped ("5xx"), not numeric like Spring's "5..".
+        - alert: HighErrorRate
+          expr: |
+            sum by (job) (rate(http_request_duration_seconds_count{status="5xx"}[5m]))
+            /
+            sum by (job) (rate(http_request_duration_seconds_count[5m])) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High 5xx error rate on {{ "{{" }} $labels.job {{ "}}" }}"
+
+        - alert: SlowP99Response
+          expr: histogram_quantile(0.99, sum by (job, le) (rate(http_request_duration_seconds_bucket[5m]))) > 2
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "P99 latency > 2s on {{ "{{" }} $labels.job {{ "}}" }}"
 {{- end }}

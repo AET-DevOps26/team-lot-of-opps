@@ -1,7 +1,6 @@
 package com.lotofopps.suggestions.dto;
 
 import com.lotofopps.suggestions.model.Suggestion;
-
 import java.time.LocalDateTime;
 
 public class SuggestionResponse {
@@ -18,6 +17,11 @@ public class SuggestionResponse {
         return new SuggestionResponse(s.getSuggestion(), s.getCreatedAt());
     }
 
-    public String getSuggestion() { return suggestion; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
+    public String getSuggestion() {
+        return suggestion;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
 }

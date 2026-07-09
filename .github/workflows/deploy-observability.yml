@@ -94,5 +94,6 @@ jobs:
             $SKIP_CRDS \
             --atomic --timeout 10m \
             --set "kube-prometheus-stack.grafana.persistence.storageClassName=${{ steps.vars.outputs.storage_class }}" \
+            --set "kube-prometheus-stack.grafana.adminPassword=${{ secrets.GRAFANA_ADMIN_PASSWORD }}" \
             --set "kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=${{ steps.vars.outputs.storage_class }}" \
             --set "loki-stack.loki.persistence.storageClassName=${{ steps.vars.outputs.storage_class }}"
