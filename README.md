@@ -35,7 +35,35 @@ Browser → Traefik ──► auth-service (/verify)   [validates Firebase ID to
                   └──► suggestions-service      [/api/v1/suggestions]
 ```
 
-An external OpenAI-compatible LLM endpoint (e.g. LM Studio or Ollama on the host, reachable via `host.docker.internal`) is used for OCR extraction, vision, and chat completions.
+An external OpenAI-compatible LLM endpoint is used for OCR extraction, vision, chat completions,
+and suggestions — see [LLM provider](#llm-provider-cloud-or-local) below.
+
+## LLM provider (cloud or local)
+
+`llm-chat`, `invoice-service`, and `suggestions-service` all talk to the LLM over the OpenAI-compatible
+`/v1/chat/completions` protocol against a configurable base URL — `llm-chat` via the OpenAI Python SDK
+(`ChatOpenAI`), the two Spring Boot services via plain REST calls (`${llmUrl}/v1/chat/completions` with
+a Bearer token) — rather than a hardcoded provider. So swapping between a cloud API and a local model
+server is just three environment variables, set once for the whole stack (`infra/.env`, or
+`LLM_URL`/`LLM_MODEL`/`LLM_API_KEY` in [`infra/helm/values.yaml`](infra/helm/values.yaml) for Kubernetes):
+
+| | `LLM_URL` | `LLM_MODEL` | `LLM_API_KEY` |
+|---|---|---|---|
+| **Local** (LM Studio / Ollama) | `http://host.docker.internal:1234` | model id loaded in the local server, e.g. `google/gemma-4-e2b` | `EMPTY` (unused, but required by the OpenAI client) |
+| **Cloud** (OpenAI) | `https://api.openai.com` | an OpenAI model, e.g. `gpt-4o-mini` | your real OpenAI API key |
+
+The default in `infra/.env.example` is local (LM Studio/Ollama on the host). To switch to a cloud
+provider, set the three variables above — no code changes required, since every service reads them
+the same way. `llm-chat`'s client construction (`services/llm-chat/app/agent.py`):
+```python
+vllm_url = os.getenv("LLM_URL", "http://host.docker.internal:1234")
+llm = ChatOpenAI(
+    model=os.getenv("LLM_MODEL", "google/gemma-4-e2b"),
+    base_url=f"{vllm_url}/v1",
+    api_key=LLM_API_KEY,  # os.getenv("LLM_API_KEY", "EMPTY")
+)
+```
+Any OpenAI-compatible endpoint works this way, not just OpenAI and LM Studio/Ollama specifically.
 
 ## Services
 
