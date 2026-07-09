@@ -5,12 +5,12 @@
 
   tasks:
     - name: Update apt cache
-      apt:
+      ansible.builtin.apt:
         update_cache: true
         cache_valid_time: 3600
 
     - name: Install prerequisites
-      apt:
+      ansible.builtin.apt:
         name:
           - curl
           - ca-certificates
@@ -22,7 +22,7 @@
     # Only SSH + Traefik (80/443) are exposed publicly. The k3s API (6443) is
     # reached over an SSH tunnel from CI, never opened to the internet.
     - name: Allow public ports through UFW
-      ufw:
+      community.general.ufw:
         rule: allow
         port: "{{ item }}"
         proto: tcp
@@ -34,7 +34,7 @@
     # Without this, UFW's default-deny drops intra-cluster (flannel) traffic and
     # the single-node cluster's pods can't talk to each other or the API.
     - name: Allow k3s pod and service CIDRs through UFW
-      ufw:
+      community.general.ufw:
         rule: allow
         src: "{{ item }}"
       loop:
@@ -42,7 +42,7 @@
         - 10.43.0.0/16
 
     - name: Enable UFW
-      ufw:
+      community.general.ufw:
         state: enabled
         policy: deny
 
@@ -50,7 +50,7 @@
     # Single-node cluster. Disable the bundled Traefik — our Helm chart ships
     # its own. kubeconfig stays root-owned (600); CI reads it via sudo.
     - name: Install single-node k3s
-      shell: |
+      ansible.builtin.shell: |
         set -o pipefail
         curl -sfL https://get.k3s.io | \
           INSTALL_K3S_EXEC="--disable traefik --write-kubeconfig-mode 600" sh -
@@ -60,7 +60,7 @@
 
     # ── On-box tooling (debugging convenience) ──────────────────────────────
     - name: Install Helm
-      shell: |
+      ansible.builtin.shell: |
         set -o pipefail
         curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       args:
@@ -68,7 +68,7 @@
         creates: /usr/local/bin/helm
 
     - name: Create .kube directory for user
-      file:
+      ansible.builtin.file:
         path: "/home/{{ ansible_user }}/.kube"
         state: directory
         owner: "{{ ansible_user }}"
@@ -76,7 +76,7 @@
         mode: "0700"
 
     - name: Give user a kubeconfig so kubectl/helm work on-box
-      copy:
+      ansible.builtin.copy:
         src: /etc/rancher/k3s/k3s.yaml
         dest: "/home/{{ ansible_user }}/.kube/config"
         remote_src: true
