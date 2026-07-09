@@ -27,3 +27,12 @@ def test_verify_invalid_token_returns_401(firebase_app, monkeypatch):
     r = client.get("/verify", headers={"Authorization": "Bearer bad"})
     assert r.status_code == 401
     assert r.json() == {"error": "invalid token"}
+
+
+def test_app_initializes_against_firebase_auth_emulator(firebase_emulator_app):
+    # FIREBASE_AUTH_EMULATOR_HOST set -> firebase_admin.initialize_app() is called
+    # with no certificate (the emulator skips signature verification). This just
+    # exercises that startup path; request handling behaves like firebase_app.
+    client = TestClient(firebase_emulator_app.app)
+    r = client.get("/health")
+    assert r.status_code == 200

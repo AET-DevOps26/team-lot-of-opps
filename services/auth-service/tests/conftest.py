@@ -35,3 +35,20 @@ def dev_auth_app(monkeypatch):
 @pytest.fixture
 def firebase_app(monkeypatch):
     return _reload_auth_app(monkeypatch, dev_auth=False)
+
+
+@pytest.fixture
+def firebase_emulator_app(monkeypatch):
+    monkeypatch.setenv("DEV_AUTH", "0")
+    monkeypatch.setenv("FIREBASE_PROJECT_ID", "test-project")
+    monkeypatch.setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
+
+    for collector in list(REGISTRY._collector_to_names):
+        REGISTRY.unregister(collector)
+
+    import firebase_admin
+
+    monkeypatch.setattr(firebase_admin, "initialize_app", lambda *args, **kwargs: object())
+
+    sys.modules.pop("app.main", None)
+    return importlib.import_module("app.main")
