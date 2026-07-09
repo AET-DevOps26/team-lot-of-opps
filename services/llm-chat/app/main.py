@@ -32,16 +32,9 @@ app = FastAPI(title="LLM Chat service", version="1.0.0", lifespan=lifespan)
 Instrumentator().instrument(app).expose(app)
 Info("build", "Service build info").info({"version": "1.0.0", "service": "llm-chat"})
 
-# Scoped to known origins; override with CORS_ALLOW_ORIGINS (comma-separated) per deploy.
-# In prod the app + API are same-origin behind Traefik, so this is mostly defence-in-depth.
-_origins = os.getenv(
-    "CORS_ALLOW_ORIGINS",
-    "http://localhost:5173,https://taxforward-devops-ss26.stud.k8s.aet.cit.tum.de",
-).split(",")
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_origins,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )

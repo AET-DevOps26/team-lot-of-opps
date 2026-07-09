@@ -6,7 +6,6 @@ ENV HF_HOME=/opt/hf \
     HOME=/opt/hf \
     UV_SYSTEM_PYTHON=1
 
-# Run non-root, matching the Helm securityContext (runAsUser: 1000).
 RUN useradd -u 1000 -m appuser
 
 COPY requirements.txt .
