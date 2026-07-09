@@ -52,6 +52,8 @@ An external OpenAI-compatible LLM endpoint (e.g. LM Studio or Ollama on the host
 | `loki`            | Grafana Loki 2.9                  | `3100`        | `loki`            |
 | `grafana`         | Grafana OSS                       | `3001` (→`3000`) | `grafana`      |
 
+Team subsystem ownership and responsibilities are documented in [`docs/RACI.md`](docs/RACI.md).
+
 ## Observability
 
 Local dev gets metrics + logs for free — Prometheus, Loki, Promtail, and
