@@ -81,6 +81,7 @@ Any OpenAI-compatible endpoint works this way, not just OpenAI and LM Studio/Oll
 | `grafana`         | Grafana OSS                       | `3001` (→`3000`) | `grafana`      |
 
 Database schema (tables, columns, migrations) is documented in [`docs/database-schema.md`](docs/database-schema.md).
+Team subsystem ownership and responsibilities are documented in [`docs/RACI.md`](docs/RACI.md).
 
 ## Observability
 
