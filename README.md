@@ -66,9 +66,14 @@ On Kubernetes, monitoring is a separate Helm release —
 deployed independently of the app via
 [`.github/workflows/deploy-observability.yml`](.github/workflows/deploy-observability.yml).
 App-side ServiceMonitors, a PrometheusRule, and dashboard ConfigMaps live in
-[`infra/helm/templates/`](infra/helm/templates/). Grafana is exposed
-publicly via Traefik at `grafana.<tls.host>`, but currently has **no auth
-middleware in front of it** — see [TODO.md](TODO.md).
+[`infra/helm/templates/`](infra/helm/templates/). Grafana is reached through
+the app's Traefik at `<tls.host>/grafana`, gated by a BasicAuth middleware
+(`grafana-auth` in
+[`traefik-configmap.yaml`](infra/helm/templates/traefik-configmap.yaml)).
+The credential is a htpasswd-format `user:bcrypt-hash` string, generated with
+`htpasswd -nbB <user> <password>` and stored in the `GRAFANA_HTPASSWD` GitHub
+Actions secret (see [`deploy.yml`](.github/workflows/deploy.yml)) — it is
+never committed in plaintext.
 
 ## Setup
 

@@ -37,6 +37,11 @@ data:
             authResponseHeaders:
               - "X-User-Sub"
 
+        grafana-auth:
+          basicAuth:
+            users:
+              - {{ required "grafana.basicAuthHtpasswd must be set (htpasswd-format \"user:hash\" string, e.g. via `htpasswd -nbB <user> <password>`) — see infra/helm/values.yaml" .Values.grafana.basicAuthHtpasswd | quote }}
+
       routers:
         invoice-router:
           rule: "PathPrefix(`/api/v1/documents`) || PathPrefix(`/api/v1/invoices`)"
@@ -77,6 +82,8 @@ data:
           rule: "PathPrefix(`/grafana`)"
           entryPoints:
             - web
+          middlewares:
+            - grafana-auth
           service: grafana-svc
 
       services:

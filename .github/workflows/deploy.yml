@@ -100,6 +100,7 @@ jobs:
             --set llm.apiKey="${{ secrets.LLM_API_KEY }}" \
             --set firebase.projectId="${{ secrets.FIREBASE_PROJECT_ID }}" \
             --set db.password="${{ secrets.DB_PASSWORD }}" \
+            --set-string grafana.basicAuthHtpasswd='${{ secrets.GRAFANA_HTPASSWD }}' \
             --set images.authService.repository="${REGISTRY}/auth-service" \
             --set images.authService.tag="${TAG}" \
             --set images.invoiceService.repository="${REGISTRY}/invoice-service" \

@@ -37,6 +37,12 @@ firebase:
   projectId: ""
   serviceAccountJson: ""
 
+# Traefik BasicAuth gating /grafana. Format: "user:bcrypt-hash" (htpasswd style).
+# Generate with: htpasswd -nbB <user> <password>
+# Set at deploy time via --set from the GRAFANA_HTPASSWD secret — never commit real credentials.
+grafana:
+  basicAuthHtpasswd: ""
+
 invoice:
   uploadMaxSizeBytes: "10485760"
 
