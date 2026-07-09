@@ -33,9 +33,7 @@ kube-prometheus-stack:
       serviceMonitorSelectorNilUsesHelmValues: false
       serviceMonitorNamespaceSelector: {}
       serviceMonitorSelector: {}
-      # Same for PrometheusRules — the default (nil) only selects rules labeled
-      # release=monitoring, which the app chart's rule doesn't carry, so its alerts
-      # would never load. Discover rules from all namespaces instead.
+
       ruleSelectorNilUsesHelmValues: false
       ruleNamespaceSelector: {}
       ruleSelector: {}
@@ -57,6 +55,11 @@ kube-prometheus-stack:
   alertmanager:
     enabled: true
     alertmanagerSpec:
+      # Mounted at /etc/alertmanager/secrets/telegram-bot-token/token. Created by
+      # deploy-observability.yml from the TELEGRAM_BOT_TOKEN repo secret; the token
+      # never passes through --set, which would leak it into `helm get values`.
+      secrets:
+        - telegram-bot-token
       resources:
         requests:
           cpu: "25m"
@@ -64,6 +67,35 @@ kube-prometheus-stack:
         limits:
           cpu: "50m"
           memory: "128Mi"
+    config:
+      route:
+        group_by: ["alertname", "job"]
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        receiver: telegram
+        routes:
+          # kube-prometheus-stack's Watchdog fires permanently by design as a
+          # dead-man's switch; routing it to Telegram would be constant spam.
+          - receiver: "null"
+            matchers:
+              - alertname = "Watchdog"
+      receivers:
+        - name: "null"
+        - name: telegram
+          telegram_configs:
+            # "TaxForwardTeam" group. Plain group, not a supergroup: if Telegram ever
+            # promotes it, this id changes to a -100... form and alerts stop silently.
+            - chat_id: -5461258895
+              bot_token_file: /etc/alertmanager/secrets/telegram-bot-token/token
+              parse_mode: HTML
+              send_resolved: true
+              # Rendered by Alertmanager, not Helm (alertmanager.tplConfig is false),
+              # so these braces must survive into the generated Secret verbatim.
+              message: |-
+                <b>[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}</b>
+                {{ range .Alerts }}{{ .Annotations.summary }}
+                {{ end }}
 
   grafana:
     # adminPassword is NOT set here (kept out of git) — injected via --set from the
