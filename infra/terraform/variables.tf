@@ -19,8 +19,9 @@ variable "vm_name" {
 variable "vm_size" {
   description = "Azure VM size"
   type        = string
-  # B-series v1 isn't offered in swedencentral; B2s_v2 (2 vCPU / 8 GiB) is, in all zones
-  default = "Standard_B2s_v2"
+  # Bsv2 family (B-series v1 not offered in swedencentral). B4s_v2 = 4 vCPU / 16 GiB;
+  # 2 vCPU (B2s_v2) can't fit the RollingUpdate surge of all deployments at once.
+  default = "Standard_B4s_v2"
 }
 
 variable "admin_username" {
