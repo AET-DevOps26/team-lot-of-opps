@@ -1,0 +1,54 @@
+name: Smoke test
+description: Prove Traefik routes traffic end-to-end, not just that the pods went ready.
+
+# Reaches the cluster through a port-forward rather than a public URL: aet has no
+# stable one, and it keeps the check off the cluster's egress path (no image pull).
+
+inputs:
+  namespace:
+    description: Namespace the release is installed in
+    required: true
+  release:
+    description: Helm release name
+    required: true
+  attempts:
+    description: Retries before the check is called failed (3s apart)
+    required: false
+    default: "20"
+
+runs:
+  using: composite
+  steps:
+    - name: Curl the ingress through a port-forward
+      shell: bash
+      env:
+        NS: ${{ inputs.namespace }}
+        RELEASE: ${{ inputs.release }}
+        ATTEMPTS: ${{ inputs.attempts }}
+      run: |
+        set -euo pipefail
+        SVC="svc/${RELEASE}-tax-forward-traefik"
+        LOG="$RUNNER_TEMP/port-forward.log"
+
+        kubectl port-forward --namespace "$NS" "$SVC" 18080:80 >"$LOG" 2>&1 &
+        PF=$!
+        trap 'kill "$PF" 2>/dev/null || true' EXIT
+
+        for i in $(seq 1 "$ATTEMPTS"); do
+          # A service with no ready endpoints kills port-forward outright; without
+          # this the loop would just burn its retries against a dead tunnel.
+          if ! kill -0 "$PF" 2>/dev/null; then
+            echo "::error::port-forward to $SVC died"
+            cat "$LOG"
+            exit 1
+          fi
+          if curl -fsS --max-time 10 -o /dev/null http://127.0.0.1:18080/; then
+            echo "smoke test passed (attempt $i)"
+            exit 0
+          fi
+          sleep 3
+        done
+
+        echo "::error::$SVC did not serve a 2xx on / after $ATTEMPTS attempts"
+        cat "$LOG"
+        exit 1

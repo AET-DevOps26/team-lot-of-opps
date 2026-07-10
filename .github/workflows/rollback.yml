@@ -1,0 +1,103 @@
+name: Rollback
+
+# Break-glass: put the previous Helm revision back in front of users, without a
+# build and without waiting for a merge.
+#
+# This changes the cluster only. main still carries the bad commit, and the next
+# push to main deploys it again -- open the revert PR immediately after.
+# See docs/runbook-rollback.md.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Cluster to roll back
+        type: choice
+        options: [aet, vm]
+        default: aet
+      revision:
+        description: "Helm revision to roll back to (helm history taxforward). Empty = previous revision."
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+# Same group as deploy.yml on purpose: a rollback must never run helm concurrently
+# with a deploy against the same cluster.
+concurrency:
+  group: deploy-app
+  cancel-in-progress: false
+
+env:
+  VM_HOST: ${{ vars.VM_HOST }}
+  RELEASE: taxforward
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      # The chart is irrelevant here -- helm replays the stored revision -- but the
+      # kube-context action and infra/known_hosts live in the repo.
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v3
+        with:
+          version: v3.14.0
+
+      - name: Resolve namespace
+        run: |
+          [ "${{ inputs.target }}" = "aet" ] && echo "APP_NAMESPACE=team-lot-of-opps" >> "$GITHUB_ENV" \
+                                            || echo "APP_NAMESPACE=taxforward" >> "$GITHUB_ENV"
+
+      - name: Resolve kube context
+        uses: ./.github/actions/kube-context
+        with:
+          target: ${{ inputs.target }}
+          vm_host: ${{ env.VM_HOST }}
+          kube_config: ${{ secrets.KUBE_CONFIG }}
+          ssh_private_key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+
+      - name: Revision history before rollback
+        run: helm history "$RELEASE" --namespace "$APP_NAMESPACE"
+
+      - name: Roll back
+        env:
+          REVISION: ${{ inputs.revision }}
+        run: |
+          set -euo pipefail
+
+          # Interpolated unquoted below (empty must mean "previous revision"), so it
+          # has to be a plain integer -- never a shell fragment from the dispatch form.
+          if [ -n "$REVISION" ]; then
+            case "$REVISION" in
+              *[!0-9]*) echo "::error::revision must be a positive integer, got '$REVISION'"; exit 1 ;;
+            esac
+          fi
+
+          REVS=$(helm history "$RELEASE" --namespace "$APP_NAMESPACE" -o json | jq 'length')
+          if [ "$REVS" -lt 2 ]; then
+            echo "::error::release has $REVS revision(s) — nothing to roll back to"
+            exit 1
+          fi
+
+          helm rollback "$RELEASE" $REVISION \
+            --namespace "$APP_NAMESPACE" \
+            --wait --timeout 5m
+
+      - name: Smoke test
+        uses: ./.github/actions/smoke-test
+        with:
+          namespace: ${{ env.APP_NAMESPACE }}
+          release: ${{ env.RELEASE }}
+
+      - name: Report what is running now
+        if: always()
+        run: |
+          helm history "$RELEASE" --namespace "$APP_NAMESPACE" || true
+          kubectl get deploy --namespace "$APP_NAMESPACE" \
+            -o custom-columns='DEPLOYMENT:.metadata.name,IMAGE:.spec.template.spec.containers[0].image' || true
+
+      - name: Remind about the revert
+        if: success()
+        run: |
+          echo "::warning::Cluster is back on the previous revision. main is unchanged — open a revert PR now, or the next merge redeploys the bad commit."
