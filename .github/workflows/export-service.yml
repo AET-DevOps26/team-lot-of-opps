@@ -1,0 +1,36 @@
+name: Export-service Test
+
+on:
+  pull_request:
+    paths:
+      - 'services/export-service/**'
+      - 'api/**'
+      - '.github/workflows/export-service.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/export-service/**'
+      - 'api/**'
+      - '.github/workflows/export-service.yml'
+
+jobs:
+
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/export-service
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Run checks (tests + spotless)
+        run: ./gradlew check

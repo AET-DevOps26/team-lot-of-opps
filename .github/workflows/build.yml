@@ -1,6 +1,6 @@
 name: Build images
 
-# Reusable: build + push the 5 service images to GHCR and report the tag.
+# Reusable: build + push the 6 service images to GHCR and report the tag.
 # Called by deploy.yml; also runnable on its own for PR build smoke-checks.
 on:
   workflow_call:
@@ -47,6 +47,10 @@ jobs:
           - service: suggestions-service
             context: ./services/suggestions-service
             dockerfile: ./services/suggestions-service/Dockerfile
+            build_contexts: api=api
+          - service: export-service
+            context: ./services/export-service
+            dockerfile: ./services/export-service/Dockerfile
             build_contexts: api=api
     steps:
       - uses: actions/checkout@v4
