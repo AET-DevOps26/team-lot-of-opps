@@ -3,7 +3,7 @@ services:
     image: traefik:v3.3
     container_name: traefik
     ports:
-      - "80:80"
+      - "5173:80"
       - "8090:8080"
     volumes:
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
@@ -57,17 +57,16 @@ services:
     platform: linux/amd64
     build:
       context: ../services/llm-chat
-      dockerfile: Dockerfile.dev
     container_name: llm-chat
     ports:
       - "8082:8081"
+      - "50051:50051"   # gRPC EmbeddingService (internal, consumed by invoice-service)
     environment:
       - LLM_URL=${LLM_URL}
       - LLM_MODEL=${LLM_MODEL}
       - LLM_API_KEY=${LLM_API_KEY}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${DB_PASSWORD}@db:5432/taxforward
-    volumes:
-      - ../services/llm-chat/app:/app/app
+      - INVOICE_SERVICE_GRPC_URL=${INVOICE_SERVICE_GRPC_URL}
     networks:
       - network
     depends_on:
@@ -99,10 +98,13 @@ services:
     platform: linux/amd64
     build:
       context: ../services/invoice-service
-      dockerfile: Dockerfile.dev
+      additional_contexts:
+        api: ../api
     container_name: invoice-service
     ports:
       - "8080:8080"
+      # gRPC InternalInvoiceService (port 9090) is reached by suggestions-service over the
+      # internal network only — not published to the host (host 9090 is Prometheus).
     environment:
       # SPRING_DATASOURCE_URL is per-service topology (points at this service's
       # own DB), so it stays a literal rather than a shared ${SPRING_DATASOURCE_URL}.
@@ -118,11 +120,7 @@ services:
       - LLM_URL=${LLM_URL}
       - LLM_MODEL=${LLM_MODEL}
       - LLM_API_KEY=${LLM_API_KEY}
-      - LLM_CHAT_URL=${LLM_CHAT_URL}
-      - OPENAPI_SPEC_PATH=/api/openapi.yaml
-    volumes:
-      - ../services/invoice-service/src:/app/src
-      - ../api/openapi.yaml:/api/openapi.yaml:ro
+      - LLM_CHAT_GRPC_URL=${LLM_CHAT_GRPC_URL}
     networks:
       - network
     healthcheck:
@@ -144,7 +142,8 @@ services:
     platform: linux/amd64
     build:
       context: ../services/suggestions-service
-      dockerfile: Dockerfile.dev
+      additional_contexts:
+        api: ../api
     container_name: suggestions-service
     ports:
       - "8083:8083"
@@ -157,12 +156,8 @@ services:
       - LLM_URL=${LLM_URL}
       - LLM_MODEL=${LLM_MODEL}
       - LLM_API_KEY=${LLM_API_KEY}
-      - INVOICE_SERVICE_URL=${INVOICE_SERVICE_URL}
+      - INVOICE_SERVICE_GRPC_URL=${INVOICE_SERVICE_GRPC_URL}
       - SUGGESTIONS_INVOICE_LIMIT=${SUGGESTIONS_INVOICE_LIMIT}
-      - OPENAPI_SPEC_PATH=/api/openapi.yaml
-    volumes:
-      - ../services/suggestions-service/src:/app/src
-      - ../api/openapi.yaml:/api/openapi.yaml:ro
     networks:
       - network
     healthcheck:
@@ -202,30 +197,27 @@ services:
     platform: linux/amd64
     build:
       context: ../client
-      dockerfile: Dockerfile.dev
+      # VITE_* are compile-time: baked into the static bundle at build, so they
+      # are build args here, not runtime environment.
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-demo-key}
+        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-demo-taxforward.firebaseapp.com}
+        VITE_FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-demo-taxforward}
+        VITE_FIREBASE_STORAGE_BUCKET: ${VITE_FIREBASE_STORAGE_BUCKET:-demo-taxforward.appspot.com}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${VITE_FIREBASE_MESSAGING_SENDER_ID:-000000000000}
+        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-1:000000000000:web:demo}
+        # Route the browser SDK at the emulator container (published on the host).
+        VITE_USE_FIREBASE_EMULATOR: ${VITE_USE_FIREBASE_EMULATOR:-true}
+        VITE_FIREBASE_AUTH_EMULATOR_HOST: ${VITE_FIREBASE_AUTH_EMULATOR_HOST:-127.0.0.1:9099}
     container_name: client
-    ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
-      - VITE_API_TARGET=${VITE_API_TARGET}
-      - VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY:-demo-key}
-      - VITE_FIREBASE_AUTH_DOMAIN=${VITE_FIREBASE_AUTH_DOMAIN:-demo-taxforward.firebaseapp.com}
-      - VITE_FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-demo-taxforward}
-      - VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET:-demo-taxforward.appspot.com}
-      - VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID:-000000000000}
-      - VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID:-1:000000000000:web:demo}
-      # Route the browser SDK at the emulator container (published on the host).
-      - VITE_USE_FIREBASE_EMULATOR=${VITE_USE_FIREBASE_EMULATOR:-true}
-      - VITE_FIREBASE_AUTH_EMULATOR_HOST=${VITE_FIREBASE_AUTH_EMULATOR_HOST:-127.0.0.1:9099}
-    volumes:
-      - ../client:/app
-      - /app/node_modules
     networks:
       - network
     depends_on:
       invoice-service:
         condition: service_healthy
+      traefik:
+        condition: service_started
     restart: unless-stopped
 
   prometheus:

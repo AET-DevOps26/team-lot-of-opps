@@ -1,14 +1,13 @@
 package com.lotofopps.backend.service;
 
-import com.lotofopps.backend.client.model.EmbedRequest;
+import com.lotofopps.backend.grpc.DeleteRequest;
+import com.lotofopps.backend.grpc.EmbedRequest;
+import com.lotofopps.backend.grpc.EmbeddingServiceGrpc;
 import com.lotofopps.backend.model.Invoice;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 @Service
 public class LlmChatEmbeddingService {
@@ -36,28 +35,18 @@ public class LlmChatEmbeddingService {
                             "AUSSERGEWOEHNLICHE_FAHRZEUGKOSTEN", "Außergewöhnliche Fahrzeugkosten"),
                     Map.entry("SONSTIGE_AUSGABEN", "Sonstige Ausgaben"));
 
-    private final String llmChatUrl;
-    private final RestTemplate restTemplate;
+    private final EmbeddingServiceGrpc.EmbeddingServiceBlockingStub embeddingStub;
 
     public LlmChatEmbeddingService(
-            @Value("${llm.chat.url}") String llmChatUrl, RestTemplate restTemplate) {
-        this.llmChatUrl =
-                llmChatUrl.endsWith("/")
-                        ? llmChatUrl.substring(0, llmChatUrl.length() - 1)
-                        : llmChatUrl;
-        this.restTemplate = restTemplate;
+            EmbeddingServiceGrpc.EmbeddingServiceBlockingStub embeddingStub) {
+        this.embeddingStub = embeddingStub;
     }
 
+    // Vector-store sync is best-effort: swallow gRPC errors so an invoice write is never
+    // blocked by llm-chat being down (same fire-and-forget contract as the former REST call).
     public void embedInvoice(Invoice invoice) {
         try {
-            EmbedRequest body = buildEmbedBody(invoice);
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            restTemplate.exchange(
-                    llmChatUrl + "/v1/embed",
-                    HttpMethod.POST,
-                    new HttpEntity<>(body, headers),
-                    String.class);
+            embeddingStub.embed(buildEmbedBody(invoice));
             log.info("Embedded invoice id={}", invoice.getId());
         } catch (Exception e) {
             log.warn("Failed to embed invoice id={}: {}", invoice.getId(), e.getMessage());
@@ -66,7 +55,8 @@ public class LlmChatEmbeddingService {
 
     public void deleteEmbedding(Long invoiceId) {
         try {
-            restTemplate.delete(llmChatUrl + "/v1/embed/" + invoiceId);
+            embeddingStub.deleteEmbedding(
+                    DeleteRequest.newBuilder().setInvoiceId(invoiceId).build());
             log.info("Deleted embedding for invoice id={}", invoiceId);
         } catch (Exception e) {
             log.warn("Failed to delete embedding for invoice id={}: {}", invoiceId, e.getMessage());
@@ -74,19 +64,26 @@ public class LlmChatEmbeddingService {
     }
 
     private EmbedRequest buildEmbedBody(Invoice invoice) {
-        return new EmbedRequest()
-                .invoiceId(invoice.getId())
-                .text(buildText(invoice))
-                .userId(invoice.getUserId() != null ? invoice.getUserId() : "")
-                .itemName(invoice.getItemName())
-                .company(invoice.getCompany())
-                .price(invoice.getPrice())
-                .category(invoice.getCategory() != null ? invoice.getCategory().name() : null)
-                .invoiceDate(
-                        invoice.getInvoiceDate() != null
-                                ? invoice.getInvoiceDate().toString()
-                                : null)
-                .documentId(invoice.getDocument() != null ? invoice.getDocument().getId() : null);
+        EmbedRequest.Builder b =
+                EmbedRequest.newBuilder()
+                        .setInvoiceId(invoice.getId())
+                        .setText(buildText(invoice))
+                        .setUserId(invoice.getUserId() != null ? invoice.getUserId() : "")
+                        .setItemName(invoice.getItemName() != null ? invoice.getItemName() : "N/A")
+                        .setCompany(invoice.getCompany() != null ? invoice.getCompany() : "N/A");
+        if (invoice.getPrice() != null) {
+            b.setPrice(invoice.getPrice().doubleValue());
+        }
+        if (invoice.getCategory() != null) {
+            b.setCategory(invoice.getCategory().name());
+        }
+        if (invoice.getInvoiceDate() != null) {
+            b.setInvoiceDate(invoice.getInvoiceDate().toString());
+        }
+        if (invoice.getDocument() != null && invoice.getDocument().getId() != null) {
+            b.setDocumentId(invoice.getDocument().getId());
+        }
+        return b.build();
     }
 
     private String buildText(Invoice invoice) {
