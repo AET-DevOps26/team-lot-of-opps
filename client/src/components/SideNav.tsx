@@ -16,6 +16,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { to: '/', icon: 'dashboard', labelKey: 'nav.dashboard', end: true },
   { to: '/invoices', icon: 'description', labelKey: 'nav.invoices' },
   { to: '/upload', icon: 'upload_file', labelKey: 'nav.upload' },
+  { to: '/export', icon: 'download', labelKey: 'nav.export' },
 ]
 
 const NAV_BASE =
