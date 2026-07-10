@@ -14,10 +14,6 @@ on:
         type: choice
         options: [aet, vm]
         default: aet
-      provision:
-        description: (vm only) Run Terraform + Ansible provisioning before deploying
-        type: boolean
-        default: false
       image_tag:
         description: Deploy an already-built tag (e.g. sha-abc1234). Leave empty to build from this commit.
         type: string
@@ -26,6 +22,9 @@ on:
 permissions:
   contents: read
   packages: write
+  # provision.yml (called for vm deploys) exchanges the OIDC token with Azure;
+  # a called workflow can't be granted more than the caller, so grant it here.
+  id-token: write
 
 # Two pushes to main in quick succession must not run helm upgrade concurrently
 # against the same cluster; later run supersedes the queued one.
@@ -42,10 +41,10 @@ env:
   RELEASE: taxforward
 
 jobs:
-  # Opt-in: only a manual VM deploy with the box checked provisions first.
-  # Provisioning is a rare VM-lifecycle op, so it's off by default.
+  # A VM deploy always provisions first (Terraform + Ansible) — it's idempotent,
+  # so it's a no-op when the VM already matches. Never runs for aet.
   provision:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'vm' && inputs.provision }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'vm' }}
     uses: ./.github/workflows/provision.yml
     secrets: inherit
 
