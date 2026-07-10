@@ -11,6 +11,9 @@ the empty schemas ahead of time.
 | `suggestions` | suggestions-service | `services/suggestions-service/src/main/resources/db/migration/` |
 | `llm_chat` | llm-chat | managed by `langchain-postgres` (pgvector store), not Flyway |
 
+`export-service` is absent on purpose: it is stateless and derives every export from
+`invoice-service` over HTTP, so it owns no schema and needs no migrations.
+
 ## `invoice` schema
 
 ### `documents`

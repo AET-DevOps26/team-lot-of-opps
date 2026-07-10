@@ -11,6 +11,7 @@ TaxForward is a full-stack application that helps German students and trainees t
 │   ├── invoice-service/       # Spring Boot REST API — document upload, OCR, invoice persistence
 │   ├── llm-chat/              # FastAPI — conversational RAG agent (pgvector)
 │   ├── suggestions-service/   # Spring Boot REST API — proactive tax suggestions (LLM-generated)
+│   ├── export-service/        # Spring Boot REST API — tax-year exports (PDF/CSV/ZIP), stateless
 │   └── auth-service/          # FastAPI — Firebase token verification (Traefik forward-auth)
 └── infra/
     ├── traefik/               # Reverse proxy config — routing + auth middleware
@@ -33,6 +34,7 @@ Browser → Traefik ──► auth-service (/verify)   [validates Firebase ID to
                   └──► invoice-service          [/api/v1/documents, /api/v1/invoices]
                   └──► llm-chat                 [/api/v1/agent]
                   └──► suggestions-service      [/api/v1/suggestions]
+                  └──► export-service           [/api/v1/exports]
 ```
 
 An external OpenAI-compatible LLM endpoint is used for OCR extraction, vision, chat completions,
@@ -73,6 +75,7 @@ Any OpenAI-compatible endpoint works this way, not just OpenAI and LM Studio/Oll
 | `invoice-service` | Spring Boot (Java, JPA)           | `8080`        | `invoice-service` |
 | `llm-chat`        | FastAPI (Python, LangChain)       | `8081`        | `llm-chat`        |
 | `suggestions-service` | Spring Boot (Java, JPA)       | `8083`        | `suggestions-service` |
+| `export-service`  | Spring Boot (Java, OpenPDF)       | `8084`        | `export-service`  |
 | `auth-service`    | FastAPI (Python, Firebase Admin)  | `8000`        | `auth-service`    |
 | `traefik`         | Traefik v3                        | `80` / `8090` | `traefik`         |
 | `db`              | PostgreSQL 16 + pgvector          | `5432`        | `db`              |
@@ -81,6 +84,44 @@ Any OpenAI-compatible endpoint works this way, not just OpenAI and LM Studio/Oll
 | `grafana`         | Grafana OSS                       | `3001` (→`3000`) | `grafana`      |
 
 Database schema (tables, columns, migrations) is documented in [`docs/database-schema.md`](docs/database-schema.md).
+`export-service` owns no schema — it is stateless and derives every export from `invoice-service`.
+
+## Tax-year export
+
+`InvoiceCategory` is not an arbitrary taxonomy: its values are the Werbungskosten
+categories of **Anlage N**. So `export-service` produces the artifact a user actually
+has to hand over, not a data dump. `GET /api/v1/exports/zip?year=2025` returns:
+
+| Entry | What it is |
+|---|---|
+| `summary.pdf` | German-language summary sheet: totals per deduction category, the itemized invoices behind them, and the amount exceeding that year's Arbeitnehmer-Pauschbetrag |
+| `invoices.csv` | One row per line item (RFC 4180, UTF-8 with BOM so Excel reads the umlauts) |
+| `invoices.json` | The same data plus the summary figures — also the DSGVO Art. 20 portability rendering |
+| `receipts/` | The original uploads, named `<documentId>-<filename>` |
+
+`/pdf`, `/csv`, `/summary` and `/years` serve the pieces individually; the client's
+Export page uses `/years` + `/summary` to preview a year before downloading it.
+
+Three things are load-bearing:
+
+- **Only `ACCEPTED` invoices are exported.** `PENDING` ones are unreviewed LLM
+  extractions — exporting them would produce a materially wrong tax return.
+- **A receipt is written once, not once per invoice.** Several line items are usually
+  extracted from one upload; the PDF's `Beleg` column and the CSV's `documentId`
+  both point at the single archived file.
+- **The Arbeitnehmer-Pauschbetrag is configuration, not a constant** — it is set by
+  legislation and moves between tax years. See `export.pauschbetrag.*` in
+  [`services/export-service/src/main/resources/application.properties`](services/export-service/src/main/resources/application.properties),
+  and verify the figure against current law before relying on an export.
+
+`export-service` reads invoice-service's **public** `/api/v1` endpoints on the internal
+network, forwarding the gateway-resolved `X-User-Sub`, rather than the `/internal/v1`
+endpoints with a `userId` parameter. invoice-service then applies its own per-user
+scoping and document-ownership checks instead of trusting the caller.
+
+An export is rendered synchronously. That is fine at a student's scale (tens of
+receipts, a few MB); if a year ever grows large enough to time out behind Traefik,
+the work to do is to move `ExportService` behind a job table and return `202 + jobId`.
 
 ## Observability
 
