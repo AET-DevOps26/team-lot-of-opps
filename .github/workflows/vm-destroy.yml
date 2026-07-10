@@ -1,0 +1,58 @@
+name: Destroy Azure VM
+
+# Tears down the whole VM stack (RG lot-of-opps-rg: VM, disk, public IP, vnet,
+# nsg) so it stops billing when idle. Dispatch only, guarded by a typed confirm.
+# Terraform state lives in a separate azurerm backend (TFSTATE_* storage), so it
+# survives the destroy — re-run provision.yml + deploy.yml to bring the VM back
+# (k3s and PVC data are gone; Postgres re-inits from infra/postgres/init.sql).
+#
+# Azure auth is the same GitHub OIDC used by provision.yml (federated cred
+# gh-main, branch-scoped to refs/heads/main) — no client secret, no extra setup.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy" to confirm teardown of lot-of-opps-rg'
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+# Share provision.yml's group so a destroy can never race a provision apply.
+concurrency:
+  group: provision
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    name: Terraform — destroy VM
+    runs-on: ubuntu-latest
+    env:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_USE_OIDC: "true"
+
+    steps:
+      - name: Confirm intent
+        run: '[ "${{ inputs.confirm }}" = "destroy" ] || { echo "::error::type destroy to confirm"; exit 1; }'
+
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ vars.TFSTATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TFSTATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TFSTATE_CONTAINER }}" \
+            -backend-config="key=vm.tfstate"
+
+      - name: Terraform Destroy
+        working-directory: infra/terraform
+        run: terraform destroy -auto-approve -var="ssh_public_key=${{ secrets.VM_SSH_PUBLIC_KEY }}"
