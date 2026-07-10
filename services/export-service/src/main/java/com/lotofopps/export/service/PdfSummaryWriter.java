@@ -85,7 +85,12 @@ public class PdfSummaryWriter {
         pdf.add(paragraph("Zusammenfassung nach Kategorie", HEADING, 8));
 
         PdfPTable table = table(new float[] {5, 1.4f, 2});
-        headerCells(table, "Kategorie", "Belege", "Betrag");
+        headerCells(
+                table,
+                new int[] {Element.ALIGN_LEFT, Element.ALIGN_RIGHT, Element.ALIGN_RIGHT},
+                "Kategorie",
+                "Belege",
+                "Betrag");
         for (ExportCategoryTotal category : summary.getCategories()) {
             table.addCell(bodyCell(labels.labelFor(category.getCategory()), Element.ALIGN_LEFT));
             table.addCell(
@@ -122,7 +127,22 @@ public class PdfSummaryWriter {
         }
 
         PdfPTable table = table(new float[] {1.6f, 3.4f, 2.6f, 3.2f, 1.6f, 1.4f});
-        headerCells(table, "Datum", "Position", "Anbieter", "Kategorie", "Betrag", "Beleg");
+        headerCells(
+                table,
+                new int[] {
+                    Element.ALIGN_LEFT,
+                    Element.ALIGN_LEFT,
+                    Element.ALIGN_LEFT,
+                    Element.ALIGN_LEFT,
+                    Element.ALIGN_RIGHT,
+                    Element.ALIGN_RIGHT
+                },
+                "Datum",
+                "Position",
+                "Anbieter",
+                "Kategorie",
+                "Betrag",
+                "Beleg");
         for (InvoiceResponse invoice : export.invoices()) {
             table.addCell(bodyCell(date(invoice.getInvoiceDate()), Element.ALIGN_LEFT));
             table.addCell(bodyCell(text(invoice.getItemName()), Element.ALIGN_LEFT));
@@ -156,10 +176,11 @@ public class PdfSummaryWriter {
         return table;
     }
 
-    private static void headerCells(PdfPTable table, String... titles) {
+    /** Each header takes the alignment of the column it labels, so headings sit over their data. */
+    private static void headerCells(PdfPTable table, int[] alignments, String... titles) {
         for (int i = 0; i < titles.length; i++) {
             PdfPCell cell = new PdfPCell(new Phrase(titles[i], TABLE_HEADER));
-            cell.setHorizontalAlignment(i == 0 ? Element.ALIGN_LEFT : Element.ALIGN_RIGHT);
+            cell.setHorizontalAlignment(alignments[i]);
             cell.setPaddingBottom(5);
             cell.setPaddingTop(3);
             table.addCell(cell);
