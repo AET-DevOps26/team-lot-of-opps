@@ -28,6 +28,7 @@ def _get_invoice_stub() -> invoice_pb2_grpc.InternalInvoiceServiceStub:
         _invoice_stub = invoice_pb2_grpc.InternalInvoiceServiceStub(channel)
     return _invoice_stub
 
+
 CATEGORY_SUGGESTIONS: dict[str, str] = {
     "WEGE_ZUR_ARBEIT": "Tankquittungen, Bahntickets oder ÖPNV-Monatskarten für den Arbeitsweg",
     "HOMEOFFICE_UND_ARBEITSZIMMER": "Mietanteil-Berechnung, Strom- und Heizkostenabrechnung für das Arbeitszimmer",

@@ -13,7 +13,7 @@ proto_dir="$here/../../api/proto"
 out="$here/app/grpc_gen"
 
 python -m grpc_tools.protoc -I "$proto_dir" \
-  --python_out="$out" --grpc_python_out="$out" \
+  --python_out="$out" --grpc_python_out="$out" --pyi_out="$out" \
   "$proto_dir/embedding.proto" "$proto_dir/invoice.proto"
 
 # Fixup relative imports in the *_grpc.py files (portable in-place sed).

@@ -62,9 +62,7 @@ def cleanup():
 
 def embed(text: str, invoice_id: int = TEST_INVOICE_ID, user_id: str = TEST_USER_ID, **fields):
     return _embedding.Embed(
-        embedding_pb2.EmbedRequest(
-            invoice_id=invoice_id, text=text, user_id=user_id, **fields
-        )
+        embedding_pb2.EmbedRequest(invoice_id=invoice_id, text=text, user_id=user_id, **fields)
     )
 
 
