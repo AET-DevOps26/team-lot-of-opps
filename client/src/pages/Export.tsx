@@ -137,7 +137,8 @@ export default function Export() {
                     value={year ?? ''}
                     onChange={(e) => setYear(Number(e.target.value))}
                     aria-label={t('export.taxYear')}
-                    className="rounded-lg border border-surface-container-highest bg-surface px-3 py-1.5 font-data-mono text-data-mono text-primary"
+                    // pr-8 keeps the native dropdown arrow from overlapping the year.
+                    className="rounded-lg border border-surface-container-highest bg-surface pl-3 pr-8 py-1.5 font-data-mono text-data-mono text-primary"
                   >
                     {years.map((option) => (
                       <option key={option} value={option}>
