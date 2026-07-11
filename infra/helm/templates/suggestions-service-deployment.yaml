@@ -61,8 +61,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "taxforward.fullname" . }}-secret
                   key: llmApiKey
-            - name: INVOICE_SERVICE_URL
-              value: "http://{{ include "taxforward.fullname" . }}-invoice-service:8080"
+            - name: INVOICE_SERVICE_GRPC_URL
+              value: "{{ include "taxforward.fullname" . }}-invoice-service:9090"
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness

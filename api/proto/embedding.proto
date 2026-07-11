@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package taxforward.embedding.v1;
+
+option java_package = "com.lotofopps.backend.grpc";
+option java_multiple_files = true;
+
+// Internal (service-to-service) API served by llm-chat and consumed by
+// invoice-service to keep the chat vector store in sync with invoices.
+service EmbeddingService {
+  rpc Embed(EmbedRequest) returns (Ack);
+  rpc DeleteEmbedding(DeleteRequest) returns (Ack);
+}
+
+// Mirrors EmbedRequest (Java model + Python Pydantic).
+message EmbedRequest {
+  int64 invoice_id = 1;
+  string text = 2;
+  string user_id = 3;
+  string item_name = 4;
+  string company = 5;
+  optional double price = 6;
+  optional string category = 7;
+  optional string invoice_date = 8;
+  optional int64 document_id = 9;
+}
+
+message DeleteRequest {
+  int64 invoice_id = 1;
+}
+
+message Ack {
+  string status = 1;  // "ok"
+}

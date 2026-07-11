@@ -2,7 +2,7 @@ import os
 import logging
 from typing import AsyncIterator
 
-import httpx
+import grpc
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import Tool, StructuredTool
 from langchain.agents import create_agent
@@ -10,11 +10,24 @@ from pydantic import BaseModel
 
 from app.vector_store import search_embeddings
 from app.categories import InvoiceCategory
+from app.grpc_gen import invoice_pb2, invoice_pb2_grpc
 
 logger = logging.getLogger(__name__)
 
-INVOICE_SERVICE_URL = os.getenv("INVOICE_SERVICE_URL", "http://invoice-service:8080")
+INVOICE_SERVICE_GRPC_URL = os.getenv("INVOICE_SERVICE_GRPC_URL", "invoice-service:9090")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "EMPTY")
+
+_invoice_stub: invoice_pb2_grpc.InternalInvoiceServiceStub | None = None
+
+
+def _get_invoice_stub() -> invoice_pb2_grpc.InternalInvoiceServiceStub:
+    # Lazily create one shared channel/stub; reused across calls.
+    global _invoice_stub
+    if _invoice_stub is None:
+        channel = grpc.aio.insecure_channel(INVOICE_SERVICE_GRPC_URL)
+        _invoice_stub = invoice_pb2_grpc.InternalInvoiceServiceStub(channel)
+    return _invoice_stub
+
 
 CATEGORY_SUGGESTIONS: dict[str, str] = {
     "WEGE_ZUR_ARBEIT": "Tankquittungen, Bahntickets oder ÖPNV-Monatskarten für den Arbeitsweg",
@@ -68,14 +81,25 @@ async def _search_documents_async(query: str, user_id: str, referenced: list[dic
 
 
 async def _fetch_invoices(user_id: str) -> list[dict]:
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{INVOICE_SERVICE_URL}/internal/v1/invoices/latest",
-            params={"userId": user_id, "limit": 1000},
-            timeout=10.0,
-        )
-        resp.raise_for_status()
-        return resp.json()
+    # Calls invoice-service's InternalInvoiceService.GetLatestInvoices over gRPC.
+    # Returns the same camelCase dict shape the REST endpoint used to, so the
+    # consumers below stay unchanged.
+    resp = await _get_invoice_stub().GetLatestInvoices(
+        invoice_pb2.GetLatestInvoicesRequest(user_id=user_id, limit=1000),
+        timeout=10.0,
+    )
+    return [
+        {
+            "id": inv.id,
+            "itemName": inv.item_name,
+            "company": inv.company,
+            "price": inv.price,
+            "category": inv.category,
+            "invoiceDate": inv.invoice_date if inv.HasField("invoice_date") else None,
+            "documentId": inv.document_id if inv.HasField("document_id") else None,
+        }
+        for inv in resp.invoices
+    ]
 
 
 async def _list_user_documents_async(user_id: str, referenced: list[dict]) -> str:

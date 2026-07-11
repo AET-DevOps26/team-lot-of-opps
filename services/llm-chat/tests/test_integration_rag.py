@@ -21,14 +21,22 @@ CI does not stand up these dependencies, so this suite must be run manually:
 import json
 import os
 
+import grpc
 import pytest
 import requests
 
+from app.grpc_gen import embedding_pb2, embedding_pb2_grpc
+
 pytestmark = pytest.mark.integration
 
+# Agent chat stays HTTP/SSE; embed + delete are gRPC (EmbeddingService).
 BASE_URL = os.getenv("LLM_CHAT_TEST_URL", "http://localhost:8081")
+GRPC_TARGET = os.getenv("LLM_CHAT_GRPC_TARGET", "localhost:50051")
 TEST_INVOICE_ID = 9999
 TEST_USER_ID = "integration-test-user"
+
+_channel = grpc.insecure_channel(GRPC_TARGET)
+_embedding = embedding_pb2_grpc.EmbeddingServiceStub(_channel)
 
 
 @pytest.fixture(autouse=True)
@@ -41,21 +49,21 @@ def check_service():
         pytest.fail(f"llm-chat not reachable at {BASE_URL}: {e}")
 
 
+def delete_embedding(invoice_id: int = TEST_INVOICE_ID):
+    return _embedding.DeleteEmbedding(embedding_pb2.DeleteRequest(invoice_id=invoice_id))
+
+
 @pytest.fixture(autouse=True)
 def cleanup():
-    requests.delete(f"{BASE_URL}/v1/embed/{TEST_INVOICE_ID}", timeout=10)
+    delete_embedding()
     yield
-    requests.delete(f"{BASE_URL}/v1/embed/{TEST_INVOICE_ID}", timeout=10)
+    delete_embedding()
 
 
 def embed(text: str, invoice_id: int = TEST_INVOICE_ID, user_id: str = TEST_USER_ID, **fields):
-    r = requests.post(
-        f"{BASE_URL}/v1/embed",
-        json={"invoice_id": invoice_id, "text": text, "user_id": user_id, **fields},
-        timeout=10,
+    return _embedding.Embed(
+        embedding_pb2.EmbedRequest(invoice_id=invoice_id, text=text, user_id=user_id, **fields)
     )
-    assert r.status_code == 200, r.text
-    return r
 
 
 def chat(question: str, user_id: str = TEST_USER_ID, timeout: int = 120) -> dict:
@@ -99,33 +107,14 @@ def chat(question: str, user_id: str = TEST_USER_ID, timeout: int = 120) -> dict
 
 class TestEmbedEndpoint:
     def test_embed_returns_ok(self):
-        r = embed("Hotel Ibis Berlin 3 nights 320 EUR REISEKOSTEN")
-        assert r.json() == {"status": "ok"}
-
-    def test_embed_update_returns_ok(self):
-        embed("original text")
-        r = requests.put(
-            f"{BASE_URL}/v1/embed",
-            json={
-                "invoice_id": TEST_INVOICE_ID,
-                "text": "updated text about laptop purchase",
-                "user_id": TEST_USER_ID,
-            },
-            timeout=10,
-        )
-        assert r.status_code == 200
-        assert r.json() == {"status": "ok"}
+        assert embed("Hotel Ibis Berlin 3 nights 320 EUR REISEKOSTEN").status == "ok"
 
     def test_delete_returns_ok(self):
         embed("some invoice text")
-        r = requests.delete(f"{BASE_URL}/v1/embed/{TEST_INVOICE_ID}", timeout=10)
-        assert r.status_code == 200
-        assert r.json() == {"status": "ok"}
+        assert delete_embedding().status == "ok"
 
     def test_delete_is_idempotent_when_nothing_embedded(self):
-        r = requests.delete(f"{BASE_URL}/v1/embed/{TEST_INVOICE_ID}", timeout=10)
-        assert r.status_code == 200
-        assert r.json() == {"status": "ok"}
+        assert delete_embedding().status == "ok"
 
 
 class TestAgentChat:
@@ -171,7 +160,7 @@ class TestAgentChat:
         before = chat("Search my documents for xylophone purple banana.")
         assert any(inv.get("invoice_id") == TEST_INVOICE_ID for inv in before["references"])
 
-        requests.delete(f"{BASE_URL}/v1/embed/{TEST_INVOICE_ID}", timeout=10)
+        delete_embedding()
 
         after = chat("Search my documents for xylophone purple banana.")
         assert not any(inv.get("invoice_id") == TEST_INVOICE_ID for inv in after["references"])

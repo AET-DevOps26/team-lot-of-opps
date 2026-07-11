@@ -40,6 +40,9 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
+            - name: grpc
+              containerPort: 9090
+              protocol: TCP
           envFrom:
             - configMapRef:
                 name: {{ include "taxforward.fullname" . }}-config
@@ -63,8 +66,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "taxforward.fullname" . }}-secret
                   key: seaweedfsSecretKey
-            - name: LLM_CHAT_URL
-              value: "http://{{ include "taxforward.fullname" . }}-llm-chat:8081"
+            - name: LLM_CHAT_GRPC_URL
+              value: "{{ include "taxforward.fullname" . }}-llm-chat:50051"
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness

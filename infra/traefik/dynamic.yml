@@ -31,6 +31,12 @@ http:
         - firebase-auth
       service: suggestions-svc
 
+    client-router:
+      rule: "PathPrefix(`/`)"
+      entryPoints:
+        - web
+      service: client-svc
+
   services:
     invoice-svc:
       loadBalancer:
@@ -46,4 +52,9 @@ http:
       loadBalancer:
         servers:
           - url: "http://suggestions-service:8083"
+
+    client-svc:
+      loadBalancer:
+        servers:
+          - url: "http://client:8080"
 

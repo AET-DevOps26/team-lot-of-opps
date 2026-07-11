@@ -14,7 +14,10 @@ Python/Java clients are generated from it rather than hand-written.
 api/
 ├── openapi.yaml     # versioned spec (info.version: 1.0.0)
 ├── scripts/
-│   └── gen-all.sh   # regenerate every client/stub from the spec
+│   └── gen-all.sh   # regenerate every REST client/stub from the spec
+├── proto/           # gRPC contracts for internal service-to-service calls
+│   ├── invoice.proto    # invoice-service → suggestions-service (latest invoices)
+│   └── embedding.proto  # invoice-service → llm-chat (embed/delete)
 └── generated/       # codegen output (git-ignored)
 ```
 
@@ -24,10 +27,11 @@ api/
   the web client consumes through the **Traefik** gateway. Auth is a Firebase ID
   token (`Authorization: Bearer …`); the gateway's forward-auth middleware
   validates it and injects `X-User-Sub` downstream.
-- **Internal API** (`Internal`) — service-to-service endpoints that are **not**
-  exposed through the public gateway (e.g. `invoice-service` ↔ `suggestions-service`,
-  `invoice-service` → `llm-chat` embeddings). Documented here so the spec stays a
-  complete source of truth; each operation notes its hosting service.
+- **Internal calls** use **gRPC**, not REST — their contracts live in
+  [`proto/`](proto/) (`invoice-service` → `suggestions-service`, `invoice-service`
+  → `llm-chat` embeddings). Each Java service compiles the protos in its own
+  Gradle build; llm-chat's Python stubs are checked in under
+  `services/llm-chat/app/grpc_gen/`.
 
 ## Linting
 

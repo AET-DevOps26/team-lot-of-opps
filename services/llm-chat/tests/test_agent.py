@@ -9,6 +9,7 @@ import asyncio
 from langchain_core.documents import Document
 
 from app import agent
+from app.grpc_gen import invoice_pb2
 
 
 def run(coro):
@@ -165,6 +166,62 @@ class TestRunAgentStreaming:
         events = run(_collect(agent.run_agent_streaming("question", "user-1")))
 
         assert events == [{"type": "error", "message": "LLM unavailable"}]
+
+
+class TestFetchInvoices:
+    def test_proto_response_maps_to_camelcase_dicts(self, monkeypatch):
+        resp = invoice_pb2.GetLatestInvoicesResponse(
+            invoices=[
+                invoice_pb2.Invoice(
+                    id=1,
+                    item_name="Laptop",
+                    company="Apple",
+                    price="1299.99",
+                    category="ARBEITSMITTEL",
+                    invoice_date="2026-01-15",
+                    document_id=3,
+                ),
+                # Optional invoice_date/document_id left unset -> should map to None.
+                invoice_pb2.Invoice(
+                    id=2,
+                    item_name="Coffee",
+                    company="Starbucks",
+                    price="4.50",
+                    category="BEWIRTUNG",
+                ),
+            ]
+        )
+
+        class _FakeStub:
+            async def GetLatestInvoices(self, request, timeout=None):
+                assert request.user_id == "user-1"
+                assert request.limit == 1000
+                return resp
+
+        monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
+
+        result = run(agent._fetch_invoices("user-1"))
+
+        assert result == [
+            {
+                "id": 1,
+                "itemName": "Laptop",
+                "company": "Apple",
+                "price": "1299.99",
+                "category": "ARBEITSMITTEL",
+                "invoiceDate": "2026-01-15",
+                "documentId": 3,
+            },
+            {
+                "id": 2,
+                "itemName": "Coffee",
+                "company": "Starbucks",
+                "price": "4.50",
+                "category": "BEWIRTUNG",
+                "invoiceDate": None,
+                "documentId": None,
+            },
+        ]
 
 
 def _async_return(value):
