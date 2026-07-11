@@ -57,8 +57,7 @@ public class ExportAssembler {
                                                 InvoiceResponse::getId,
                                                 Comparator.nullsLast(Comparator.naturalOrder())))
                         .toList();
-        return new TaxYearExport(
-                year, summarize(year, ordered), ordered, referencedDocuments(userId, ordered));
+        return new TaxYearExport(year, summarize(year, ordered), ordered);
     }
 
     public ExportSummaryResponse summarize(int year, List<InvoiceResponse> invoices) {
@@ -114,7 +113,12 @@ public class ExportAssembler {
                 .toList();
     }
 
-    private Map<Long, DocumentResponse> referencedDocuments(
+    /**
+     * The receipts the given invoices actually reference, keyed by document id. Only the zip
+     * rendering needs these; summary, CSV and PDF never trigger a documents call. invoice-service
+     * filters to the requested ids server-side.
+     */
+    public Map<Long, DocumentResponse> referencedDocuments(
             String userId, List<InvoiceResponse> invoices) {
         Set<Long> referenced =
                 invoices.stream()
@@ -124,8 +128,7 @@ public class ExportAssembler {
         if (referenced.isEmpty()) {
             return Map.of();
         }
-        return invoiceServiceClient.fetchDocuments(userId).stream()
-                .filter(doc -> referenced.contains(doc.getId()))
+        return invoiceServiceClient.fetchDocuments(userId, referenced).stream()
                 .collect(
                         Collectors.toMap(
                                 DocumentResponse::getId,

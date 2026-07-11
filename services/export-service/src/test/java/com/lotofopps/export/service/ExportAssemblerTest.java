@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -110,34 +111,29 @@ class ExportAssemblerTest {
     }
 
     @Test
-    void collectsEachReferencedReceiptOnceEvenWhenSeveralInvoicesShareIt() {
+    void requestsEachReferencedReceiptOnceEvenWhenSeveralInvoicesShareIt() {
         InvoiceResponse first = invoice(1L, "10.00", null, LocalDate.of(2025, 1, 1)).documentId(7L);
         InvoiceResponse second =
                 invoice(2L, "20.00", null, LocalDate.of(2025, 1, 2)).documentId(7L);
         InvoiceResponse third = invoice(3L, "30.00", null, LocalDate.of(2025, 1, 3)).documentId(8L);
-        when(invoiceServiceClient.fetchAcceptedInvoices(USER, 2025))
-                .thenReturn(List.of(first, second, third));
-        when(invoiceServiceClient.fetchDocuments(USER))
-                .thenReturn(
-                        List.of(
-                                document(7L, "hotel.pdf"),
-                                document(8L, "train.pdf"),
-                                document(9L, "unrelated.pdf")));
+        // Only the distinct referenced ids go over the wire; invoice-service filters to them.
+        when(invoiceServiceClient.fetchDocuments(USER, Set.of(7L, 8L)))
+                .thenReturn(List.of(document(7L, "hotel.pdf"), document(8L, "train.pdf")));
 
-        TaxYearExport export = assembler.assemble(USER, 2025);
+        Map<Long, DocumentResponse> documents =
+                assembler.referencedDocuments(USER, List.of(first, second, third));
 
-        assertThat(export.invoices()).hasSize(3);
-        assertThat(export.documentsById()).containsOnlyKeys(7L, 8L);
+        assertThat(documents).containsOnlyKeys(7L, 8L);
     }
 
     @Test
     void skipsTheDocumentLookupWhenNoInvoiceReferencesAReceipt() {
-        when(invoiceServiceClient.fetchAcceptedInvoices(USER, 2025))
-                .thenReturn(List.of(invoice(1L, "10.00", null, LocalDate.of(2025, 1, 1))));
+        Map<Long, DocumentResponse> documents =
+                assembler.referencedDocuments(
+                        USER, List.of(invoice(1L, "10.00", null, LocalDate.of(2025, 1, 1))));
 
-        TaxYearExport export = assembler.assemble(USER, 2025);
-
-        assertThat(export.documentsById()).isEmpty();
+        assertThat(documents).isEmpty();
+        verifyNoInteractions(invoiceServiceClient);
     }
 
     @Test

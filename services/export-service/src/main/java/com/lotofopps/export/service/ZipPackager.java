@@ -31,6 +31,7 @@ public class ZipPackager {
 
     public byte[] pack(
             TaxYearExport export,
+            Map<Long, DocumentResponse> documents,
             byte[] summaryPdf,
             byte[] csv,
             byte[] json,
@@ -46,7 +47,7 @@ public class ZipPackager {
 
             // One entry per *document*, not per invoice: several line items are typically
             // extracted from the same receipt, and the archive must not duplicate the file.
-            for (Map.Entry<Long, DocumentResponse> entry : export.documentsById().entrySet()) {
+            for (Map.Entry<Long, DocumentResponse> entry : documents.entrySet()) {
                 long documentId = entry.getKey();
                 try {
                     write(
