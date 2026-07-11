@@ -1,11 +1,20 @@
 package com.lotofopps.export;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
+import com.google.protobuf.ByteString;
+import com.lotofopps.backend.grpc.GetDocumentContentRequest;
+import com.lotofopps.backend.grpc.GetDocumentContentResponse;
+import com.lotofopps.backend.grpc.GetDocumentsRequest;
+import com.lotofopps.backend.grpc.GetDocumentsResponse;
+import com.lotofopps.backend.grpc.GetLatestInvoicesRequest;
+import com.lotofopps.backend.grpc.GetLatestInvoicesResponse;
+import com.lotofopps.backend.grpc.InternalInvoiceServiceGrpc;
+import com.lotofopps.backend.grpc.Invoice;
 import com.lowagie.text.pdf.PdfReader;
 import com.lowagie.text.pdf.parser.PdfTextExtractor;
 import java.io.ByteArrayInputStream;
@@ -20,72 +29,70 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.client.RestTemplate;
 
 /**
- * Drives a whole export through the real controller, assembler and writers, stubbing only
- * invoice-service — the one boundary this service does not own.
+ * Drives a whole export through the real controller, assembler, client mapping and writers,
+ * stubbing only invoice-service's gRPC stub — the one boundary this service does not own. The proto
+ * requests are matched exactly, so a wrong user id, year or document id fails the test.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 class ExportIntegrationTest {
 
     private static final String USER = "user-42";
-    private static final String INVOICE_SERVICE = "http://localhost:9998";
     private static final String ROOT = "taxforward-export-2025/";
-
-    /** Two line items extracted from the same uploaded receipt (document 7). */
-    private static final String INVOICES_JSON =
-            """
-            [
-              {"id":1,"itemName":"Laptop","company":"Media Markt","price":999.99,
-               "category":"ARBEITSMITTEL","userId":"user-42","invoiceDate":"2025-03-04",
-               "createdAt":"2025-03-05T10:00:00","documentId":7,"status":"ACCEPTED"},
-              {"id":2,"itemName":"Maus","company":"Media Markt","price":400.51,
-               "category":"ARBEITSMITTEL","userId":"user-42","invoiceDate":"2025-03-04",
-               "createdAt":"2025-03-05T10:00:00","documentId":7,"status":"ACCEPTED"}
-            ]
-            """;
-
-    private static final String DOCUMENTS_JSON =
-            """
-            [
-              {"id":7,"filename":"rechnung media markt.pdf","contentType":"application/pdf",
-               "sizeBytes":1234,"uploadedAt":"2025-03-05T09:59:00","userId":"user-42"},
-              {"id":9,"filename":"unrelated.pdf","contentType":"application/pdf",
-               "sizeBytes":10,"uploadedAt":"2025-01-01T00:00:00","userId":"user-42"}
-            ]
-            """;
 
     @Autowired private MockMvc mockMvc;
 
-    @Autowired private RestTemplate restTemplate;
-
-    private MockRestServiceServer invoiceService;
+    @MockitoBean private InternalInvoiceServiceGrpc.InternalInvoiceServiceBlockingStub invoiceStub;
 
     @BeforeEach
     void stubInvoiceService() {
-        invoiceService = MockRestServiceServer.bindTo(restTemplate).ignoreExpectOrder(true).build();
+        // The client re-derives a per-call deadline; the mock must return itself for the chain.
+        when(invoiceStub.withDeadlineAfter(anyLong(), any())).thenReturn(invoiceStub);
 
-        invoiceService
-                .expect(
-                        requestTo(
-                                INVOICE_SERVICE
-                                        + "/api/v1/invoices?status=ACCEPTED&invoiceYear=2025"))
-                .andExpect(header("X-User-Sub", USER))
-                .andRespond(withSuccess(INVOICES_JSON, MediaType.APPLICATION_JSON));
-        invoiceService
-                .expect(requestTo(INVOICE_SERVICE + "/api/v1/documents"))
-                .andExpect(header("X-User-Sub", USER))
-                .andRespond(withSuccess(DOCUMENTS_JSON, MediaType.APPLICATION_JSON));
-        invoiceService
-                .expect(requestTo(INVOICE_SERVICE + "/api/v1/documents/7/content"))
-                .andExpect(header("X-User-Sub", USER))
-                .andRespond(withSuccess("%PDF-1.4 scanned receipt", MediaType.APPLICATION_PDF));
+        // Two line items extracted from the same uploaded receipt (document 7).
+        when(invoiceStub.getLatestInvoices(
+                        GetLatestInvoicesRequest.newBuilder()
+                                .setUserId(USER)
+                                .setInvoiceYear(2025)
+                                .build()))
+                .thenReturn(
+                        GetLatestInvoicesResponse.newBuilder()
+                                .addInvoices(invoice(1, "Laptop", "999.99"))
+                                .addInvoices(invoice(2, "Maus", "400.51"))
+                                .build());
+
+        // Asked for exactly the referenced document; the server owns the ownership filter.
+        when(invoiceStub.getDocuments(
+                        GetDocumentsRequest.newBuilder()
+                                .setUserId(USER)
+                                .addDocumentIds(7L)
+                                .build()))
+                .thenReturn(
+                        GetDocumentsResponse.newBuilder()
+                                .addDocuments(
+                                        com.lotofopps.backend.grpc.Document.newBuilder()
+                                                .setId(7L)
+                                                .setFilename("rechnung media markt.pdf")
+                                                .setContentType("application/pdf")
+                                                .setSizeBytes(1234)
+                                                .setUploadedAt("2025-03-05T09:59:00")
+                                                .setUserId(USER))
+                                .build());
+
+        when(invoiceStub.getDocumentContent(
+                        GetDocumentContentRequest.newBuilder()
+                                .setUserId(USER)
+                                .setDocumentId(7L)
+                                .build()))
+                .thenReturn(
+                        GetDocumentContentResponse.newBuilder()
+                                .setContent(ByteString.copyFromUtf8("%PDF-1.4 scanned receipt"))
+                                .build());
     }
 
     @Test
@@ -101,8 +108,7 @@ class ExportIntegrationTest {
                         ROOT + "invoices.csv",
                         ROOT + "invoices.json",
                         ROOT + "README.txt",
-                        // Both invoices came from document 7, so the receipt is written once; the
-                        // user's unreferenced document 9 stays out of this tax year's archive.
+                        // Both invoices came from document 7, so the receipt is written once.
                         ROOT + "receipts/7-rechnung_media_markt.pdf");
 
         // 999.99 + 400.51 = 1400.50, minus the 2025 allowance of 1230.00.
@@ -119,8 +125,6 @@ class ExportIntegrationTest {
         assertThat(new String(entries.get(ROOT + "invoices.json"), StandardCharsets.UTF_8))
                 .contains("\"deductibleAboveLumpSum\" : 170.50")
                 .contains("\"itemName\" : \"Laptop\"");
-
-        invoiceService.verify();
     }
 
     @Test
@@ -131,6 +135,21 @@ class ExportIntegrationTest {
         assertThat(response.getHeader("Content-Disposition"))
                 .isEqualTo("attachment; filename=\"taxforward-export-2025.pdf\"");
         assertThat(pdfText(response.getContentAsByteArray())).contains("Werbungskosten 2025");
+    }
+
+    private static Invoice invoice(long id, String itemName, String price) {
+        return Invoice.newBuilder()
+                .setId(id)
+                .setItemName(itemName)
+                .setCompany("Media Markt")
+                .setPrice(price)
+                .setCategory("ARBEITSMITTEL")
+                .setUserId(USER)
+                .setInvoiceDate("2025-03-04")
+                .setCreatedAt("2025-03-05T10:00:00")
+                .setDocumentId(7L)
+                .setStatus("ACCEPTED")
+                .build();
     }
 
     private MockHttpServletResponse download(String path) throws Exception {

@@ -184,11 +184,13 @@ services:
     environment:
       # No SPRING_DATASOURCE_URL: an export is derived entirely from invoice-service,
       # so this service holds no state and owns no schema.
-      - INVOICE_SERVICE_URL=${INVOICE_SERVICE_URL}
+      - INVOICE_SERVICE_GRPC_URL=${INVOICE_SERVICE_GRPC_URL}
       - OPENAPI_SPEC_PATH=/api/openapi.yaml
+      - PROTO_PATH=/api/proto
     volumes:
       - ../services/export-service/src:/app/src
       - ../api/openapi.yaml:/api/openapi.yaml:ro
+      - ../api/proto:/api/proto:ro
     networks:
       - network
     healthcheck:

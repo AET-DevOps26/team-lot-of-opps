@@ -1,5 +1,6 @@
 package com.lotofopps.export.service;
 
+import com.lotofopps.export.api.model.DocumentResponse;
 import com.lotofopps.export.api.model.ExportSummaryResponse;
 import com.lotofopps.export.client.InvoiceServiceClient;
 import java.time.Instant;
@@ -53,22 +54,26 @@ public class ExportService {
 
     public byte[] zip(String userId, int year) {
         TaxYearExport export = assembler.assemble(userId, year);
+        // Only the zip ships receipts, so only the zip fetches their metadata.
+        Map<Long, DocumentResponse> documents =
+                assembler.referencedDocuments(userId, export.invoices());
         return zipPackager.pack(
                 export,
+                documents,
                 pdfSummaryWriter.render(export),
                 csvWriter.toCsv(export.invoices()),
-                json(export),
+                json(export, documents),
                 documentId -> invoiceServiceClient.fetchDocumentContent(userId, documentId));
     }
 
     /** The portability rendering: the year's figures and every invoice field, as stored. */
-    private byte[] json(TaxYearExport export) {
+    private byte[] json(TaxYearExport export, Map<Long, DocumentResponse> documents) {
         Map<String, Object> bundle = new LinkedHashMap<>();
         bundle.put("generatedAt", Instant.now().toString());
         bundle.put("year", export.year());
         bundle.put("summary", export.summary());
         bundle.put("invoices", export.invoices());
-        bundle.put("documents", export.documentsById().values());
+        bundle.put("documents", documents.values());
         return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(bundle);
     }
 }

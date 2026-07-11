@@ -13,7 +13,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class PdfSummaryWriterTest {
@@ -49,7 +48,7 @@ class PdfSummaryWriterTest {
                                                                 .BERUFSVERB_NDE_UND_GEWERKSCHAFTEN)
                                                 .invoiceCount(1)
                                                 .total(new BigDecimal("120.00"))));
-        TaxYearExport export = new TaxYearExport(2025, summary, List.of(), Map.of());
+        TaxYearExport export = new TaxYearExport(2025, summary, List.of());
 
         assertThat(text(writer.render(export))).contains("Berufsverbände und Gewerkschaften");
     }
@@ -75,8 +74,7 @@ class PdfSummaryWriterTest {
                                 .lumpSumAllowance(new BigDecimal("1230.00"))
                                 .deductibleAboveLumpSum(BigDecimal.ZERO)
                                 .categories(List.of()),
-                        List.of(),
-                        Map.of());
+                        List.of());
 
         assertThatCode(() -> writer.render(empty)).doesNotThrowAnyException();
         assertThat(textQuietly(writer.render(empty))).contains("Keine Belege");
@@ -115,7 +113,7 @@ class PdfSummaryWriterTest {
                                                 .invoiceCount(1)
                                                 .total(new BigDecimal("400.51"))));
 
-        return new TaxYearExport(2025, summary, List.of(laptop, train), Map.of());
+        return new TaxYearExport(2025, summary, List.of(laptop, train));
     }
 
     private static ExportSummaryResponse summary() {

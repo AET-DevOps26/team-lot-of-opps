@@ -1,94 +1,126 @@
 package com.lotofopps.export.client;
 
+import com.lotofopps.backend.grpc.GetDocumentContentRequest;
+import com.lotofopps.backend.grpc.GetDocumentsRequest;
+import com.lotofopps.backend.grpc.GetLatestInvoicesRequest;
+import com.lotofopps.backend.grpc.InternalInvoiceServiceGrpc;
 import com.lotofopps.export.api.model.DocumentResponse;
+import com.lotofopps.export.api.model.InvoiceCategory;
 import com.lotofopps.export.api.model.InvoiceResponse;
+import com.lotofopps.export.api.model.InvoiceStatus;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import java.util.concurrent.TimeUnit;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Reads the user's invoices and receipts from invoice-service.
+ * Reads the user's invoices and receipts from invoice-service over gRPC ({@code
+ * InternalInvoiceService}, see {@code api/proto/invoice.proto}).
  *
- * <p>Unlike suggestions-service, this talks to invoice-service's <em>public</em> {@code /api/v1}
- * endpoints rather than {@code /internal/v1}, forwarding the {@code X-User-Sub} that Traefik's
- * forward-auth middleware resolved. invoice-service therefore applies its own per-user scoping and
- * document-ownership checks to every read, instead of this service being trusted to pass the right
- * {@code userId}. The endpoints are reached directly on the cluster-internal address, so they never
- * traverse the public gateway.
+ * <p>The user scoping travels in-band as the {@code user_id} field — like the other internal gRPC
+ * consumers — and invoice-service applies per-user filtering and document-ownership checks
+ * server-side, so this service is never trusted with unscoped reads.
  */
 @Service
 public class InvoiceServiceClient {
 
-    private static final String USER_HEADER = "X-User-Sub";
+    /** REST predecessor read-timeout, kept: a hung invoice-service must fail the export. */
+    private static final long DEADLINE_SECONDS = 30;
 
-    private final String invoiceServiceUrl;
-    private final RestTemplate restTemplate;
+    private final InternalInvoiceServiceGrpc.InternalInvoiceServiceBlockingStub invoiceStub;
 
     public InvoiceServiceClient(
-            @Value("${invoice.service.url}") String invoiceServiceUrl, RestTemplate restTemplate) {
-        this.invoiceServiceUrl =
-                invoiceServiceUrl.endsWith("/")
-                        ? invoiceServiceUrl.substring(0, invoiceServiceUrl.length() - 1)
-                        : invoiceServiceUrl;
-        this.restTemplate = restTemplate;
+            InternalInvoiceServiceGrpc.InternalInvoiceServiceBlockingStub invoiceStub) {
+        this.invoiceStub = invoiceStub;
     }
 
     /** Accepted invoices only; invoices still under review must never reach a tax export. */
     public List<InvoiceResponse> fetchAcceptedInvoices(String userId, Integer year) {
-        UriComponentsBuilder uri =
-                UriComponentsBuilder.fromUriString(invoiceServiceUrl + "/api/v1/invoices")
-                        .queryParam("status", "ACCEPTED");
+        GetLatestInvoicesRequest.Builder request =
+                GetLatestInvoicesRequest.newBuilder().setUserId(userId); // limit 0 = all
         if (year != null) {
-            uri.queryParam("invoiceYear", year);
+            request.setInvoiceYear(year);
         }
-        return getForList(uri.toUriString(), userId, new ParameterizedTypeReference<>() {});
+        return stub().getLatestInvoices(request.build()).getInvoicesList().stream()
+                .map(InvoiceServiceClient::fromProto)
+                .toList();
     }
 
-    public List<DocumentResponse> fetchDocuments(String userId) {
-        return getForList(
-                invoiceServiceUrl + "/api/v1/documents",
-                userId,
-                new ParameterizedTypeReference<>() {});
+    /** Metadata of the given receipts; invoice-service returns only documents the user owns. */
+    public List<DocumentResponse> fetchDocuments(String userId, Collection<Long> documentIds) {
+        return stub()
+                .getDocuments(
+                        GetDocumentsRequest.newBuilder()
+                                .setUserId(userId)
+                                .addAllDocumentIds(documentIds)
+                                .build())
+                .getDocumentsList()
+                .stream()
+                .map(InvoiceServiceClient::fromProto)
+                .toList();
     }
 
-    /**
-     * The raw bytes of an uploaded receipt; invoice-service 403s documents owned by someone else.
-     */
+    /** The raw bytes of an uploaded receipt; NOT_FOUND if missing or owned by someone else. */
     public byte[] fetchDocumentContent(String userId, long documentId) {
-        String url = invoiceServiceUrl + "/api/v1/documents/" + documentId + "/content";
-        ResponseEntity<byte[]> response =
-                restTemplate.exchange(
-                        url, HttpMethod.GET, new HttpEntity<>(headers(userId)), byte[].class);
-        byte[] body = response.getBody();
-        if (!response.getStatusCode().is2xxSuccessful() || body == null) {
-            throw new RestClientException(
-                    "invoice-service returned no content for document " + documentId);
-        }
-        return body;
+        return stub().getDocumentContent(
+                        GetDocumentContentRequest.newBuilder()
+                                .setUserId(userId)
+                                .setDocumentId(documentId)
+                                .build())
+                .getContent()
+                .toByteArray();
     }
 
-    private <T> List<T> getForList(
-            String url, String userId, ParameterizedTypeReference<List<T>> type) {
-        ResponseEntity<List<T>> response =
-                restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers(userId)), type);
-        List<T> body = response.getBody();
-        if (!response.getStatusCode().is2xxSuccessful() || body == null) {
-            throw new RestClientException("invoice-service returned no body for " + url);
-        }
-        return body;
+    /** Deadlines are per call by design: computed when set, so never put one on the bean. */
+    private InternalInvoiceServiceGrpc.InternalInvoiceServiceBlockingStub stub() {
+        return invoiceStub.withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS);
     }
 
-    private static HttpHeaders headers(String userId) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set(USER_HEADER, userId);
-        return headers;
+    // Maps the proto messages back onto the OpenAPI-generated models the export pipeline
+    // consumes. Mirrors suggestions-service's InvoiceClient#fromProto (models are generated
+    // per-service into different packages, so the mapper cannot be shared).
+    private static InvoiceResponse fromProto(com.lotofopps.backend.grpc.Invoice p) {
+        InvoiceResponse r =
+                new InvoiceResponse()
+                        .id(p.getId())
+                        .itemName(p.getItemName())
+                        .company(p.getCompany())
+                        .price(p.getPrice().isEmpty() ? null : new BigDecimal(p.getPrice()))
+                        .category(
+                                p.getCategory().isEmpty()
+                                        ? null
+                                        : InvoiceCategory.fromValue(p.getCategory()))
+                        .userId(p.getUserId())
+                        .status(
+                                p.getStatus().isEmpty()
+                                        ? null
+                                        : InvoiceStatus.fromValue(p.getStatus()));
+        if (p.hasInvoiceDate()) {
+            r.invoiceDate(LocalDate.parse(p.getInvoiceDate()));
+        }
+        if (p.hasCreatedAt()) {
+            r.createdAt(LocalDateTime.parse(p.getCreatedAt()));
+        }
+        if (p.hasDocumentId()) {
+            r.documentId(p.getDocumentId());
+        }
+        return r;
+    }
+
+    private static DocumentResponse fromProto(com.lotofopps.backend.grpc.Document p) {
+        DocumentResponse r =
+                new DocumentResponse()
+                        .id(p.getId())
+                        .filename(p.getFilename())
+                        .contentType(p.getContentType())
+                        .sizeBytes(p.getSizeBytes())
+                        .userId(p.getUserId());
+        if (!p.getUploadedAt().isEmpty()) {
+            r.uploadedAt(LocalDateTime.parse(p.getUploadedAt()));
+        }
+        return r;
     }
 }

@@ -2,6 +2,7 @@ package com.lotofopps.export.controller;
 
 import com.lotofopps.export.api.model.ExportSummaryResponse;
 import com.lotofopps.export.service.ExportService;
+import io.grpc.StatusRuntimeException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,7 +22,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestClientException;
 
 @RestController
 @RequestMapping("/api/v1/exports")
@@ -151,8 +151,9 @@ public class ExportController {
      * not exist yet rather than being empty — an empty CSV would look like a legitimate "no
      * receipts this year" answer.
      */
-    @ExceptionHandler(RestClientException.class)
-    public ResponseEntity<Map<String, String>> handleInvoiceServiceFailure(RestClientException e) {
+    @ExceptionHandler(StatusRuntimeException.class)
+    public ResponseEntity<Map<String, String>> handleInvoiceServiceFailure(
+            StatusRuntimeException e) {
         log.error("invoice-service unavailable while building an export", e);
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(Map.of("error", "Could not reach invoice-service to build the export"));

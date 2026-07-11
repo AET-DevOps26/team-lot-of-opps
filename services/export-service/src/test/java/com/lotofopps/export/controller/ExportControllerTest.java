@@ -15,6 +15,7 @@ import com.lotofopps.export.api.model.ExportCategoryTotal;
 import com.lotofopps.export.api.model.ExportSummaryResponse;
 import com.lotofopps.export.api.model.InvoiceCategory;
 import com.lotofopps.export.service.ExportService;
+import io.grpc.Status;
 import java.math.BigDecimal;
 import java.time.Year;
 import java.util.List;
@@ -23,7 +24,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.client.RestClientException;
 
 @WebMvcTest(ExportController.class)
 class ExportControllerTest {
@@ -148,7 +148,10 @@ class ExportControllerTest {
     @Test
     void reportsABadGatewayRatherThanAnEmptyExportWhenInvoiceServiceIsDown() throws Exception {
         when(exportService.zip(USER, 2025))
-                .thenThrow(new RestClientException("connection refused"));
+                .thenThrow(
+                        Status.UNAVAILABLE
+                                .withDescription("connection refused")
+                                .asRuntimeException());
 
         mockMvc.perform(get("/api/v1/exports/zip").param("year", "2025").header("X-User-Sub", USER))
                 .andExpect(status().isBadGateway())

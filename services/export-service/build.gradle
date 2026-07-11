@@ -1,8 +1,9 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.0.6'
+	id 'org.springframework.boot' version '4.1.0'
 	id 'io.spring.dependency-management' version '1.1.7'
 	id 'org.openapi.generator' version '7.16.0'
+	id 'com.google.protobuf' version '0.9.6'
 	id 'com.diffplug.spotless' version '7.2.1'
 }
 
@@ -23,7 +24,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 	implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
-	implementation 'org.springframework.boot:spring-boot-starter-restclient'
+	implementation 'org.springframework.boot:spring-boot-starter-grpc-client'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8'
 	// PDF rendering for the Werbungskosten summary sheet.
@@ -74,3 +75,28 @@ tasks.named('openApiGenerate') {
 	doNotTrackState("openapi-generator 7.x uses /dev/stderr as inputSpec default, not a regular file on Gradle 9")
 }
 tasks.named('compileJava') { dependsOn tasks.named('openApiGenerate') }
+
+// gRPC contract shared from api/proto (mounted at /api/proto in the container build).
+sourceSets {
+	main {
+		proto {
+			srcDir System.getenv('PROTO_PATH') ?: "$rootDir/../../api/proto"
+		}
+	}
+}
+
+protobuf {
+	protoc {
+		artifact = "com.google.protobuf:protoc:${dependencyManagement.importedProperties['protobuf-java.version']}"
+	}
+	plugins {
+		grpc {
+			artifact = "io.grpc:protoc-gen-grpc-java:${dependencyManagement.importedProperties['grpc.version']}"
+		}
+	}
+	generateProtoTasks {
+		all()*.plugins {
+			grpc {}
+		}
+	}
+}

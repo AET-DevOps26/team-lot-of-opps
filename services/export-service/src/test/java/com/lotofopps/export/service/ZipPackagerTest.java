@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.client.RestClientException;
 
 class ZipPackagerTest {
 
@@ -23,10 +22,17 @@ class ZipPackagerTest {
 
     @Test
     void packsTheSummaryRenderingsAndOneEntryPerReceipt() throws IOException {
-        TaxYearExport export = export(Map.of(7L, document(7L, "hotel.pdf")));
+        Map<Long, DocumentResponse> documents = Map.of(7L, document(7L, "hotel.pdf"));
 
         Map<String, byte[]> entries =
-                unzip(packager.pack(export, pdf(), csv(), json(), id -> "receipt".getBytes(UTF_8)));
+                unzip(
+                        packager.pack(
+                                export(),
+                                documents,
+                                pdf(),
+                                csv(),
+                                json(),
+                                id -> "receipt".getBytes(UTF_8)));
 
         assertThat(entries.keySet())
                 .containsExactlyInAnyOrder(
@@ -40,12 +46,13 @@ class ZipPackagerTest {
     @Test
     void writesEachSharedReceiptOnlyOnce() throws IOException {
         // Two invoices extracted from document 7 must not produce two copies of the file.
-        TaxYearExport export = export(Map.of(7L, document(7L, "hotel.pdf")));
+        Map<Long, DocumentResponse> documents = Map.of(7L, document(7L, "hotel.pdf"));
 
         List<Long> loaded = new java.util.ArrayList<>();
         unzip(
                 packager.pack(
-                        export,
+                        export(),
+                        documents,
                         pdf(),
                         csv(),
                         json(),
@@ -66,13 +73,14 @@ class ZipPackagerTest {
         Map<String, byte[]> entries =
                 unzip(
                         packager.pack(
-                                export(documents),
+                                export(),
+                                documents,
                                 pdf(),
                                 csv(),
                                 json(),
                                 id -> {
                                     if (id == 8L) {
-                                        throw new RestClientException("gone");
+                                        throw new IllegalStateException("gone");
                                     }
                                     return "receipt".getBytes(UTF_8);
                                 }));
@@ -110,9 +118,9 @@ class ZipPackagerTest {
 
     private static final java.nio.charset.Charset UTF_8 = StandardCharsets.UTF_8;
 
-    private static TaxYearExport export(Map<Long, DocumentResponse> documents) {
+    private static TaxYearExport export() {
         ExportSummaryResponse summary = new ExportSummaryResponse().year(2025);
-        return new TaxYearExport(2025, summary, List.of(), documents);
+        return new TaxYearExport(2025, summary, List.of());
     }
 
     private static DocumentResponse document(Long id, String filename) {

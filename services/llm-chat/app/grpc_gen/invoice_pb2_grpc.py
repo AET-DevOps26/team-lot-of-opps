@@ -27,7 +27,7 @@ if _version_not_supported:
 
 class InternalInvoiceServiceStub:
     """Internal (service-to-service) API served by invoice-service and consumed by
-    suggestions-service. Not exposed publicly via Traefik.
+    suggestions-service, llm-chat and export-service. Not exposed publicly via Traefik.
     """
 
     def __init__(self, channel):
@@ -41,14 +41,36 @@ class InternalInvoiceServiceStub:
                 request_serializer=invoice__pb2.GetLatestInvoicesRequest.SerializeToString,
                 response_deserializer=invoice__pb2.GetLatestInvoicesResponse.FromString,
                 _registered_method=True)
+        self.GetDocuments = channel.unary_unary(
+                '/taxforward.invoice.v1.InternalInvoiceService/GetDocuments',
+                request_serializer=invoice__pb2.GetDocumentsRequest.SerializeToString,
+                response_deserializer=invoice__pb2.GetDocumentsResponse.FromString,
+                _registered_method=True)
+        self.GetDocumentContent = channel.unary_unary(
+                '/taxforward.invoice.v1.InternalInvoiceService/GetDocumentContent',
+                request_serializer=invoice__pb2.GetDocumentContentRequest.SerializeToString,
+                response_deserializer=invoice__pb2.GetDocumentContentResponse.FromString,
+                _registered_method=True)
 
 
 class InternalInvoiceServiceServicer:
     """Internal (service-to-service) API served by invoice-service and consumed by
-    suggestions-service. Not exposed publicly via Traefik.
+    suggestions-service, llm-chat and export-service. Not exposed publicly via Traefik.
     """
 
     def GetLatestInvoices(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetDocuments(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetDocumentContent(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -62,6 +84,16 @@ def add_InternalInvoiceServiceServicer_to_server(servicer, server):
                     request_deserializer=invoice__pb2.GetLatestInvoicesRequest.FromString,
                     response_serializer=invoice__pb2.GetLatestInvoicesResponse.SerializeToString,
             ),
+            'GetDocuments': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetDocuments,
+                    request_deserializer=invoice__pb2.GetDocumentsRequest.FromString,
+                    response_serializer=invoice__pb2.GetDocumentsResponse.SerializeToString,
+            ),
+            'GetDocumentContent': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetDocumentContent,
+                    request_deserializer=invoice__pb2.GetDocumentContentRequest.FromString,
+                    response_serializer=invoice__pb2.GetDocumentContentResponse.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'taxforward.invoice.v1.InternalInvoiceService', rpc_method_handlers)
@@ -72,7 +104,7 @@ def add_InternalInvoiceServiceServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class InternalInvoiceService:
     """Internal (service-to-service) API served by invoice-service and consumed by
-    suggestions-service. Not exposed publicly via Traefik.
+    suggestions-service, llm-chat and export-service. Not exposed publicly via Traefik.
     """
 
     @staticmethod
@@ -92,6 +124,60 @@ class InternalInvoiceService:
             '/taxforward.invoice.v1.InternalInvoiceService/GetLatestInvoices',
             invoice__pb2.GetLatestInvoicesRequest.SerializeToString,
             invoice__pb2.GetLatestInvoicesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetDocuments(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/taxforward.invoice.v1.InternalInvoiceService/GetDocuments',
+            invoice__pb2.GetDocumentsRequest.SerializeToString,
+            invoice__pb2.GetDocumentsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetDocumentContent(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/taxforward.invoice.v1.InternalInvoiceService/GetDocumentContent',
+            invoice__pb2.GetDocumentContentRequest.SerializeToString,
+            invoice__pb2.GetDocumentContentResponse.FromString,
             options,
             channel_credentials,
             insecure,

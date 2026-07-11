@@ -44,10 +44,10 @@ spec:
             - configMapRef:
                 name: {{ include "taxforward.fullname" . }}-config
           # The service is stateless — no datasource, no secrets. Its only
-          # dependency is invoice-service, addressed on the cluster network.
+          # dependency is invoice-service's gRPC port, addressed on the cluster network.
           env:
-            - name: INVOICE_SERVICE_URL
-              value: "http://{{ include "taxforward.fullname" . }}-invoice-service:8080"
+            - name: INVOICE_SERVICE_GRPC_URL
+              value: "{{ include "taxforward.fullname" . }}-invoice-service:9090"
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
