@@ -39,6 +39,12 @@ http:
         - firebase-auth
       service: export-svc
 
+    client-router:
+      rule: "PathPrefix(`/`)"
+      entryPoints:
+        - web
+      service: client-svc
+
   services:
     invoice-svc:
       loadBalancer:
@@ -59,4 +65,9 @@ http:
       loadBalancer:
         servers:
           - url: "http://export-service:8084"
+
+    client-svc:
+      loadBalancer:
+        servers:
+          - url: "http://client:8080"
 

@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package taxforward.invoice.v1;
+
+option java_package = "com.lotofopps.backend.grpc";
+option java_multiple_files = true;
+
+// Internal (service-to-service) API served by invoice-service and consumed by
+// suggestions-service. Not exposed publicly via Traefik.
+service InternalInvoiceService {
+  rpc GetLatestInvoices(GetLatestInvoicesRequest) returns (GetLatestInvoicesResponse);
+}
+
+message GetLatestInvoicesRequest {
+  string user_id = 1;
+  int32 limit = 2;
+}
+
+message GetLatestInvoicesResponse {
+  repeated Invoice invoices = 1;
+}
+
+// Mirrors dto/InvoiceResponse.java. Money/dates/enums are strings to avoid
+// float rounding and keep the wire format language-neutral. Optional fields
+// use proto3 `optional` so absence is distinguishable from empty.
+message Invoice {
+  int64 id = 1;
+  string item_name = 2;
+  string company = 3;
+  string price = 4;              // BigDecimal -> plain string
+  string category = 5;           // InvoiceCategory enum name
+  string user_id = 6;
+  optional string invoice_date = 7;  // ISO LocalDate
+  optional string created_at = 8;    // ISO LocalDateTime
+  optional int64 document_id = 9;
+  string status = 10;            // InvoiceStatus enum name
+}

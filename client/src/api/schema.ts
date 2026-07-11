@@ -280,70 +280,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/internal/v1/invoices/latest": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * [invoice-service] Latest accepted invoices for a user
-         * @description Consumed by suggestions-service. Returns only `ACCEPTED` invoices, most recent first. Not exposed through the public gateway.
-         */
-        get: operations["getLatestInvoicesInternal"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/embed": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * [llm-chat] Update an invoice embedding
-         * @description Consumed by invoice-service. Not exposed through the public gateway.
-         */
-        put: operations["updateEmbedding"];
-        /**
-         * [llm-chat] Embed an invoice into the chat vector store
-         * @description Consumed by invoice-service. Not exposed through the public gateway.
-         */
-        post: operations["createEmbedding"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/embed/{invoiceId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * [llm-chat] Delete an invoice embedding
-         * @description Consumed by invoice-service. Not exposed through the public gateway.
-         */
-        delete: operations["deleteEmbedding"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -424,25 +360,6 @@ export interface components {
         };
         AgentChatRequest: {
             question: string;
-        };
-        EmbedRequest: {
-            /** Format: int64 */
-            invoice_id: number;
-            text: string;
-            user_id: string;
-            /** @default N/A */
-            item_name: string;
-            /** @default N/A */
-            company: string;
-            price?: number | null;
-            category?: string | null;
-            invoice_date?: string | null;
-            /** Format: int64 */
-            document_id?: number | null;
-        };
-        StatusResponse: {
-            /** @example ok */
-            status?: string;
         };
         Error: {
             error?: string;
@@ -926,99 +843,6 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-        };
-    };
-    getLatestInvoicesInternal: {
-        parameters: {
-            query: {
-                userId: string;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List of invoices */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvoiceResponse"][];
-                };
-            };
-        };
-    };
-    updateEmbedding: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EmbedRequest"];
-            };
-        };
-        responses: {
-            /** @description Embedding updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StatusResponse"];
-                };
-            };
-        };
-    };
-    createEmbedding: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EmbedRequest"];
-            };
-        };
-        responses: {
-            /** @description Embedding stored */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StatusResponse"];
-                };
-            };
-        };
-    };
-    deleteEmbedding: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                invoiceId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Embedding deleted */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StatusResponse"];
-                };
-            };
         };
     };
 }
