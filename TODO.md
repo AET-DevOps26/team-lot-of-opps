@@ -24,5 +24,12 @@
   URL, or email via an SMTP relay such as a Gmail app-password). Keep the secret out of git by
   injecting it via `--set` from a GitHub secret in `.github/workflows/deploy-observability.yml`,
   mirroring how the storage-class values are already set.
+- Verify the OpenTelemetry migration on a real cluster: (1) confirm a single trace
+  spans a gRPC hop (e.g. export-service → invoice-service) in Jaeger — Spring gRPC
+  context propagation via Micrometer Observation is assumed but untested; add the
+  gRPC observation interceptors if spans don't chain; (2) confirm the FastAPI metric
+  name the PrometheusRule keys on (`http_server_request_duration_seconds_*`, pinned
+  via `OTEL_SEMCONV_STABILITY_OPT_IN=http`) actually shows up in the collector's
+  `:8889/metrics`, and adjust the alert exprs if the emitted name/labels differ.
 - Presentation
 - Github Actions workflows to execute the tests for each micorservice.

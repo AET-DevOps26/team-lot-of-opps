@@ -45,11 +45,17 @@ services:
       - FIREBASE_AUTH_EMULATOR_HOST=${FIREBASE_AUTH_EMULATOR_HOST:-firebase-auth:9099}
       # Local dev only: skip Firebase verification when no admin credentials exist.
       - DEV_AUTH=${DEV_AUTH:-false}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_SERVICE_NAME=auth-service
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true
     networks:
       - network
     depends_on:
       firebase-auth:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     restart: unless-stopped
 
 
@@ -67,11 +73,17 @@ services:
       - LLM_API_KEY=${LLM_API_KEY}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${DB_PASSWORD}@db:5432/taxforward
       - INVOICE_SERVICE_GRPC_URL=${INVOICE_SERVICE_GRPC_URL}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_SERVICE_NAME=llm-chat
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true
     networks:
       - network
     depends_on:
       db:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 30s
@@ -121,6 +133,8 @@ services:
       - LLM_MODEL=${LLM_MODEL}
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_CHAT_GRPC_URL=${LLM_CHAT_GRPC_URL}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_SERVICE_NAME=invoice-service
     networks:
       - network
     healthcheck:
@@ -135,6 +149,8 @@ services:
       llm-chat:
         condition: service_healthy
       seaweedfs:
+        condition: service_started
+      otel-collector:
         condition: service_started
     restart: unless-stopped
 
@@ -158,6 +174,8 @@ services:
       - LLM_API_KEY=${LLM_API_KEY}
       - INVOICE_SERVICE_GRPC_URL=${INVOICE_SERVICE_GRPC_URL}
       - SUGGESTIONS_INVOICE_LIMIT=${SUGGESTIONS_INVOICE_LIMIT}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_SERVICE_NAME=suggestions-service
     networks:
       - network
     healthcheck:
@@ -171,6 +189,8 @@ services:
         condition: service_healthy
       invoice-service:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     restart: unless-stopped
 
   export-service:
@@ -187,6 +207,8 @@ services:
       - INVOICE_SERVICE_GRPC_URL=${INVOICE_SERVICE_GRPC_URL}
       - OPENAPI_SPEC_PATH=/api/openapi.yaml
       - PROTO_PATH=/api/proto
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_SERVICE_NAME=export-service
     volumes:
       - ../services/export-service/src:/app/src
       - ../api/openapi.yaml:/api/openapi.yaml:ro
@@ -202,6 +224,8 @@ services:
     depends_on:
       invoice-service:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     restart: unless-stopped
 
   db:
@@ -251,6 +275,31 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # OTLP hub: receives metrics + traces + logs from every service, fans out to
+  # Prometheus (scrapes :8889), Jaeger (:4317) and Loki (:3100). See otel-collector/config.yaml.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    container_name: otel-collector
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+    networks:
+      - network
+    depends_on:
+      - jaeger
+      - loki
+    restart: unless-stopped
+
+  # Jaeger v2 is collector-based: ingests OTLP natively, in-memory storage, UI on 16686.
+  jaeger:
+    image: jaegertracing/jaeger:2.9.0
+    container_name: jaeger
+    ports:
+      - "16686:16686"   # Jaeger UI (OTLP :4317 stays internal, fed by the collector)
+    networks:
+      - network
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v2.52.0
     container_name: prometheus
@@ -270,7 +319,7 @@ services:
     restart: unless-stopped
 
   loki:
-    image: grafana/loki:2.9.0
+    image: grafana/loki:3.4.2
     container_name: loki
     ports:
       - "3100:3100"
@@ -279,19 +328,6 @@ services:
     command: -config.file=/etc/loki/loki-config.yaml
     networks:
       - network
-    restart: unless-stopped
-
-  promtail:
-    image: grafana/promtail:2.9.0
-    container_name: promtail
-    volumes:
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - ./promtail/promtail.yml:/etc/promtail/promtail.yml
-    command: -config.file=/etc/promtail/promtail.yml
-    networks:
-      - network
-    depends_on:
-      - loki
     restart: unless-stopped
 
   grafana:
@@ -306,6 +342,8 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:5173/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - GF_FEATURE_TOGGLES_ENABLE=logsInExplore
       - GF_LOG_CONSOLECOLORS=true
     networks:

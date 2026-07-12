@@ -14,3 +14,7 @@ data:
   STORAGE_S3_REGION: {{ .Values.seaweedfs.region | quote }}
   UPLOAD_MAX_SIZE_BYTES: {{ .Values.invoice.uploadMaxSizeBytes | quote }}
   SUGGESTIONS_INVOICE_LIMIT: {{ .Values.suggestions.invoiceLimit | quote }}
+  # Java reads this in application.properties; Python's opentelemetry-instrument reads it directly.
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.otel.collectorEndpoint | quote }}
+  OTEL_LOGS_EXPORTER: "otlp"
+  OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED: "true"

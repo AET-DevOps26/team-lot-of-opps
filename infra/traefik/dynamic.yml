@@ -7,6 +7,12 @@ http:
           - "X-User-Sub"
 
   routers:
+    grafana-router:
+      rule: "PathPrefix(`/grafana`)"
+      entryPoints:
+        - web
+      service: grafana-svc
+
     invoice-router:
       rule: "PathPrefix(`/api/v1/documents`) || PathPrefix(`/api/v1/invoices`)"
       entryPoints:
@@ -46,6 +52,11 @@ http:
       service: client-svc
 
   services:
+    grafana-svc:
+      loadBalancer:
+        servers:
+          - url: "http://grafana:3000"
+
     invoice-svc:
       loadBalancer:
         servers:

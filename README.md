@@ -16,7 +16,8 @@ TaxForward is a full-stack application that helps German students and trainees t
 └── infra/
     ├── traefik/               # Reverse proxy config — routing + auth middleware
     ├── helm/                  # Kubernetes Helm chart (app + ServiceMonitors/dashboards)
-    ├── monitoring/            # Helm chart: kube-prometheus-stack + loki-stack (k8s)
+    ├── monitoring/            # Helm chart: kube-prometheus-stack + loki-stack + otel-collector + jaeger (k8s)
+    ├── otel-collector/        # OpenTelemetry Collector config (local Docker Compose)
     ├── prometheus/            # Prometheus config (local Docker Compose)
     ├── loki/                  # Loki config (local Docker Compose)
     ├── promtail/              # Promtail config (local Docker Compose)
@@ -79,6 +80,8 @@ Any OpenAI-compatible endpoint works this way, not just OpenAI and LM Studio/Oll
 | `auth-service`    | FastAPI (Python, Firebase Admin)  | `8000`        | `auth-service`    |
 | `traefik`         | Traefik v3                        | `80` / `8090` | `traefik`         |
 | `db`              | PostgreSQL 16 + pgvector          | `5432`        | `db`              |
+| `otel-collector`  | OpenTelemetry Collector           | `4317`/`4318`/`8889` | `otel-collector` |
+| `jaeger`          | Jaeger v2 (tracing)               | `16686`       | `jaeger`          |
 | `prometheus`      | Prometheus v2.52                  | `9090`        | `prometheus`      |
 | `loki`            | Grafana Loki 2.9                  | `3100`        | `loki`            |
 | `grafana`         | Grafana OSS                       | `3001` (→`3000`) | `grafana`      |
@@ -125,19 +128,33 @@ the work to do is to move `ExportService` behind a job table and return `202 + j
 
 ## Observability
 
-Local dev gets metrics + logs for free — Prometheus, Loki, Promtail, and
-Grafana all start with `docker compose up -d`. Grafana is at
-`http://localhost:3001`, with dashboards and datasources auto-provisioned
-from [`infra/grafana/provisioning/`](infra/grafana/provisioning/) (Prometheus
-+ Loki datasources, a TaxForward dashboard). Services log structured JSON,
-which Promtail ships to Loki for querying alongside metrics.
+Every service emits **metrics + traces over OTLP** — Java via the Spring Boot
+OpenTelemetry starter (Micrometer), Python via `opentelemetry-instrument`. They
+push to a central **OpenTelemetry Collector**, which fans out to Prometheus
+(metrics, scraped off the collector) and **Jaeger v2** (traces). Distributed
+traces follow requests across the gRPC + REST hops between services. Logs stay on
+the `logstash-encoder → Promtail → Loki` path.
+
+```
+services ──OTLP──▶ otel-collector ──▶ Jaeger v2    (traces)
+                                 └──▶ Prometheus   (metrics)
+logs: structured JSON ──▶ Promtail ──▶ Loki
+```
+
+Local dev starts the whole stack with `docker compose up -d`. Grafana is at
+`http://localhost:3001`, datasources auto-provisioned from
+[`infra/grafana/provisioning/`](infra/grafana/provisioning/) (Prometheus, Loki,
+Jaeger). View traces in the Jaeger UI at `http://localhost:16686`, or in Grafana
+→ Explore → Jaeger; a span links straight to its logs in Loki (trace↔log
+correlation).
 
 On Kubernetes, monitoring is a separate Helm release —
-[`infra/monitoring`](infra/monitoring) (kube-prometheus-stack + loki-stack) —
-deployed independently of the app via
+[`infra/monitoring`](infra/monitoring) (kube-prometheus-stack + loki-stack +
+the Collector and Jaeger) — deployed independently of the app via
 [`.github/workflows/deploy-observability.yml`](.github/workflows/deploy-observability.yml).
-App-side ServiceMonitors, a PrometheusRule, and dashboard ConfigMaps live in
-[`infra/helm/templates/`](infra/helm/templates/). Grafana is exposed
+The app injects the collector endpoint (`otel.collectorEndpoint`) and a single
+ServiceMonitor scrapes the collector; a PrometheusRule and dashboard ConfigMaps
+live in [`infra/helm/templates/`](infra/helm/templates/). Grafana is exposed
 publicly via Traefik at `grafana.<tls.host>`, but currently has **no auth
 middleware in front of it** — see [TODO.md](TODO.md).
 

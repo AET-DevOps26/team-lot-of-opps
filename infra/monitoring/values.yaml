@@ -133,37 +133,19 @@ kube-prometheus-stack:
         uid: loki                    # dashboard log panel references this uid explicitly
         type: loki
         access: proxy
-        url: http://monitoring-loki:3100   # loki-stack service name is release-prefixed
+        url: http://loki:3100
         jsonData:
           maxLines: 1000
-
-loki-stack:
-  loki:
-    isDefault: false   # loki-stack ships its own Loki datasource defaulted to true, conflicts with kube-prometheus-stack's default Prometheus one
-    persistence:
-      enabled: true
-      storageClassName: csi-rbd-sc
-      size: 5Gi
-    resources:
-      requests:
-        cpu: "100m"
-        memory: "256Mi"
-      limits:
-        cpu: "200m"
-        memory: "512Mi"
-  promtail:
-    enabled: true
-    resources:
-      requests:
-        cpu: "50m"
-        memory: "64Mi"
-      limits:
-        cpu: "100m"
-        memory: "128Mi"
-    config:
-      clients:
-        # Chart default templates to http://{{ .Release.Name }}:3100/..., which
-        # isn't a real service — the loki subchart's actual service is release-prefixed.
-        - url: http://monitoring-loki:3100/loki/api/v1/push
-  grafana:
-    enabled: false  # use kube-prometheus-stack's Grafana instead
+      - name: Jaeger
+        uid: jaeger
+        type: jaeger
+        access: proxy
+        url: http://jaeger:16686     # in-namespace, see templates/jaeger.yaml
+        jsonData:
+          tracesToLogsV2:
+            datasourceUid: loki
+            spanStartTimeShift: '-1h'
+            spanEndTimeShift: '1h'
+            filterByTraceID: true
+          tracesToMetrics:
+            datasourceUid: prometheus

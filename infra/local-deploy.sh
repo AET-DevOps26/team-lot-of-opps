@@ -6,6 +6,8 @@ REGISTRY="ghcr.io/aet-devops26/team-taxforward"
 TAG="latest"
 RELEASE="taxforward"
 NAMESPACE="taxforward"
+# Mirrors the VM target of deploy-observability.yml (namespace, storage class, secrets).
+OBS_NAMESPACE="taxforward-observ"
 HELM_DIR="$REPO_ROOT/infra/helm"
 
 VALUES_LOCAL="$HELM_DIR/values.local.yaml"
@@ -62,9 +64,22 @@ helm repo add prometheus-community https://prometheus-community.github.io/helm-c
 helm repo add grafana https://grafana.github.io/helm-charts >/dev/null
 helm repo update >/dev/null
 helm dependency update "$REPO_ROOT/infra/monitoring" >/dev/null
+
+# Alertmanager mounts this secret (values.yaml alertmanagerSpec.secrets), so it must
+# exist before the chart installs or the pod stays Pending and the release hangs. The
+# real deploy injects TELEGRAM_BOT_TOKEN from a repo secret; locally a placeholder is
+# fine — alerts just won't reach Telegram. Namespace must match values.local.yaml's
+# otel.collectorEndpoint / grafana.backendUrl, or OTLP push and /grafana resolve to nothing.
+kubectl create namespace "$OBS_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic telegram-bot-token \
+  --namespace "$OBS_NAMESPACE" \
+  --from-literal=token="${TELEGRAM_BOT_TOKEN:-placeholder-local-no-alerts}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
 helm upgrade --install monitoring "$REPO_ROOT/infra/monitoring" \
-  --namespace monitoring --create-namespace \
+  --namespace "$OBS_NAMESPACE" --create-namespace \
   --wait --rollback-on-failure --timeout 10m \
+  --set "kube-prometheus-stack.grafana.adminPassword=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in infra/.env}" \
   --set 'kube-prometheus-stack.grafana.persistence.storageClassName=local-path' \
   --set 'kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=local-path' \
   --set 'loki-stack.loki.persistence.storageClassName=local-path'
