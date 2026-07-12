@@ -1,3 +1,6 @@
+loki:
+  storageClassName: csi-rbd-sc
+
 kube-prometheus-stack:
   # Privileged per-node DaemonSet; not runnable on the shared AET cluster.
   nodeExporter:
@@ -107,7 +110,7 @@ kube-prometheus-stack:
         cpu: "50m"
         memory: "128Mi"
       limits:
-        cpu: "200m"
+        cpu: "1"
         memory: "512Mi"
     persistence:
       enabled: true

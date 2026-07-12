@@ -82,7 +82,7 @@ helm upgrade --install monitoring "$REPO_ROOT/infra/monitoring" \
   --set "kube-prometheus-stack.grafana.adminPassword=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in infra/.env}" \
   --set 'kube-prometheus-stack.grafana.persistence.storageClassName=local-path' \
   --set 'kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=local-path' \
-  --set 'loki-stack.loki.persistence.storageClassName=local-path'
+  --set 'loki.storageClassName=local-path'
 
 echo "==> Deploying with Helm..."
 SA_JSON="$REPO_ROOT/services/auth-service/devops-25c9a-firebase-adminsdk-fbsvc-d15365a6ac.json"

@@ -28,6 +28,16 @@ data:
     log:
       level: {{ .Values.traefik.logLevel }}
 
+    tracing:
+      otlp:
+        http:
+          endpoint: "{{ .Values.otel.collectorEndpoint }}/v1/traces"
+
+    metrics:
+      otlp:
+        http:
+          endpoint: "{{ .Values.otel.collectorEndpoint }}/v1/metrics"
+
   dynamic.yml: |
     http:
       middlewares:

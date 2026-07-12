@@ -11,3 +11,4 @@ stud.yaml
 # client/src/api/schema.ts is committed (the client imports it); a CI drift
 # check keeps it in sync with the spec. Language-specific stubs are not.
 api/generated/
+CLAUDE.md

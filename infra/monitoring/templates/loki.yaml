@@ -49,7 +49,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: csi-rbd-sc
+  storageClassName: {{ .Values.loki.storageClassName }}
   resources:
     requests:
       storage: 5Gi
