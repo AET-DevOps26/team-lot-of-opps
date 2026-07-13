@@ -12,9 +12,9 @@ spec:
       rules:
         - alert: HighErrorRate
           expr: |
-            sum by (job) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            sum by (job) (rate(http_server_requests_milliseconds_count{status=~"5.."}[5m]))
             /
-            sum by (job) (rate(http_server_requests_seconds_count[5m])) > 0.05
+            sum by (job) (rate(http_server_requests_milliseconds_count[5m])) > 0.05
           for: 2m
           labels:
             severity: warning
@@ -30,21 +30,21 @@ spec:
             summary: "Pod {{ "{{" }} $labels.pod {{ "}}" }} restarting repeatedly"
 
         - alert: SlowP99Response
-          expr: histogram_quantile(0.99, sum by (job, le) (rate(http_server_requests_seconds_bucket[5m]))) > 2
+          expr: histogram_quantile(0.99, sum by (job, le) (rate(http_server_requests_milliseconds_bucket[5m]))) > 2000
           for: 5m
           labels:
             severity: warning
           annotations:
             summary: "P99 latency > 2s on {{ "{{" }} $labels.job {{ "}}" }}"
 
-        # FastAPI services (auth-service, llm-chat) expose http_request_duration_seconds_*
-        # instead of Spring's http_server_requests_seconds_* — sibling rules cover them.
-        # The status label is grouped ("5xx"), not numeric like Spring's "5..".
+        # FastAPI services (auth-service, llm-chat) emit OTel's stable HTTP histogram
+        # http_server_request_duration_seconds_* (status label http_response_status_code)
+        # instead of Spring's http_server_requests_milliseconds_* — sibling rules cover them.
         - alert: HighErrorRate
           expr: |
-            sum by (job) (rate(http_request_duration_seconds_count{status="5xx"}[5m]))
+            sum by (job) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
             /
-            sum by (job) (rate(http_request_duration_seconds_count[5m])) > 0.05
+            sum by (job) (rate(http_server_request_duration_seconds_count[5m])) > 0.05
           for: 2m
           labels:
             severity: warning
@@ -52,7 +52,7 @@ spec:
             summary: "High 5xx error rate on {{ "{{" }} $labels.job {{ "}}" }}"
 
         - alert: SlowP99Response
-          expr: histogram_quantile(0.99, sum by (job, le) (rate(http_request_duration_seconds_bucket[5m]))) > 2
+          expr: histogram_quantile(0.99, sum by (job, le) (rate(http_server_request_duration_seconds_bucket[5m]))) > 2
           for: 5m
           labels:
             severity: warning

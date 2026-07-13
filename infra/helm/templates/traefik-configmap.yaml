@@ -28,6 +28,16 @@ data:
     log:
       level: {{ .Values.traefik.logLevel }}
 
+    tracing:
+      otlp:
+        http:
+          endpoint: "{{ .Values.otel.collectorEndpoint }}/v1/traces"
+
+    metrics:
+      otlp:
+        http:
+          endpoint: "{{ .Values.otel.collectorEndpoint }}/v1/metrics"
+
   dynamic.yml: |
     http:
       middlewares:
@@ -116,5 +126,6 @@ data:
         grafana-svc:
           loadBalancer:
             servers:
-              # Grafana lives in the "taxforward-observ" namespace/release, not this one — cross-namespace ClusterIP DNS.
-              - url: "http://monitoring-grafana.taxforward-observ.svc.cluster.local:80"
+              # Grafana lives in the observability release's namespace, not this one — cross-namespace
+              # ClusterIP DNS. That namespace differs per target (AET vs VM), so it's a value.
+              - url: {{ .Values.grafana.backendUrl | quote }}

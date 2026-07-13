@@ -166,7 +166,7 @@ else
     --atomic --timeout 10m \
     --set 'kube-prometheus-stack.grafana.persistence.storageClassName=csi-rbd-sc' \
     --set 'kube-prometheus-stack.prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=csi-rbd-sc' \
-    --set 'loki-stack.loki.persistence.storageClassName=csi-rbd-sc'
+    --set 'loki.storageClassName=csi-rbd-sc'
 fi
 
 # ─── App ─────────────────────────────────────────────────────────────────────

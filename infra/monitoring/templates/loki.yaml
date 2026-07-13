@@ -1,0 +1,117 @@
+# Loki 3 log store. Ingests OTLP logs from the otel-collector (which pushes to
+# /otlp), filesystem storage on a PVC. Grafana reads it via the Loki datasource.
+# Mirrors infra/loki/loki-config.yaml. Replaces the deprecated loki-stack subchart
+# (which pinned Loki 2.6.1 and could not ingest OTLP).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-config
+  labels:
+    app.kubernetes.io/name: loki
+data:
+  loki-config.yaml: |
+    auth_enabled: false
+
+    server:
+      http_listen_port: 3100
+
+    common:
+      path_prefix: /loki
+      storage:
+        filesystem:
+          chunks_directory: /loki/chunks
+          rules_directory: /loki/rules
+      replication_factor: 1
+      ring:
+        instance_addr: 127.0.0.1
+        kvstore:
+          store: inmemory
+
+    schema_config:
+      configs:
+        - from: 2024-01-01
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+
+    limits_config:
+      allow_structured_metadata: true
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: loki-data
+  labels:
+    app.kubernetes.io/name: loki
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.loki.storageClassName }}
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki
+  labels:
+    app.kubernetes.io/name: loki
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate   # single RWO PVC, can't run two pods at once during rollout
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: loki
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: loki
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: loki
+          image: grafana/loki:3.4.2
+          args: ["-config.file=/etc/loki/loki-config.yaml"]
+          ports:
+            - { name: http, containerPort: 3100 }
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /etc/loki
+            - name: data
+              mountPath: /loki
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "200m", memory: "512Mi" }
+      volumes:
+        - name: config
+          configMap:
+            name: loki-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: loki-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  labels:
+    app.kubernetes.io/name: loki
+spec:
+  selector:
+    app.kubernetes.io/name: loki
+  ports:
+    - { name: http, port: 3100, targetPort: 3100 }

@@ -1,135 +1,329 @@
 {
   "title": "TaxForward",
-  "description": "HTTP metrics, JVM memory, and logs for all TaxForward microservices",
+  "description": "RED metrics, JVM, Jaeger traces and logs for all TaxForward microservices",
   "uid": "taxforward-main",
   "schemaVersion": 41,
-  "version": 1,
+  "version": 3,
   "editable": true,
   "time": { "from": "now-1h", "to": "now" },
   "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "label": "Service",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values({__name__=~\"http_server_.*_count\"}, job)",
+        "definition": "label_values({__name__=~\"http_server_.*_count\"}, job)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "trace_service",
+        "type": "query",
+        "label": "Trace service",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values({__name__=~\"http_server_.*_count\"}, job)",
+        "definition": "label_values({__name__=~\"http_server_.*_count\"}, job)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false
+      },
+      {
+        "name": "search",
+        "type": "textbox",
+        "label": "Log search",
+        "query": "",
+        "current": { "text": "", "value": "" }
+      }
+    ]
+  },
   "panels": [
     {
+      "id": 100,
+      "type": "row",
+      "title": "Overview",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
       "id": 1,
-      "type": "timeseries",
-      "title": "HTTP Request Rate (Spring Boot services)",
-      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "type": "stat",
+      "title": "Request Rate",
+      "gridPos": { "x": 0, "y": 1, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum by (job, uri) (rate(http_server_requests_seconds_count{job=~\"invoice-service|suggestions-service\"}[5m]))",
-          "legendFormat": "{{job}} {{uri}}",
+          "expr": "(sum(rate(http_server_requests_milliseconds_count{job=~\"$service\"}[$__rate_interval])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{job=~\"$service\"}[$__rate_interval])) or vector(0))",
           "refId": "A"
         }
       ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
+        },
+        "overrides": []
+      },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi" }
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
       }
     },
     {
       "id": 2,
-      "type": "timeseries",
-      "title": "HTTP Error Rate (4xx + 5xx)",
-      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "type": "stat",
+      "title": "Error Rate (4xx+5xx)",
+      "gridPos": { "x": 6, "y": 1, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum by (job, status) (rate(http_server_requests_seconds_count{job=~\"invoice-service|suggestions-service\", status=~\"4..|5..\"}[5m]))",
-          "legendFormat": "{{job}} {{status}}",
+          "expr": "100 * ( (sum(rate(http_server_requests_milliseconds_count{job=~\"$service\", status=~\"4..|5..\"}[$__rate_interval])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{job=~\"$service\", http_response_status_code=~\"4..|5..\"}[$__rate_interval])) or vector(0)) ) / ( (sum(rate(http_server_requests_milliseconds_count{job=~\"$service\"}[$__rate_interval])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{job=~\"$service\"}[$__rate_interval])) or vector(0)) )",
           "refId": "A"
-        },
-        {
-          "expr": "sum by (job, status) (rate(http_request_duration_seconds_count{job=~\"llm-chat|auth-service\", status=~\"4xx|5xx\"}[5m]))",
-          "legendFormat": "{{job}} {{status}}",
-          "refId": "B"
         }
       ],
       "fieldConfig": {
-        "defaults": { "color": { "fixedColor": "red", "mode": "fixed" } },
+        "defaults": {
+          "unit": "percent",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 } ] }
+        },
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi" }
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
       }
     },
     {
       "id": 3,
-      "type": "timeseries",
-      "title": "JVM Heap Memory",
-      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "type": "stat",
+      "title": "Services Reporting",
+      "gridPos": { "x": 12, "y": 1, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "jvm_memory_used_bytes{area=\"heap\", job=~\"invoice-service|suggestions-service\"}",
-          "legendFormat": "{{job}} heap used",
+          "expr": "count( count by (job) (http_server_requests_milliseconds_count{job=~\"$service\"}) or count by (job) (http_server_request_duration_seconds_count{job=~\"$service\"}) )",
           "refId": "A"
-        },
-        {
-          "expr": "jvm_memory_max_bytes{area=\"heap\", job=~\"invoice-service|suggestions-service\"}",
-          "legendFormat": "{{job}} heap max",
-          "refId": "B"
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "bytes" },
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+        },
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi" }
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
       }
     },
     {
       "id": 4,
-      "type": "timeseries",
-      "title": "HTTP Request Rate (FastAPI services)",
-      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "expr": "sum by (job, handler) (rate(http_request_duration_seconds_count{job=~\"llm-chat|auth-service\"}[5m]))",
-          "legendFormat": "{{job}} {{handler}}",
-          "refId": "A"
-        }
-      ],
-      "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi" }
-      }
-    },
-    {
-      "id": 5,
-      "type": "timeseries",
-      "title": "Build Version",
-      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 6 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "expr": "build_info{service=~\"llm-chat|auth-service\"}",
-          "legendFormat": "{{service}} v{{version}}",
-          "refId": "A"
-        },
-        {
-          "expr": "kube_pod_labels{label_app_kubernetes_io_name=~\"invoice-service|suggestions-service\"}",
-          "legendFormat": "{{label_app_kubernetes_io_name}} {{label_app_kubernetes_io_version}}",
-          "refId": "B"
-        }
-      ],
-      "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi" }
-      }
-    },
-    {
-      "id": 6,
-      "type": "logs",
-      "title": "Application Logs",
-      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 10 },
+      "type": "stat",
+      "title": "Log Error Rate",
+      "gridPos": { "x": 18, "y": 1, "w": 6, "h": 4 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "{namespace=\"taxforward\"}",
+          "expr": "sum(rate({service_name=~\"$service\"} |~ \"(?i)error\" [$__rate_interval]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.1 }, { "color": "red", "value": 1 } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 101,
+      "type": "row",
+      "title": "HTTP (RED metrics)",
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Request Rate by Service",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (job) (rate(http_server_requests_milliseconds_count{job=~\"$service\"}[$__rate_interval]))",
+          "legendFormat": "{{job}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"$service\"}[$__rate_interval]))",
+          "legendFormat": "{{job}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["mean", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Error Rate by Service (4xx+5xx)",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (job, status) (rate(http_server_requests_milliseconds_count{job=~\"$service\", status=~\"4..|5..\"}[$__rate_interval]))",
+          "legendFormat": "{{job}} {{status}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (job, http_response_status_code) (rate(http_server_request_duration_seconds_count{job=~\"$service\", http_response_status_code=~\"4..|5..\"}[$__rate_interval]))",
+          "legendFormat": "{{job}} {{http_response_status_code}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["mean", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "P95 Latency by Service",
+      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (job, le) (rate(http_server_requests_milliseconds_bucket{job=~\"$service\"}[$__rate_interval]))) / 1000",
+          "legendFormat": "{{job}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (job, le) (rate(http_server_request_duration_seconds_bucket{job=~\"$service\"}[$__rate_interval])))",
+          "legendFormat": "{{job}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Top Endpoints by Request Rate",
+      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (job, uri) (rate(http_server_requests_milliseconds_count{job=~\"$service\"}[$__rate_interval])))",
+          "legendFormat": "{{job}} {{uri}}",
+          "refId": "A"
+        },
+        {
+          "expr": "topk(10, sum by (job, http_route) (rate(http_server_request_duration_seconds_count{job=~\"$service\"}[$__rate_interval])))",
+          "legendFormat": "{{job}} {{http_route}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 102,
+      "type": "row",
+      "title": "Traces (Jaeger)",
+      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "id": 20,
+      "type": "table",
+      "title": "Recent Traces — $trace_service",
+      "description": "Recent traces from Jaeger. Click a Trace ID to open the waterfall; the datasource links each span to its Loki logs and Prometheus metrics.",
+      "gridPos": { "x": 0, "y": 23, "w": 24, "h": 9 },
+      "datasource": { "type": "jaeger", "uid": "jaeger" },
+      "targets": [
+        {
+          "queryType": "search",
+          "service": "$trace_service",
+          "limit": 20,
+          "refId": "A"
+        }
+      ],
+      "options": { "showHeader": true }
+    },
+    {
+      "id": 103,
+      "type": "row",
+      "title": "Logs (Loki)",
+      "gridPos": { "x": 0, "y": 32, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "Log Volume by Service",
+      "gridPos": { "x": 0, "y": 33, "w": 24, "h": 6 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum by (service_name) (count_over_time({service_name=~\"$service\"} |~ \"(?i)$search\" [$__interval]))",
+          "legendFormat": "{{service_name}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 70, "stacking": { "mode": "normal", "group": "A" } }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 31,
+      "type": "logs",
+      "title": "Application Logs",
+      "gridPos": { "x": 0, "y": 39, "w": 24, "h": 12 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "{service_name=~\"$service\"} |~ \"(?i)$search\"",
           "refId": "A"
         }
       ],
@@ -138,14 +332,207 @@
         "enableLogDetails": true,
         "prettifyLogMessage": false,
         "showCommonLabels": false,
-        "showLabels": false,
+        "showLabels": true,
         "showTime": true,
         "sortOrder": "Descending",
         "wrapLogMessage": true
       }
+    },
+    {
+      "id": 104,
+      "type": "row",
+      "title": "JVM & Runtime (Java services)",
+      "gridPos": { "x": 0, "y": 51, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "id": 40,
+      "type": "timeseries",
+      "title": "JVM Heap Memory",
+      "gridPos": { "x": 0, "y": 52, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{area=\"heap\", job=~\"$service\"}",
+          "legendFormat": "{{job}} used",
+          "refId": "A"
+        },
+        {
+          "expr": "jvm_memory_max_bytes{area=\"heap\", job=~\"$service\"}",
+          "legendFormat": "{{job}} max",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes", "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 41,
+      "type": "timeseries",
+      "title": "Process CPU Usage",
+      "gridPos": { "x": 8, "y": 52, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "process_cpu_usage{job=~\"$service\"}",
+          "legendFormat": "{{job}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 42,
+      "type": "timeseries",
+      "title": "JVM Live Threads",
+      "gridPos": { "x": 16, "y": 52, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "jvm_threads_live_threads{job=~\"$service\"}",
+          "legendFormat": "{{job}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 105,
+      "type": "row",
+      "title": "Kubernetes (Helm deployment only)",
+      "gridPos": { "x": 0, "y": 60, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "id": 50,
+      "type": "timeseries",
+      "title": "Pod Restarts",
+      "gridPos": { "x": 0, "y": 61, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (pod) (kube_pod_container_status_restarts_total{namespace=\"taxforward\"})",
+          "legendFormat": "{{pod}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 51,
+      "type": "table",
+      "title": "Build Info",
+      "gridPos": { "x": 12, "y": 61, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "kube_pod_labels{namespace=\"taxforward\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "options": { "showHeader": true }
+    },
+    {
+      "id": 106,
+      "type": "row",
+      "title": "Traefik (edge)",
+      "gridPos": { "x": 0, "y": 69, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "id": 60,
+      "type": "timeseries",
+      "title": "Edge Request Rate by Service",
+      "gridPos": { "x": 0, "y": 70, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (service) (rate(traefik_service_requests_total[$__rate_interval]))",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["mean", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 61,
+      "type": "timeseries",
+      "title": "Edge Error Rate by Service (4xx+5xx)",
+      "gridPos": { "x": 12, "y": 70, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (service, code) (rate(traefik_service_requests_total{code=~\"4..|5..\"}[$__rate_interval]))",
+          "legendFormat": "{{service}} {{code}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["mean", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 62,
+      "type": "timeseries",
+      "title": "Edge P95 Latency by Service",
+      "gridPos": { "x": 0, "y": 78, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(traefik_service_request_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 63,
+      "type": "timeseries",
+      "title": "Entrypoint Request Rate by Status",
+      "gridPos": { "x": 12, "y": 78, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (code) (rate(traefik_entrypoint_requests_total[$__rate_interval]))",
+          "legendFormat": "{{code}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["mean", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
     }
   ],
-  "templating": { "list": [] },
   "annotations": { "list": [] },
   "links": []
 }

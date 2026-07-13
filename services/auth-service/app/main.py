@@ -5,8 +5,6 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from prometheus_fastapi_instrumentator import Instrumentator
-from prometheus_client import Info
 
 logger = logging.getLogger("auth-service")
 
@@ -32,9 +30,6 @@ else:
     logger.warning("DEV_AUTH enabled: Firebase token verification is DISABLED.")
 
 app = FastAPI(title="Auth service", version="1.0.0")
-
-Instrumentator().instrument(app).expose(app)
-Info("build", "Service build info").info({"version": "1.0.0", "service": "auth-service"})
 
 
 class StatusResponse(BaseModel):

@@ -67,6 +67,8 @@ spec:
               value: "1"
             - name: TRANSFORMERS_OFFLINE
               value: "1"
+            - name: OTEL_SERVICE_NAME
+              value: llm-chat
           # The embedding model download/load can take a while on first start
           # (compose uses start_period: 120s), hence the startup probe.
           startupProbe:

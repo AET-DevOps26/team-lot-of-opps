@@ -44,6 +44,17 @@ firebase:
 invoice:
   uploadMaxSizeBytes: "10485760"
 
+# ─── OpenTelemetry ───────────────────────────────────────────────────────────
+# Services push OTLP (metrics + traces) to the collector, which lives in the
+# monitoring release's namespace. Default is the AET observ namespace; the VM
+# cluster (namespace taxforward-observ) overrides this in values.local.yaml.
+otel:
+  collectorEndpoint: "http://otel-collector.team-lot-of-opps-observ.svc.cluster.local:4318"
+
+grafana:
+  # Cross-namespace backend for the /grafana Traefik route (observability release's namespace).
+  backendUrl: "http://monitoring-grafana.team-lot-of-opps-observ.svc.cluster.local:80"
+
 seaweedfs:
   image: "chrislusf/seaweedfs"
   tag: "4.37"
