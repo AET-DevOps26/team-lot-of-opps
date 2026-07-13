@@ -76,7 +76,9 @@ tls:
 
 # ─── Resource limits / requests ──────────────────────────────────────────────
 # Total limits must stay within the Rancher project quota: 4 vCPU / 6 Gi.
-# App totals: CPU 3400m, memory 4864Mi.
+# App totals: CPU 3100m, memory 4352Mi.
+# invoiceService/suggestionsService/llmChat limits trimmed to leave RollingUpdate
+# surge headroom (deployments use maxSurge:1/maxUnavailable:0, see templates).
 resources:
   traefik:
     requests:
@@ -97,23 +99,23 @@ resources:
       cpu: "250m"
       memory: "512Mi"
     limits:
-      cpu: "700m"
-      memory: "768Mi"
+      cpu: "600m"
+      memory: "640Mi"
   # llm-chat loads a sentence-transformers embedding model into memory.
   llmChat:
     requests:
       cpu: "250m"
       memory: "1Gi"
     limits:
-      cpu: "800m"
-      memory: "2Gi"
+      cpu: "700m"
+      memory: "1792Mi"
   suggestionsService:
     requests:
       cpu: "250m"
       memory: "512Mi"
     limits:
-      cpu: "700m"
-      memory: "768Mi"
+      cpu: "600m"
+      memory: "640Mi"
   client:
     requests:
       cpu: "50m"

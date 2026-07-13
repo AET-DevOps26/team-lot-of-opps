@@ -1,8 +1,8 @@
 name: Deploy
 
 # One app deploy for both targets (both run k3s/Helm):
-#   push to main          -> auto-deploy to the VM
-#   workflow_dispatch     -> choose target: vm or aet (AET cluster)
+#   push to main          -> auto-deploy to the AET cluster
+#   workflow_dispatch     -> choose target: aet (AET cluster) or vm
 # Monitoring is NOT deployed here — see deploy-observability.yml.
 on:
   push:
@@ -12,8 +12,8 @@ on:
       target:
         description: Cluster to deploy to
         type: choice
-        options: [vm, aet]
-        default: vm
+        options: [aet, vm]
+        default: aet
       image_tag:
         description: Deploy an already-built tag (e.g. sha-abc1234). Leave empty to build from this commit.
         type: string
@@ -33,6 +33,9 @@ env:
   # Deterministic Azure DNS name (Terraform domain_name_label = vm_name); stable
   # across IP recreates, so no AZURE_VM_IP variable to maintain.
   VM_HOST: ${{ vars.VM_HOST }}
+  # Helm release name → resource names (taxforward-tax-forward-*). Same on both
+  # clusters. The namespace differs by target and is set in the "vars" step.
+  RELEASE: taxforward
 
 jobs:
   build:
@@ -58,7 +61,7 @@ jobs:
       - name: Resolve target config and image tag
         id: vars
         run: |
-          TARGET="${{ github.event_name == 'push' && 'vm' || inputs.target }}"
+          TARGET="${{ github.event_name == 'push' && 'aet' || inputs.target }}"
           case "$TARGET" in
             vm)
               echo "storage_class=local-path"
@@ -70,6 +73,10 @@ jobs:
               ;;
           esac >> "$GITHUB_OUTPUT"
           echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+          # Namespace differs by target: the VM stays 'taxforward' (single-tenant k3s);
+          # AET uses a team-prefixed namespace in the shared Rancher project.
+          [ "$TARGET" = "aet" ] && echo "APP_NAMESPACE=team-lot-of-opps" >> "$GITHUB_ENV" \
+                               || echo "APP_NAMESPACE=taxforward" >> "$GITHUB_ENV"
           TAG="${{ inputs.image_tag }}"
           [ -n "$TAG" ] || TAG="${{ needs.build.outputs.image_tag }}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -85,13 +92,33 @@ jobs:
       - name: Write Firebase service account file
         run: echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" | base64 -d > firebase-sa.json
 
+      # AET is Rancher: a bare `helm --create-namespace` namespace lands "not in a
+      # project" — no team RBAC, and we can't delete it. Pre-create it annotated
+      # into the team-lot-of-opps project so it inherits the team's access.
+      # Idempotent: skip if it already exists. VM (plain k3s) uses --create-namespace.
+      - name: Ensure namespace in the AET Rancher project
+        if: steps.vars.outputs.target == 'aet'
+        run: |
+          PROJECT_ID='${{ vars.AET_PROJECT_ID }}'
+          [ -n "$PROJECT_ID" ] || { echo "::error::repo variable AET_PROJECT_ID is not set"; exit 1; }
+          kubectl get namespace "$APP_NAMESPACE" >/dev/null 2>&1 || kubectl create -f - <<YAML
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: $APP_NAMESPACE
+            annotations:
+              field.cattle.io/projectId: "$PROJECT_ID"
+            labels:
+              field.cattle.io/projectId: "${PROJECT_ID#*:}"
+          YAML
+
       - name: Helm upgrade --install
         run: |
           REGISTRY=ghcr.io/aet-devops26/taxforward
           TAG="${{ steps.vars.outputs.tag }}"
 
-          helm upgrade --install taxforward ./infra/helm \
-            --namespace taxforward --create-namespace \
+          helm upgrade --install "$RELEASE" ./infra/helm \
+            --namespace "$APP_NAMESPACE" --create-namespace \
             --atomic \
             --timeout 10m \
             -f infra/helm/values.yaml \
@@ -118,12 +145,12 @@ jobs:
       - name: Diagnose on failure
         if: failure()
         run: |
-          echo "===== PVC ====="; kubectl get pvc -n taxforward -o wide || true
-          kubectl describe pvc -n taxforward || true
-          echo "===== PODS ====="; kubectl get pods -n taxforward -o wide || true
-          kubectl describe pods -n taxforward || true
-          echo "===== EVENTS ====="; kubectl get events -n taxforward --sort-by=.lastTimestamp || true
-          echo "===== HELM ====="; helm status taxforward -n taxforward || true
+          echo "===== PVC ====="; kubectl get pvc -n "$APP_NAMESPACE" -o wide || true
+          kubectl describe pvc -n "$APP_NAMESPACE" || true
+          echo "===== PODS ====="; kubectl get pods -n "$APP_NAMESPACE" -o wide || true
+          kubectl describe pods -n "$APP_NAMESPACE" || true
+          echo "===== EVENTS ====="; kubectl get events -n "$APP_NAMESPACE" --sort-by=.lastTimestamp || true
+          echo "===== HELM ====="; helm status "$RELEASE" -n "$APP_NAMESPACE" || true
 
       # --atomic only proves pods became ready; this proves Traefik actually
       # routes traffic end-to-end on the VM (aet has no stable public URL here).
@@ -136,8 +163,8 @@ jobs:
           if [ "${{ steps.vars.outputs.target }}" = "vm" ]; then
             echo "App reachable at: http://${VM_HOST}/"
           else
-            NODE_PORT=$(kubectl get svc taxforward-tax-forward-traefik \
-              --namespace taxforward \
+            NODE_PORT=$(kubectl get svc "$RELEASE-tax-forward-traefik" \
+              --namespace "$APP_NAMESPACE" \
               -o jsonpath='{.spec.ports[0].nodePort}')
             NODE_IP=$(kubectl get nodes \
               -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')

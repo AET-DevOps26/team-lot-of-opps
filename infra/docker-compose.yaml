@@ -12,19 +12,44 @@ services:
       - network
     restart: unless-stopped
 
+  # Firebase Auth Emulator — local, offline stand-in for production Firebase.
+  # Needs no real project or service account; sign-ups appear in its UI on :4000.
+  firebase-auth:
+    build:
+      context: ./firebase-emulator
+    container_name: firebase-auth
+    # --project is tied to FIREBASE_PROJECT_ID so the emulator, auth-service, and
+    # client all stamp/expect the same token "aud". Falls back to demo-taxforward.
+    command: ["firebase","emulators:start","--only","auth","--project","${FIREBASE_PROJECT_ID:-demo-taxforward}","--config","/firebase.json"]
+    ports:
+      - "9099:9099"   # Auth emulator (browser reaches it at 127.0.0.1:9099)
+      - "4000:4000"   # Emulator UI — http://127.0.0.1:4000/auth
+    networks:
+      - network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9099/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
   auth-service:
     build:
       context: ../services/auth-service
     container_name: auth-service
     environment:
-      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-demo-taxforward}
+      # Route token verification through the emulator container. Unset (and mount
+      # a service account) to verify against production Firebase instead.
+      - FIREBASE_AUTH_EMULATOR_HOST=${FIREBASE_AUTH_EMULATOR_HOST:-firebase-auth:9099}
       # Local dev only: skip Firebase verification when no admin credentials exist.
       - DEV_AUTH=${DEV_AUTH:-false}
-    volumes:
-      - ../services/auth-service/devops-25c9a-firebase-adminsdk-fbsvc-d15365a6ac.json:/app/firebase-service-account.json:ro
     networks:
       - network
+    depends_on:
+      firebase-auth:
+        condition: service_healthy
     restart: unless-stopped
 
 
@@ -167,7 +192,7 @@ services:
     networks:
       - network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U appuser -d taxforward"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d taxforward"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -184,12 +209,15 @@ services:
     environment:
       - VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
       - VITE_API_TARGET=${VITE_API_TARGET}
-      - VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}
-      - VITE_FIREBASE_AUTH_DOMAIN=${VITE_FIREBASE_AUTH_DOMAIN}
-      - VITE_FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID}
-      - VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET}
-      - VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID}
-      - VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID}
+      - VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY:-demo-key}
+      - VITE_FIREBASE_AUTH_DOMAIN=${VITE_FIREBASE_AUTH_DOMAIN:-demo-taxforward.firebaseapp.com}
+      - VITE_FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-demo-taxforward}
+      - VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET:-demo-taxforward.appspot.com}
+      - VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID:-000000000000}
+      - VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID:-1:000000000000:web:demo}
+      # Route the browser SDK at the emulator container (published on the host).
+      - VITE_USE_FIREBASE_EMULATOR=${VITE_USE_FIREBASE_EMULATOR:-true}
+      - VITE_FIREBASE_AUTH_EMULATOR_HOST=${VITE_FIREBASE_AUTH_EMULATOR_HOST:-127.0.0.1:9099}
     volumes:
       - ../client:/app
       - /app/node_modules
@@ -231,7 +259,7 @@ services:
     restart: unless-stopped
 
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:2.9.0
     container_name: promtail
     volumes:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -244,7 +272,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana-oss:latest
+    image: grafana/grafana-oss:11.4.0
     container_name: grafana
     ports:
       - "3001:3000"
