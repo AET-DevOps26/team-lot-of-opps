@@ -36,6 +36,7 @@ services=(
   "invoice-service:$REPO_ROOT/services/invoice-service"
   "llm-chat:$REPO_ROOT/services/llm-chat"
   "suggestions-service:$REPO_ROOT/services/suggestions-service"
+  "export-service:$REPO_ROOT/services/export-service"
 )
 
 echo "==> Building images..."
@@ -47,7 +48,7 @@ for entry in "${services[@]}"; do
     docker build "${FIREBASE_BUILD_ARGS[@]}" -t "$REGISTRY/$name:latest" "$context"
   elif [ "$name" = "llm-chat" ]; then
     docker build --platform linux/amd64 -t "$REGISTRY/$name:latest" "$context"
-  elif [ "$name" = "invoice-service" ] || [ "$name" = "suggestions-service" ]; then
+  elif [ "$name" = "invoice-service" ] || [ "$name" = "suggestions-service" ] || [ "$name" = "export-service" ]; then
     docker build --build-context "api=$REPO_ROOT/api" -t "$REGISTRY/$name:latest" "$context"
   else
     docker build -t "$REGISTRY/$name:latest" "$context"
@@ -92,6 +93,8 @@ helm upgrade --install "$RELEASE" "$HELM_DIR" \
   --set images.client.tag="$TAG" \
   --set images.suggestionsService.repository="$REGISTRY/suggestions-service" \
   --set images.suggestionsService.tag="$TAG" \
+  --set images.exportService.repository="$REGISTRY/export-service" \
+  --set images.exportService.tag="$TAG" \
   --set-file "db.initSql=$REPO_ROOT/infra/postgres/init.sql" \
   "${FIREBASE_SA_ARG[@]}" || {
     echo "===== PVC ====="; kubectl get pvc -n "$NAMESPACE" -o wide || true

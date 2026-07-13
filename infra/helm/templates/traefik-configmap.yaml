@@ -62,6 +62,14 @@ data:
             - firebase-auth
           service: suggestions-svc
 
+        export-router:
+          rule: "PathPrefix(`/api/v1/exports`)"
+          entryPoints:
+            - web
+          middlewares:
+            - firebase-auth
+          service: export-svc
+
         # Catch-all: serves the SPA. Default rule-length priority keeps the
         # /api/* routers winning over this one. No auth middleware — the
         # client is public; auth happens client-side via Firebase.
@@ -94,6 +102,11 @@ data:
           loadBalancer:
             servers:
               - url: "http://{{ include "taxforward.fullname" . }}-suggestions-service:8083"
+
+        export-svc:
+          loadBalancer:
+            servers:
+              - url: "http://{{ include "taxforward.fullname" . }}-export-service:8084"
 
         client-svc:
           loadBalancer:

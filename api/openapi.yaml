@@ -33,6 +33,10 @@ tags:
     description: Proactive, LLM-generated tax suggestions (suggestions-service).
   - name: Chat
     description: Conversational RAG agent over the user's invoices (llm-chat).
+  - name: Exports
+    description: >-
+      Tax-year exports of the user's accepted invoices — summary figures plus
+      downloadable CSV, PDF, and ZIP artifacts (export-service).
 
 security:
   - firebaseToken: []
@@ -330,6 +334,109 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /api/v1/exports/years:
+    get:
+      tags: [Exports]
+      operationId: listExportYears
+      summary: Tax years the user has accepted invoices for
+      description: >-
+        Descending. Invoices without an `invoiceDate` are not attributable to a
+        tax year and are omitted.
+      responses:
+        "200":
+          description: List of years
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/exports/summary:
+    get:
+      tags: [Exports]
+      operationId: getExportSummary
+      summary: Per-category totals for one tax year
+      description: >-
+        The figures rendered into the PDF summary, exposed separately so the
+        client can preview an export before downloading it.
+      parameters:
+        - $ref: "#/components/parameters/YearQuery"
+      responses:
+        "200":
+          description: Summary of the year's accepted invoices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportSummaryResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/exports/csv:
+    get:
+      tags: [Exports]
+      operationId: downloadExportCsv
+      summary: Download the year's accepted invoices as CSV
+      description: >-
+        RFC 4180, UTF-8 with a byte-order mark so spreadsheet software reads the
+        German umlauts correctly. One row per invoice line item.
+      parameters:
+        - $ref: "#/components/parameters/YearQuery"
+      responses:
+        "200":
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/exports/pdf:
+    get:
+      tags: [Exports]
+      operationId: downloadExportPdf
+      summary: Download the year's Werbungskosten summary as PDF
+      description: >-
+        A German-language summary sheet: totals per deduction category, the
+        itemized invoices behind them, and the amount exceeding that year's
+        Arbeitnehmer-Pauschbetrag.
+      parameters:
+        - $ref: "#/components/parameters/YearQuery"
+      responses:
+        "200":
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/exports/zip:
+    get:
+      tags: [Exports]
+      operationId: downloadExportZip
+      summary: Download the complete tax-year package as a ZIP archive
+      description: >-
+        Contains the PDF summary, the CSV and JSON renderings of the invoices,
+        and every original receipt the invoices were extracted from.
+      parameters:
+        - $ref: "#/components/parameters/YearQuery"
+      responses:
+        "200":
+          description: ZIP archive
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   # Internal service-to-service calls (latest-invoices, embed/delete) now use gRPC.
   # Contracts live in api/proto/. This spec covers only the public REST surface.
 
@@ -351,6 +458,13 @@ components:
       schema:
         type: integer
         format: int64
+    YearQuery:
+      name: year
+      in: query
+      required: true
+      description: Tax year, matched against the invoice date.
+      schema:
+        type: integer
 
   responses:
     Unauthorized:
@@ -491,6 +605,48 @@ components:
           nullable: true
         status:
           $ref: "#/components/schemas/InvoiceStatus"
+
+    ExportCategoryTotal:
+      type: object
+      required: [category, invoiceCount, total]
+      properties:
+        category:
+          type: string
+          nullable: true
+          description: Null groups the invoices the AI could not categorize.
+          allOf:
+            - $ref: "#/components/schemas/InvoiceCategory"
+        invoiceCount:
+          type: integer
+        total:
+          type: number
+
+    ExportSummaryResponse:
+      type: object
+      required:
+        [year, invoiceCount, totalExpenses, lumpSumAllowance, deductibleAboveLumpSum, categories]
+      properties:
+        year:
+          type: integer
+        invoiceCount:
+          type: integer
+        totalExpenses:
+          type: number
+          description: Sum of every accepted invoice dated in this year.
+        lumpSumAllowance:
+          type: number
+          description: >-
+            The Arbeitnehmer-Pauschbetrag granted for this year without any
+            receipts (§9a EStG).
+        deductibleAboveLumpSum:
+          type: number
+          description: >-
+            `max(0, totalExpenses - lumpSumAllowance)` — what the collected
+            receipts are worth beyond the automatic allowance.
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportCategoryTotal"
 
     SuggestionResponse:
       type: object

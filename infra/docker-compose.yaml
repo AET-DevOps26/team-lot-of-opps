@@ -173,6 +173,37 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  export-service:
+    platform: linux/amd64
+    build:
+      context: ../services/export-service
+      dockerfile: Dockerfile.dev
+    container_name: export-service
+    ports:
+      - "8084:8084"
+    environment:
+      # No SPRING_DATASOURCE_URL: an export is derived entirely from invoice-service,
+      # so this service holds no state and owns no schema.
+      - INVOICE_SERVICE_GRPC_URL=${INVOICE_SERVICE_GRPC_URL}
+      - OPENAPI_SPEC_PATH=/api/openapi.yaml
+      - PROTO_PATH=/api/proto
+    volumes:
+      - ../services/export-service/src:/app/src
+      - ../api/openapi.yaml:/api/openapi.yaml:ro
+      - ../api/proto:/api/proto:ro
+    networks:
+      - network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    depends_on:
+      invoice-service:
+        condition: service_healthy
+    restart: unless-stopped
+
   db:
     platform: linux/amd64
     image: pgvector/pgvector:pg16

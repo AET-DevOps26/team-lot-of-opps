@@ -13,22 +13,30 @@ import org.springframework.transaction.annotation.Transactional;
 
 public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
-    List<Invoice> findByInvoiceDateYear(int invoiceYear);
-
     List<Invoice> findByUserId(String userId);
 
-    List<Invoice> findByUserIdAndInvoiceDateYear(String userId, int invoiceYear);
-
     Page<Invoice> findByUserId(String userId, Pageable pageable);
-
-    Page<Invoice> findByUserIdAndInvoiceDateYear(String userId, int invoiceYear, Pageable pageable);
 
     // Status-filtered variants used to keep PENDING (under review) invoices out of the
     // main list, chat context and tax suggestions until the user accepts them.
     Page<Invoice> findByUserIdAndStatus(String userId, InvoiceStatus status, Pageable pageable);
 
+    /**
+     * Spring Data cannot derive a date part from a method name: {@code ...InvoiceDateYear} parses
+     * as the nested property {@code invoiceDate.year}, which Hibernate rejects at query-build time.
+     * The year filter therefore has to be spelled out in JPQL.
+     *
+     * <p>Undated invoices belong to no tax year, so they are excluded rather than silently grouped
+     * into one.
+     */
+    @Query(
+            "select i from Invoice i where i.userId = :userId and i.status = :status"
+                    + " and i.invoiceDate is not null and year(i.invoiceDate) = :invoiceYear")
     Page<Invoice> findByUserIdAndStatusAndInvoiceDateYear(
-            String userId, InvoiceStatus status, int invoiceYear, Pageable pageable);
+            @Param("userId") String userId,
+            @Param("status") InvoiceStatus status,
+            @Param("invoiceYear") int invoiceYear,
+            Pageable pageable);
 
     List<Invoice> findByDocumentId(Long documentId);
 

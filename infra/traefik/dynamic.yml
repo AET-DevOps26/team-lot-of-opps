@@ -31,6 +31,14 @@ http:
         - firebase-auth
       service: suggestions-svc
 
+    export-router:
+      rule: "PathPrefix(`/api/v1/exports`)"
+      entryPoints:
+        - web
+      middlewares:
+        - firebase-auth
+      service: export-svc
+
     client-router:
       rule: "PathPrefix(`/`)"
       entryPoints:
@@ -52,6 +60,11 @@ http:
       loadBalancer:
         servers:
           - url: "http://suggestions-service:8083"
+
+    export-svc:
+      loadBalancer:
+        servers:
+          - url: "http://export-service:8084"
 
     client-svc:
       loadBalancer:

@@ -123,6 +123,7 @@ services=(
   "invoice-service:$REPO_ROOT/services/invoice-service"
   "llm-chat:$REPO_ROOT/services/llm-chat"
   "suggestions-service:$REPO_ROOT/services/suggestions-service"
+  "export-service:$REPO_ROOT/services/export-service"
 )
 
 # ─── Build + push images (cluster pulls from GHCR) ───────────────────────────
@@ -138,7 +139,7 @@ for entry in "${services[@]}"; do
   echo "    docker build $name -> $image"
   if [ "$name" = "client" ]; then
     docker build --platform "$PLATFORM" "${FIREBASE_BUILD_ARGS[@]}" -t "$image" "$context"
-  elif [ "$name" = "invoice-service" ] || [ "$name" = "suggestions-service" ]; then
+  elif [ "$name" = "invoice-service" ] || [ "$name" = "suggestions-service" ] || [ "$name" = "export-service" ]; then
     docker build --platform "$PLATFORM" --build-context "api=$REPO_ROOT/api" -t "$image" "$context"
   else
     docker build --platform "$PLATFORM" -t "$image" "$context"
@@ -192,6 +193,8 @@ helm upgrade --install "$RELEASE" "$HELM_DIR" \
   --set images.client.tag="$TAG" \
   --set images.suggestionsService.repository="$REGISTRY/suggestions-service" \
   --set images.suggestionsService.tag="$TAG" \
+  --set images.exportService.repository="$REGISTRY/export-service" \
+  --set images.exportService.tag="$TAG" \
   --set-file "db.initSql=$REPO_ROOT/infra/postgres/init.sql" \
   "${FIREBASE_SA_ARG[@]}" || {
     echo "===== PVC ====="; kubectl get pvc -n "$NAMESPACE" -o wide || true

@@ -19,6 +19,10 @@ images:
     repository: "ghcr.io/aet-devops26/taxforward/suggestions-service"
     tag: "latest"
     pullPolicy: IfNotPresent
+  exportService:
+    repository: "ghcr.io/aet-devops26/taxforward/export-service"
+    tag: "latest"
+    pullPolicy: IfNotPresent
 
 traefik:
   imageTag: "v3.3"
@@ -76,7 +80,7 @@ tls:
 
 # ─── Resource limits / requests ──────────────────────────────────────────────
 # Total limits must stay within the Rancher project quota: 4 vCPU / 6 Gi.
-# App totals: CPU 3100m, memory 4352Mi.
+# App totals: CPU 3400m, memory 4864Mi.
 # invoiceService/suggestionsService/llmChat limits trimmed to leave RollingUpdate
 # surge headroom (deployments use maxSurge:1/maxUnavailable:0, see templates).
 resources:
@@ -116,6 +120,15 @@ resources:
     limits:
       cpu: "600m"
       memory: "640Mi"
+  # Stateless and idle between exports; the burst is rendering a PDF and buffering
+  # one ZIP archive in memory.
+  exportService:
+    requests:
+      cpu: "150m"
+      memory: "384Mi"
+    limits:
+      cpu: "300m"
+      memory: "512Mi"
   client:
     requests:
       cpu: "50m"
@@ -145,4 +158,5 @@ replicaCount:
   invoiceService: 1
   llmChat: 1
   suggestionsService: 1
+  exportService: 1
   client: 1
