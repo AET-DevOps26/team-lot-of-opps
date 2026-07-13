@@ -9,20 +9,22 @@ for PR review routing.
 
 | Team member | GitHub | Primary subsystem |
 |---|---|---|
-| Simon Fritz | `simon-fritz` | Client (React) |
-| Lukas Ketzer | `lukasketzer` | Backend (Spring Boot services) + Infra/CI-CD/Observability |
-| Tareq | `Tareqahr` | GenAI  |
+| Simon Fritz | `simon-fritz` | Suggestions Service, Client (React) |
+| Lukas Ketzer | `lukasketzer` | Kubernetes Infrastructure (Helm/Terraform/Ansible), Invoice Service, Chat-Agent (partially) |
+| Tareq | `Tareqahr` | Invoice-Service Extraction (OCR/categorization), GenAI RAG (`llm-chat`) |
 
 ## Matrix
 
 | Area | Simon | Lukas | Tareq |
 |---|---|---|---|
 | `client/` (React) | R/A | C | C |
-| `services/invoice-service/` (Spring Boot) | I | A | R |
-| `services/suggestions-service/` (Spring Boot) | C | R/A | C |
-| `services/llm-chat/` (FastAPI, RAG) | I | C | R/A |
+| `services/suggestions-service/` (Spring Boot) | R/A | C | C |
+| `services/invoice-service/` (Spring Boot, core service) | C | R/A | C |
+| `services/invoice-service/.../ExtractionService` (OCR/categorization) | I | C | R/A |
+| `services/llm-chat/` — Chat-Agent (orchestration, `agent.py`/`main.py`) | I | R/A (partial) | C |
+| `services/llm-chat/` — RAG/vector store (`vector_store.py`) | I | C | R/A |
 | `services/auth-service/` (FastAPI, Firebase) | C | R/A | C |
-| `infra/` (Docker Compose, Helm, Terraform, Ansible) | C | R/A | C |
+| `infra/` (Kubernetes, Helm, Terraform, Ansible) | I | R/A | I |
 | `.github/workflows/` (CI/CD) | C | R/A | C |
 | `infra/monitoring/`, `infra/grafana/`, `infra/prometheus/` (Observability) | I | R/A | I |
 | `api/openapi.yaml` (API contract) | C | C | C — jointly owned; changes need agreement from whichever services are affected |
@@ -32,12 +34,14 @@ for PR review routing.
 
 - Ownership above reflects who currently maintains each area (recent commit activity), not a fixed
   or permanent assignment — it will drift as the project continues and should be updated if it does.
-- History note: the AI/business logic now split across `invoice-service` (extraction, categorization),
-  `suggestions-service`, and `llm-chat` (RAG, vector store) was originally designed and built by Tareq
-  as a single Python service (`ai-components`: OCR extraction, categorization, vector DB, RAG pipeline,
-  suggestion engine). Lukas later rearchitected the system into the current microservice split — Java
-  `invoice-service`/`suggestions-service` plus Python `llm-chat` — and has maintained the Java services
-  since. `auth-service` was built by Lukas as part of that same rearchitecture (Firebase auth + Traefik).
+- History note: the AI/business logic now split across `invoice-service`'s `ExtractionService`
+  (OCR, categorization) and `llm-chat`'s RAG/vector store was originally designed and built by
+  Tareq as a single Python service (`ai-components`: OCR extraction, categorization, vector DB,
+  RAG pipeline, suggestion engine). Lukas later rearchitected the system into the current
+  microservice split — Java `invoice-service`/`suggestions-service` plus Python `llm-chat` — and
+  maintains `invoice-service` core and `auth-service` since. `suggestions-service` is currently
+  owned by Simon; `llm-chat`'s chat-agent orchestration is shared between Lukas and Tareq, with
+  Tareq owning the RAG/vector-store logic specifically.
 - Integration work (wiring services together, debugging across boundaries, PR review) is a shared
   responsibility for all three members, not just the subsystem owner's.
 - Course registration details (GitHub username, TUMonline login, matriculation number) are submitted
