@@ -90,10 +90,13 @@ tls:
   clusterIssuer: "letsencrypt-prod"
 
 # ─── Resource limits / requests ──────────────────────────────────────────────
-# Total limits must stay within the Rancher project quota: 4 vCPU / 6 Gi.
-# App totals: CPU 3400m, memory 4864Mi.
-# invoiceService/suggestionsService/llmChat limits trimmed to leave RollingUpdate
-# surge headroom (deployments use maxSurge:1/maxUnavailable:0, see templates).
+# Total limits must stay within the per-namespace Rancher quota: 4 vCPU / 6 Gi
+# (enforced on limits, not requests). App totals: CPU 3400m, memory 4864Mi.
+# Most deployments use maxSurge:1/maxUnavailable:0 for zero-downtime rollouts;
+# their surge peak fits the ~600m/1280Mi headroom. llmChat is the exception: its
+# 1792Mi limit exceeds the headroom, so it rolls with maxSurge:0/maxUnavailable:1
+# (no surge pod, brief downtime) — otherwise its rollout deadlocks against the
+# quota. See infra/helm/templates/llm-chat-deployment.yaml.
 resources:
   traefik:
     requests:
