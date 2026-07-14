@@ -36,7 +36,10 @@ function summary(overrides: Partial<ExportSummaryResponse> = {}): ExportSummaryR
 }
 
 /** Routes each endpoint the page calls; `years` first, then `summary` for the selected year. */
-function stubApi(years: number[], summaries: Record<number, ExportSummaryResponse> = {}) {
+function stubApi(
+  years: number[],
+  summaries: Record<number, ExportSummaryResponse | Promise<ExportSummaryResponse>> = {},
+) {
   apiGet.mockImplementation((path: string, options?: { params?: { query?: { year: number } } }) => {
     if (path === '/api/v1/exports/years') return Promise.resolve(years)
     if (path === '/api/v1/exports/summary') {
@@ -67,10 +70,12 @@ describe('Export page', () => {
     stubApi([2025, 2024], { 2025: summary() })
     renderWithProviders(<Export />)
 
-    expect(await screen.findByText('€1400.50')).toBeInTheDocument()
+    expect(await screen.findByText('€ 1.400,50')).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: t.taxYear })).toHaveValue('2025')
-    expect(screen.getByText('- €1230.00')).toBeInTheDocument()
-    expect(screen.getByText('€170.50')).toBeInTheDocument()
+    expect(screen.getByText(t.table.total)).toBeInTheDocument()
+    expect(screen.getByText('€ 999,99')).toBeInTheDocument()
+    // The allowance calculation lives in the exported PDF, not on the page.
+    expect(screen.queryByText(/1\.230/)).toBeNull()
   })
 
   it('labels the null category as uncategorized rather than dropping the row', async () => {
@@ -78,17 +83,27 @@ describe('Export page', () => {
     renderWithProviders(<Export />)
 
     expect(await screen.findByText(t.table.uncategorized)).toBeInTheDocument()
-    expect(screen.getByText('€400.51')).toBeInTheDocument()
+    expect(screen.getByText('€ 400,51')).toBeInTheDocument()
   })
 
-  it('warns when the receipts do not yet beat the lump-sum allowance', async () => {
-    stubApi([2025], {
-      2025: summary({ totalExpenses: 42, deductibleAboveLumpSum: 0 }),
+  it('shows a loading state instead of the previous year while switching', async () => {
+    const user = userEvent.setup()
+    let release!: (value: ExportSummaryResponse) => void
+    const pending = new Promise<ExportSummaryResponse>((resolve) => {
+      release = resolve
     })
+    stubApi([2025, 2024], { 2025: summary(), 2024: pending })
     renderWithProviders(<Export />)
 
-    expect(await screen.findByText(t.summary.belowAllowance)).toBeInTheDocument()
-    expect(screen.queryByText(t.summary.lumpSumHint)).toBeNull()
+    await screen.findByText('€ 1.400,50')
+    await user.selectOptions(screen.getByRole('combobox', { name: t.taxYear }), '2024')
+
+    // 2025's figures must not linger under the 2024 selection.
+    expect(screen.getByText(t.summary.loading)).toBeInTheDocument()
+    expect(screen.queryByText('€ 1.400,50')).toBeNull()
+
+    release(summary({ year: 2024, totalExpenses: 50 }))
+    expect(await screen.findByText('€ 50,00')).toBeInTheDocument()
   })
 
   it('reloads the summary when another tax year is picked', async () => {
@@ -99,10 +114,10 @@ describe('Export page', () => {
     })
     renderWithProviders(<Export />)
 
-    await screen.findByText('€1400.50')
+    await screen.findByText('€ 1.400,50')
     await user.selectOptions(screen.getByRole('combobox', { name: t.taxYear }), '2024')
 
-    expect(await screen.findByText('€50.00')).toBeInTheDocument()
+    expect(await screen.findByText('€ 50,00')).toBeInTheDocument()
     expect(apiGet).toHaveBeenCalledWith('/api/v1/exports/summary', {
       params: { query: { year: 2024 } },
     })
@@ -118,7 +133,7 @@ describe('Export page', () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
 
     renderWithProviders(<Export />)
-    await screen.findByText('€1400.50')
+    await screen.findByText('€ 1.400,50')
     await user.click(screen.getByRole('button', { name: byLabel(t.downloads.zip) }))
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce())
@@ -134,7 +149,7 @@ describe('Export page', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 502 }))
 
     renderWithProviders(<Export />)
-    await screen.findByText('€1400.50')
+    await screen.findByText('€ 1.400,50')
     await user.click(screen.getByRole('button', { name: byLabel(t.downloads.pdf) }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(t.downloads.failed)

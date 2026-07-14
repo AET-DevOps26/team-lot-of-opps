@@ -3,20 +3,18 @@ import { api, unwrap, authHeaders, BASE_URL } from '../api/client'
 import type { ExportSummaryResponse } from '../api/types'
 import Icon from '../components/Icon'
 import useT from '../i18n/useT'
-import { useCategoryLabel } from '../lib/invoices'
+import { formatEuro, useCategoryLabel } from '../lib/invoices'
 
 const CARD_SHADOW = 'shadow-[0px_4px_20px_rgba(26,43,60,0.05)]'
 const CARD_BASE = `bg-surface-container-lowest border border-outline-variant rounded-xl p-6 ${CARD_SHADOW}`
 
 type ExportFormat = 'zip' | 'pdf' | 'csv'
 
-const FORMATS: readonly { format: ExportFormat; icon: string; primary: boolean }[] = [
-  { format: 'zip', icon: 'folder_zip', primary: true },
-  { format: 'pdf', icon: 'picture_as_pdf', primary: false },
-  { format: 'csv', icon: 'table_view', primary: false },
+const FORMATS: readonly { format: ExportFormat; icon: string }[] = [
+  { format: 'zip', icon: 'folder_zip' },
+  { format: 'pdf', icon: 'picture_as_pdf' },
+  { format: 'csv', icon: 'table_view' },
 ]
-
-const euro = (amount: number) => `€${amount.toFixed(2)}`
 
 /**
  * The export endpoints need the Firebase bearer token, so a plain <a download> would 401.
@@ -108,8 +106,6 @@ export default function Export() {
     [year],
   )
 
-  const belowAllowance = summary != null && summary.deductibleAboveLumpSum === 0
-
   return (
     <>
       <div className="mb-10">
@@ -151,73 +147,57 @@ export default function Export() {
 
               {loadError ? (
                 <p className="font-body-sm text-body-sm text-error">{t('export.loadFailed')}</p>
-              ) : summary == null ? null : summary.invoiceCount === 0 ? (
+              ) : loading || summary == null ? (
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  {t('export.summary.loading')}
+                </p>
+              ) : summary.invoiceCount === 0 ? (
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
                   {t('export.summary.empty')}
                 </p>
               ) : (
-                <>
-                  <table className="w-full mb-6">
-                    <thead>
-                      <tr className="text-left font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant">
-                        <th className="pb-2">{t('export.table.category')}</th>
-                        <th className="pb-2 text-right">{t('export.table.receipts')}</th>
-                        <th className="pb-2 text-right">{t('export.table.amount')}</th>
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-left font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant">
+                      <th className="pb-2">{t('export.table.category')}</th>
+                      <th className="pb-2 text-right">{t('export.table.receipts')}</th>
+                      <th className="pb-2 text-right">{t('export.table.amount')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.categories.map((row) => (
+                      <tr
+                        key={row.category ?? 'uncategorized'}
+                        className="border-t border-surface-container-highest"
+                      >
+                        <td className="py-2 font-body-sm text-body-sm text-on-surface">
+                          {row.category
+                            ? categoryLabel(row.category)
+                            : t('export.table.uncategorized')}
+                        </td>
+                        <td className="py-2 text-right font-body-sm text-body-sm text-on-surface-variant">
+                          {row.invoiceCount}
+                        </td>
+                        <td className="py-2 text-right font-data-mono text-data-mono text-primary">
+                          {formatEuro(row.total)}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {summary.categories.map((row) => (
-                        <tr
-                          key={row.category ?? 'uncategorized'}
-                          className="border-t border-surface-container-highest"
-                        >
-                          <td className="py-2 font-body-sm text-body-sm text-on-surface">
-                            {row.category
-                              ? categoryLabel(row.category)
-                              : t('export.table.uncategorized')}
-                          </td>
-                          <td className="py-2 text-right font-body-sm text-body-sm text-on-surface-variant">
-                            {row.invoiceCount}
-                          </td>
-                          <td className="py-2 text-right font-data-mono text-data-mono text-primary">
-                            {euro(row.total)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  <div className="bg-surface p-4 rounded-lg border border-surface-container-highest">
-                    <div className="space-y-2 border-l-2 border-primary-fixed-dim pl-4">
-                      <Figure
-                        label={t('export.summary.invoiceCount')}
-                        value={String(summary.invoiceCount)}
-                      />
-                      <Figure
-                        label={t('export.summary.totalExpenses')}
-                        value={euro(summary.totalExpenses)}
-                      />
-                      <Figure
-                        label={t('export.summary.lumpSumAllowance')}
-                        value={`- ${euro(summary.lumpSumAllowance)}`}
-                      />
-                      <div className="w-full h-px bg-surface-container-highest my-2" />
-                      <Figure
-                        label={t('export.summary.deductibleAboveLumpSum')}
-                        value={euro(summary.deductibleAboveLumpSum)}
-                        emphasis
-                      />
-                    </div>
-                    <p className="flex items-start gap-1 mt-4 text-xs text-on-surface-variant">
-                      <Icon name="info" size={14} />
-                      <span>
-                        {belowAllowance
-                          ? t('export.summary.belowAllowance')
-                          : t('export.summary.lumpSumHint')}
-                      </span>
-                    </p>
-                  </div>
-                </>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-surface-container-highest">
+                      <td className="pt-3 font-body-md text-body-md font-semibold text-primary">
+                        {t('export.table.total')}
+                      </td>
+                      <td className="pt-3 text-right font-body-sm text-body-sm text-on-surface-variant">
+                        {summary.invoiceCount}
+                      </td>
+                      <td className="pt-3 text-right font-data-mono text-data-mono text-secondary font-semibold">
+                        {formatEuro(summary.totalExpenses)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               )}
             </section>
           </div>
@@ -226,18 +206,13 @@ export default function Export() {
             <section className={CARD_BASE}>
               <h3 className="font-h3 text-h3 text-primary mb-4">{t('export.downloads.title')}</h3>
               <div className="space-y-3">
-                {FORMATS.map(({ format, icon, primary }) => (
+                {FORMATS.map(({ format, icon }) => (
                   <button
                     key={format}
                     type="button"
                     onClick={() => handleDownload(format)}
                     disabled={year == null || downloading != null}
-                    className={[
-                      'w-full flex items-start gap-3 rounded-lg border p-3 text-left transition-colors disabled:opacity-50',
-                      primary
-                        ? 'border-primary bg-primary/5 hover:bg-primary/10'
-                        : 'border-outline-variant bg-white hover:bg-surface-container',
-                    ].join(' ')}
+                    className="w-full flex items-start gap-3 rounded-lg border border-outline-variant bg-white p-3 text-left transition-colors hover:bg-surface-container disabled:opacity-50"
                   >
                     <span className="mt-0.5 text-primary">
                       <Icon name={downloading === format ? 'hourglass_top' : icon} />
@@ -270,38 +245,5 @@ export default function Export() {
         </div>
       )}
     </>
-  )
-}
-
-function Figure({
-  label,
-  value,
-  emphasis = false,
-}: {
-  label: string
-  value: string
-  emphasis?: boolean
-}) {
-  return (
-    <div className="flex justify-between items-center gap-4">
-      <span
-        className={
-          emphasis
-            ? 'font-body-md text-body-md font-semibold text-primary'
-            : 'font-body-sm text-body-sm text-on-surface-variant'
-        }
-      >
-        {label}
-      </span>
-      <span
-        className={
-          emphasis
-            ? 'font-data-mono text-data-mono text-secondary font-semibold'
-            : 'font-data-mono text-data-mono text-primary'
-        }
-      >
-        {value}
-      </span>
-    </div>
   )
 }

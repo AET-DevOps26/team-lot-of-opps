@@ -176,15 +176,10 @@ export interface TranslationDict {
     loadFailed: string
     summary: {
       title: string
-      invoiceCount: string
-      totalExpenses: string
-      lumpSumAllowance: string
-      deductibleAboveLumpSum: string
-      lumpSumHint: string
-      belowAllowance: string
+      loading: string
       empty: string
     }
-    table: { category: string; receipts: string; amount: string; uncategorized: string }
+    table: { category: string; receipts: string; amount: string; total: string; uncategorized: string }
     downloads: {
       title: string
       zip: string
@@ -410,20 +405,14 @@ const translations: Record<Language, TranslationDict> = {
       loadFailed: 'Could not load this tax year.',
       summary: {
         title: 'Summary',
-        invoiceCount: 'Accepted invoices',
-        totalExpenses: 'Total work-related expenses',
-        lumpSumAllowance: 'Employee lump-sum allowance',
-        deductibleAboveLumpSum: 'Deductible above the allowance',
-        lumpSumHint:
-          'Every employee may deduct this without any receipt. Only what your receipts add on top of it is worth claiming.',
-        belowAllowance:
-          'Your receipts still add up to less than the lump-sum allowance for this year, so they gain you nothing extra yet.',
+        loading: 'Loading…',
         empty: 'No accepted invoices for this year.',
       },
       table: {
         category: 'Category',
         receipts: 'Invoices',
         amount: 'Amount',
+        total: 'Total',
         uncategorized: 'Uncategorized',
       },
       downloads: {
@@ -437,8 +426,7 @@ const translations: Record<Language, TranslationDict> = {
         preparing: 'Preparing…',
         failed: 'Download failed. Please try again.',
       },
-      disclaimer:
-        'Only invoices you reviewed and accepted are exported. The lump-sum allowance is set by legislation — check the figure for the tax year before you file.',
+      disclaimer: 'Only reviewed invoices are exported.',
     },
     categories: {
       KONTOFUEHRUNGSGEBUEHREN: 'Account maintenance fees',
@@ -666,20 +654,14 @@ const translations: Record<Language, TranslationDict> = {
       loadFailed: 'Dieses Steuerjahr konnte nicht geladen werden.',
       summary: {
         title: 'Zusammenfassung',
-        invoiceCount: 'Bestätigte Rechnungen',
-        totalExpenses: 'Summe der Werbungskosten',
-        lumpSumAllowance: 'Arbeitnehmer-Pauschbetrag',
-        deductibleAboveLumpSum: 'Zusätzlich absetzbar',
-        lumpSumHint:
-          'Diesen Betrag darf jede:r Arbeitnehmer:in ohne Belege absetzen. Nur was deine Belege darüber hinaus ergeben, bringt dir zusätzlich etwas.',
-        belowAllowance:
-          'Deine Belege liegen für dieses Jahr noch unter dem Pauschbetrag — sie bringen dir also bisher nichts zusätzlich.',
+        loading: 'Wird geladen…',
         empty: 'Keine bestätigten Rechnungen für dieses Jahr.',
       },
       table: {
         category: 'Kategorie',
         receipts: 'Rechnungen',
         amount: 'Betrag',
+        total: 'Gesamt',
         uncategorized: 'Ohne Kategorie',
       },
       downloads: {
@@ -693,8 +675,7 @@ const translations: Record<Language, TranslationDict> = {
         preparing: 'Wird vorbereitet…',
         failed: 'Download fehlgeschlagen. Bitte versuch es erneut.',
       },
-      disclaimer:
-        'Exportiert werden nur Rechnungen, die du geprüft und bestätigt hast. Der Pauschbetrag ist gesetzlich festgelegt — prüfe den Wert für das Steuerjahr, bevor du abgibst.',
+      disclaimer: 'Es werden nur geprüfte Rechnungen exportiert.',
     },
     categories: {
       KONTOFUEHRUNGSGEBUEHREN: 'Kontoführungsgebühren',
