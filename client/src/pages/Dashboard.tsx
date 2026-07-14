@@ -146,6 +146,9 @@ export default function Dashboard() {
       price: number
       category?: string | null
       invoiceDate?: string | null
+      status?: string | null
+      createdAt?: string | null
+      documentId?: number | null
     }[]
   >([])
 
@@ -154,8 +157,13 @@ export default function Dashboard() {
   const [suggestionsError, setSuggestionsError] = useState(false)
 
   useEffect(() => {
-    unwrap(api.GET('/api/v1/invoices'))
-      .then((data) => setInvoices(data || []))
+    // The endpoint defaults to ACCEPTED only, so fetch both review states to get
+    // every recorded expense; the status field then separates confirmed from pending.
+    Promise.all([
+      unwrap(api.GET('/api/v1/invoices', { params: { query: { status: 'ACCEPTED' } } })),
+      unwrap(api.GET('/api/v1/invoices', { params: { query: { status: 'PENDING' } } })),
+    ])
+      .then(([accepted, pending]) => setInvoices([...(accepted || []), ...(pending || [])]))
       .catch(() => setInvoices([]))
   }, [])
 
@@ -182,9 +190,28 @@ export default function Dashboard() {
   }, [language])
 
   const totalExpenses = invoices.reduce((s, inv) => s + Number(inv.price || 0), 0)
-  const carryforward = totalExpenses // placeholder: same as recorded expenses
+  // The carryforward only counts expenses the user has reviewed and accepted —
+  // pending invoices are unreviewed AI extractions and cannot be claimed yet.
+  const confirmedExpenses = invoices
+    .filter((inv) => inv.status === 'ACCEPTED')
+    .reduce((s, inv) => s + Number(inv.price || 0), 0)
   const taxRate = taxRatePercent / 100
   const futureRefund = totalExpenses * taxRate
+
+  // How much the most recent upload added. Invoices from one upload share a
+  // documentId, so the newest upload is the batch of the most recently created
+  // invoice; null when nothing has been uploaded yet (manual entries excluded).
+  const uploadedInvoices = invoices.filter((inv) => inv.documentId != null && inv.createdAt != null)
+  const newestUpload = uploadedInvoices.reduce<(typeof uploadedInvoices)[number] | null>(
+    (newest, inv) => (newest == null || inv.createdAt! > newest.createdAt! ? inv : newest),
+    null,
+  )
+  const lastUploadTotal =
+    newestUpload == null
+      ? null
+      : uploadedInvoices
+          .filter((inv) => inv.documentId === newestUpload.documentId)
+          .reduce((s, inv) => s + Number(inv.price || 0), 0)
 
   // compute top categories
   const byCategory = invoices.reduce<Record<string, number>>((acc, inv) => {
@@ -211,15 +238,20 @@ export default function Dashboard() {
       label: t('dashboard.cards.totalExpenses'),
       value: `€${totalExpenses.toFixed(2)}`,
       icon: 'payments',
-      hint: t('dashboard.cards.sinceLastUpload'),
+      hint:
+        lastUploadTotal == null
+          ? undefined
+          : `+€${lastUploadTotal.toFixed(2)} ${t('dashboard.cards.sinceLastUpload')}`,
       hintIcon: 'trending_up',
       hintColor: 'text-secondary',
     },
     {
       label: t('dashboard.cards.carryforward'),
-      value: `€${carryforward.toFixed(2)}`,
+      value: `€${confirmedExpenses.toFixed(2)}`,
       icon: 'account_balance',
       highlight: true,
+      hint: t('dashboard.cards.carryforwardNote'),
+      hintIcon: 'verified',
     },
     {
       label: t('dashboard.cards.futureRefund'),

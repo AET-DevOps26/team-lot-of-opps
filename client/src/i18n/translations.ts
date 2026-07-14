@@ -67,6 +67,7 @@ export interface TranslationDict {
       totalExpenses: string
       sinceLastUpload: string
       carryforward: string
+      carryforwardNote: string
       aiVerified: string
       futureRefund: string
       taxRateNote: string
@@ -275,8 +276,9 @@ const translations: Record<Language, TranslationDict> = {
       subtitle: 'Here is the current state of your academic tax loss carryforward.',
       cards: {
         totalExpenses: 'Total Expenses',
-        sinceLastUpload: '+€350 since last upload',
+        sinceLastUpload: 'since last upload',
         carryforward: 'Est. Loss Carryforward',
+        carryforwardNote: 'From confirmed invoices only',
         aiVerified: 'AI Verified',
         futureRefund: 'Estimated Future Refund',
         taxRateNote: 'Based on your assumed tax rate',
@@ -524,8 +526,9 @@ const translations: Record<Language, TranslationDict> = {
       subtitle: 'Hier ist der aktuelle Stand deines akademischen Verlustvortrags.',
       cards: {
         totalExpenses: 'Gesamtausgaben',
-        sinceLastUpload: '+350 € seit letztem Upload',
+        sinceLastUpload: 'seit letztem Upload',
         carryforward: 'Geschätzter Verlustvortrag',
+        carryforwardNote: 'Nur aus bestätigten Rechnungen',
         aiVerified: 'KI-geprüft',
         futureRefund: 'Geschätzte zukünftige Rückerstattung',
         taxRateNote: 'Basierend auf deinem angenommenen Steuersatz',
