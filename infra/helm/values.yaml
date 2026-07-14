@@ -19,6 +19,10 @@ images:
     repository: "ghcr.io/aet-devops26/taxforward/suggestions-service"
     tag: "latest"
     pullPolicy: IfNotPresent
+  exportService:
+    repository: "ghcr.io/aet-devops26/taxforward/export-service"
+    tag: "latest"
+    pullPolicy: IfNotPresent
 
 traefik:
   imageTag: "v3.3"
@@ -39,6 +43,17 @@ firebase:
 
 invoice:
   uploadMaxSizeBytes: "10485760"
+
+# ─── OpenTelemetry ───────────────────────────────────────────────────────────
+# Services push OTLP (metrics + traces) to the collector, which lives in the
+# monitoring release's namespace. Default is the AET observ namespace; the VM
+# cluster (namespace taxforward-observ) overrides this in values.local.yaml.
+otel:
+  collectorEndpoint: "http://otel-collector.team-lot-of-opps-observ.svc.cluster.local:4318"
+
+grafana:
+  # Cross-namespace backend for the /grafana Traefik route (observability release's namespace).
+  backendUrl: "http://monitoring-grafana.team-lot-of-opps-observ.svc.cluster.local:80"
 
 seaweedfs:
   image: "chrislusf/seaweedfs"
@@ -75,10 +90,13 @@ tls:
   clusterIssuer: "letsencrypt-prod"
 
 # ─── Resource limits / requests ──────────────────────────────────────────────
-# Total limits must stay within the Rancher project quota: 4 vCPU / 6 Gi.
-# App totals: CPU 3100m, memory 4352Mi.
-# invoiceService/suggestionsService/llmChat limits trimmed to leave RollingUpdate
-# surge headroom (deployments use maxSurge:1/maxUnavailable:0, see templates).
+# Total limits must stay within the per-namespace Rancher quota: 4 vCPU / 6 Gi
+# (enforced on limits, not requests). App totals: CPU 3400m, memory 4864Mi.
+# Most deployments use maxSurge:1/maxUnavailable:0 for zero-downtime rollouts;
+# their surge peak fits the ~600m/1280Mi headroom. llmChat is the exception: its
+# 1792Mi limit exceeds the headroom, so it rolls with maxSurge:0/maxUnavailable:1
+# (no surge pod, brief downtime) — otherwise its rollout deadlocks against the
+# quota. See infra/helm/templates/llm-chat-deployment.yaml.
 resources:
   traefik:
     requests:
@@ -116,6 +134,15 @@ resources:
     limits:
       cpu: "600m"
       memory: "640Mi"
+  # Stateless and idle between exports; the burst is rendering a PDF and buffering
+  # one ZIP archive in memory.
+  exportService:
+    requests:
+      cpu: "150m"
+      memory: "384Mi"
+    limits:
+      cpu: "300m"
+      memory: "512Mi"
   client:
     requests:
       cpu: "50m"
@@ -145,4 +172,5 @@ replicaCount:
   invoiceService: 1
   llmChat: 1
   suggestionsService: 1
+  exportService: 1
   client: 1

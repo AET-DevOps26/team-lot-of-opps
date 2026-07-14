@@ -4,6 +4,10 @@ name: Deploy
 #   push to main          -> auto-deploy to the AET cluster
 #   workflow_dispatch     -> choose target: aet (AET cluster) or vm
 # Monitoring is NOT deployed here — see deploy-observability.yml.
+#
+# Rolling back: for the fast path use rollback.yml (helm rollback, no build). To
+# redeploy a known-good commit instead, dispatch this with ref + image_tag both
+# set to that commit. See docs/runbook-rollback.md.
 on:
   push:
     branches: [main]
@@ -18,10 +22,17 @@ on:
         description: Deploy an already-built tag (e.g. sha-abc1234). Leave empty to build from this commit.
         type: string
         required: false
+      ref:
+        description: Take the chart from this commit/tag instead of the current one. Requires image_tag.
+        type: string
+        required: false
 
 permissions:
   contents: read
   packages: write
+  # provision.yml (called for vm deploys) exchanges the OIDC token with Azure;
+  # a called workflow can't be granted more than the caller, so grant it here.
+  id-token: write
 
 # Two pushes to main in quick succession must not run helm upgrade concurrently
 # against the same cluster; later run supersedes the queued one.
@@ -38,6 +49,13 @@ env:
   RELEASE: taxforward
 
 jobs:
+  # A VM deploy always provisions first (Terraform + Ansible) — it's idempotent,
+  # so it's a no-op when the VM already matches. Never runs for aet.
+  provision:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'vm' }}
+    uses: ./.github/workflows/provision.yml
+    secrets: inherit
+
   build:
     # Skip building only when a manual run pins an existing tag.
     if: ${{ github.event_name == 'push' || inputs.image_tag == '' }}
@@ -45,11 +63,16 @@ jobs:
     secrets: inherit
 
   deploy:
-    needs: build
-    if: ${{ always() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    needs: [build, provision]
+    if: ${{ always()
+         && (needs.build.result == 'success' || needs.build.result == 'skipped')
+         && (needs.provision.result == 'success' || needs.provision.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
+      # Empty ref = the triggering commit, i.e. the normal push-to-main path.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - uses: azure/setup-helm@v3
         with:
@@ -61,6 +84,14 @@ jobs:
       - name: Resolve target config and image tag
         id: vars
         run: |
+          # 'ref' only pins the chart. Without image_tag the build job would still
+          # build from the dispatch branch, silently pairing an old chart with new
+          # images — the exact split a rollback is supposed to close.
+          if [ -n "${{ inputs.ref }}" ] && [ -z "${{ inputs.image_tag }}" ]; then
+            echo "::error::'ref' pins the chart but not the images — pass image_tag (e.g. sha-abc1234) from the same commit"
+            exit 1
+          fi
+
           TARGET="${{ github.event_name == 'push' && 'aet' || inputs.target }}"
           case "$TARGET" in
             vm)
@@ -142,6 +173,15 @@ jobs:
             --set persistence.storageClassName="${{ steps.vars.outputs.storage_class }}" \
             --set traefik.service.type="${{ steps.vars.outputs.traefik_service_type }}"
 
+      # --atomic only proves the pods went ready. A service that answers /health but
+      # 500s on every real request is a successful deploy as far as Helm is concerned.
+      - name: Smoke test
+        id: smoke
+        uses: ./.github/actions/smoke-test
+        with:
+          namespace: ${{ env.APP_NAMESPACE }}
+          release: ${{ env.RELEASE }}
+
       - name: Diagnose on failure
         if: failure()
         run: |
@@ -152,11 +192,19 @@ jobs:
           echo "===== EVENTS ====="; kubectl get events -n "$APP_NAMESPACE" --sort-by=.lastTimestamp || true
           echo "===== HELM ====="; helm status "$RELEASE" -n "$APP_NAMESPACE" || true
 
-      # --atomic only proves pods became ready; this proves Traefik actually
-      # routes traffic end-to-end on the VM (aet has no stable public URL here).
-      - name: Smoke test
-        if: steps.vars.outputs.target == 'vm'
-        run: curl -fsS --retry 5 --retry-delay 10 --retry-all-errors -o /dev/null "http://${VM_HOST}/" && echo "smoke test passed"
+      # If the upgrade itself failed, --atomic already rolled it back. It cannot help
+      # here: Helm called the release healthy and only the smoke test disagreed.
+      - name: Roll back after failed smoke test
+        if: failure() && steps.smoke.outcome == 'failure'
+        run: |
+          set -euo pipefail
+          REVS=$(helm history "$RELEASE" --namespace "$APP_NAMESPACE" -o json | jq 'length')
+          if [ "$REVS" -lt 2 ]; then
+            echo "::warning::first revision of $RELEASE — nothing to roll back to, leaving it up for inspection"
+            exit 0
+          fi
+          helm rollback "$RELEASE" --namespace "$APP_NAMESPACE" --wait --timeout 5m
+          echo "::warning::Smoke test failed; rolled $RELEASE back to the previous revision. main still carries this commit — revert it."
 
       - name: Print application URL
         run: |

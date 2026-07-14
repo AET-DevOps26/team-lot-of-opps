@@ -13,6 +13,9 @@ COPY src/ src/
 COPY --from=api openapi.yaml ./api/openapi.yaml
 ENV OPENAPI_SPEC_PATH=/app/api/openapi.yaml
 
+COPY --from=api proto/ ./api/proto/
+ENV PROTO_PATH=/app/api/proto
+
 RUN chmod +x ./gradlew && ./gradlew build -x test
 
 FROM eclipse-temurin:17-jre

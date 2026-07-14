@@ -45,6 +45,8 @@ spec:
           env:
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: /app/firebase-service-account.json
+            - name: OTEL_SERVICE_NAME
+              value: auth-service
           volumeMounts:
             - name: firebase-sa
               mountPath: /app/firebase-service-account.json

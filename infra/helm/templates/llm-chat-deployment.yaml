@@ -14,8 +14,8 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+      maxSurge: 0
+      maxUnavailable: 1
   template:
     metadata:
       labels:
@@ -39,6 +39,9 @@ spec:
             - name: http
               containerPort: 8081
               protocol: TCP
+            - name: grpc
+              containerPort: 50051
+              protocol: TCP
           # Shared non-secret config (LLM_URL, LLM_MODEL, ...) — mirrors infra/.env.
           envFrom:
             - configMapRef:
@@ -58,12 +61,14 @@ spec:
                 secretKeyRef:
                   name: {{ include "taxforward.fullname" . }}-secret
                   key: llmApiKey
-            - name: INVOICE_SERVICE_URL
-              value: "http://{{ include "taxforward.fullname" . }}-invoice-service:8080"
+            - name: INVOICE_SERVICE_GRPC_URL
+              value: "{{ include "taxforward.fullname" . }}-invoice-service:9090"
             - name: HF_HUB_OFFLINE
               value: "1"
             - name: TRANSFORMERS_OFFLINE
               value: "1"
+            - name: OTEL_SERVICE_NAME
+              value: llm-chat
           # The embedding model download/load can take a while on first start
           # (compose uses start_period: 120s), hence the startup probe.
           startupProbe:

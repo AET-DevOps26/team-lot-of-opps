@@ -18,4 +18,6 @@ RUN ./gradlew dependencies --no-daemon -q || true
 
 EXPOSE 8080
 
-CMD ["./gradlew", "bootRun", "--no-daemon"]
+# --no-watch-fs: the single-use daemon discards its VFS at build end, so watching
+# buys nothing here, and inotify over the bind-mounted /app/src fails with EINTR.
+CMD ["./gradlew", "bootRun", "--no-daemon", "--no-watch-fs"]

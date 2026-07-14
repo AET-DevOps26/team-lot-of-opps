@@ -7,6 +7,12 @@ http:
           - "X-User-Sub"
 
   routers:
+    grafana-router:
+      rule: "PathPrefix(`/grafana`)"
+      entryPoints:
+        - web
+      service: grafana-svc
+
     invoice-router:
       rule: "PathPrefix(`/api/v1/documents`) || PathPrefix(`/api/v1/invoices`)"
       entryPoints:
@@ -31,7 +37,26 @@ http:
         - firebase-auth
       service: suggestions-svc
 
+    export-router:
+      rule: "PathPrefix(`/api/v1/exports`)"
+      entryPoints:
+        - web
+      middlewares:
+        - firebase-auth
+      service: export-svc
+
+    client-router:
+      rule: "PathPrefix(`/`)"
+      entryPoints:
+        - web
+      service: client-svc
+
   services:
+    grafana-svc:
+      loadBalancer:
+        servers:
+          - url: "http://grafana:3000"
+
     invoice-svc:
       loadBalancer:
         servers:
@@ -46,4 +71,14 @@ http:
       loadBalancer:
         servers:
           - url: "http://suggestions-service:8083"
+
+    export-svc:
+      loadBalancer:
+        servers:
+          - url: "http://export-service:8084"
+
+    client-svc:
+      loadBalancer:
+        servers:
+          - url: "http://client:8080"
 

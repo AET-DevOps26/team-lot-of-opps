@@ -2,13 +2,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
-from app.vector_store import store_embeddings, update_embeddings, delete_embeddings, get_vectorstore
+from app.vector_store import get_vectorstore
 from app.agent import run_agent_streaming
+from app.grpc_server import start_grpc_server
 from starlette.responses import StreamingResponse
 from openai import AsyncOpenAI
-from prometheus_fastapi_instrumentator import Instrumentator
-from prometheus_client import Info
 import os
 import json
 import logging
@@ -24,13 +22,12 @@ LLM_API_KEY = os.getenv("LLM_API_KEY", "EMPTY")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await get_vectorstore()
+    grpc_server = await start_grpc_server()
     yield
+    await grpc_server.stop(grace=None)
 
 
 app = FastAPI(title="LLM Chat service", version="1.0.0", lifespan=lifespan)
-
-Instrumentator().instrument(app).expose(app)
-Info("build", "Service build info").info({"version": "1.0.0", "service": "llm-chat"})
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,30 +39,6 @@ app.add_middleware(
 _client = AsyncOpenAI(base_url=f"{LLM_URL}/v1", api_key=LLM_API_KEY, timeout=120)
 
 
-class EmbedRequest(BaseModel):
-    invoice_id: int
-    text: str
-    user_id: str
-    item_name: str = "N/A"
-    company: str = "N/A"
-    price: Optional[float] = None
-    category: Optional[str] = None
-    invoice_date: Optional[str] = None
-    document_id: Optional[int] = None
-
-
-class UpdateRequest(BaseModel):
-    invoice_id: int
-    text: str
-    user_id: str
-    item_name: str = "N/A"
-    company: str = "N/A"
-    price: Optional[float] = None
-    category: Optional[str] = None
-    invoice_date: Optional[str] = None
-    document_id: Optional[int] = None
-
-
 class AgentChatRequest(BaseModel):
     question: str
 
@@ -74,57 +47,7 @@ class StatusResponse(BaseModel):
     status: str = "ok"
 
 
-@app.post(
-    "/v1/embed",
-    tags=["Internal"],
-    response_model=StatusResponse,
-    summary="Embed an invoice into the chat vector store",
-)
-async def embed(request: EmbedRequest):
-    await store_embeddings(
-        request.invoice_id,
-        request.text,
-        request.user_id,
-        item_name=request.item_name,
-        company=request.company,
-        price=request.price,
-        category=request.category,
-        invoice_date=request.invoice_date,
-        document_id=request.document_id,
-    )
-    return {"status": "ok"}
-
-
-@app.put(
-    "/v1/embed",
-    tags=["Internal"],
-    response_model=StatusResponse,
-    summary="Update an invoice embedding",
-)
-async def update(request: UpdateRequest):
-    await update_embeddings(
-        request.invoice_id,
-        request.text,
-        request.user_id,
-        item_name=request.item_name,
-        company=request.company,
-        price=request.price,
-        category=request.category,
-        invoice_date=request.invoice_date,
-        document_id=request.document_id,
-    )
-    return {"status": "ok"}
-
-
-@app.delete(
-    "/v1/embed/{invoice_id}",
-    tags=["Internal"],
-    response_model=StatusResponse,
-    summary="Delete an invoice embedding",
-)
-async def delete_embed(invoice_id: int):
-    await delete_embeddings(invoice_id)
-    return {"status": "ok"}
+# Invoice embed/delete moved to gRPC — see app/grpc_server.py (EmbeddingService).
 
 
 @app.post(

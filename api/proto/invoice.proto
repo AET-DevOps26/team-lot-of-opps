@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package taxforward.invoice.v1;
+
+option java_package = "com.lotofopps.backend.grpc";
+option java_multiple_files = true;
+
+// Internal (service-to-service) API served by invoice-service and consumed by
+// suggestions-service, llm-chat and export-service. Not exposed publicly via Traefik.
+service InternalInvoiceService {
+  rpc GetLatestInvoices(GetLatestInvoicesRequest) returns (GetLatestInvoicesResponse);
+  rpc GetDocuments(GetDocumentsRequest) returns (GetDocumentsResponse);
+  rpc GetDocumentContent(GetDocumentContentRequest) returns (GetDocumentContentResponse);
+}
+
+message GetLatestInvoicesRequest {
+  string user_id = 1;
+  int32 limit = 2;                  // <= 0: no limit (proto3 default 0 = all)
+  optional int32 invoice_year = 3;  // restrict to one tax year (by invoice_date)
+}
+
+message GetLatestInvoicesResponse {
+  repeated Invoice invoices = 1;
+}
+
+// Mirrors dto/InvoiceResponse.java. Money/dates/enums are strings to avoid
+// float rounding and keep the wire format language-neutral. Optional fields
+// use proto3 `optional` so absence is distinguishable from empty.
+message Invoice {
+  int64 id = 1;
+  string item_name = 2;
+  string company = 3;
+  string price = 4;              // BigDecimal -> plain string
+  string category = 5;           // InvoiceCategory enum name
+  string user_id = 6;
+  optional string invoice_date = 7;  // ISO LocalDate
+  optional string created_at = 8;    // ISO LocalDateTime
+  optional int64 document_id = 9;
+  string status = 10;            // InvoiceStatus enum name
+}
+
+// Requests are scoped by user_id and further filtered to the requested ids, so a
+// caller only ever sees the documents its user both owns and asked for.
+message GetDocumentsRequest {
+  string user_id = 1;
+  repeated int64 document_ids = 2;
+}
+
+message GetDocumentsResponse {
+  repeated Document documents = 1;
+}
+
+// Mirrors dto/DocumentResponse.java. The raw bytes are fetched separately via
+// GetDocumentContent so metadata listings stay cheap.
+message Document {
+  int64 id = 1;
+  string filename = 2;
+  string content_type = 3;
+  int64 size_bytes = 4;
+  string uploaded_at = 5;  // ISO LocalDateTime
+  string user_id = 6;
+}
+
+message GetDocumentContentRequest {
+  string user_id = 1;
+  int64 document_id = 2;
+}
+
+// NOT_FOUND covers both a missing document and one owned by another user.
+message GetDocumentContentResponse {
+  bytes content = 1;
+}

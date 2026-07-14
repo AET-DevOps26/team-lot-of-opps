@@ -1,0 +1,104 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.1.0'
+	id 'io.spring.dependency-management' version '1.1.7'
+	id 'org.openapi.generator' version '7.16.0'
+	id 'com.google.protobuf' version '0.9.6'
+	id 'com.diffplug.spotless' version '7.2.1'
+}
+
+group = 'com.lotofopps'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	// OTLP push of metrics + traces + logs (bundles registry-otlp + tracing-bridge-otel + otlp exporter).
+	implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
+	implementation 'io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.16.0-alpha'
+	implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
+	implementation 'org.springframework.boot:spring-boot-starter-grpc-client'
+	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8'
+	// PDF rendering for the Werbungskosten summary sheet.
+	implementation 'com.github.librepdf:openpdf:2.0.3'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+spotless {
+	java {
+		target 'src/**/*.java'          // src only → excludes OpenAPI-generated code under build/
+		googleJavaFormat().aosp()       // AOSP = 4-space indent, matches existing style
+		removeUnusedImports()
+		trimTrailingWhitespace()
+		endWithNewline()
+	}
+}
+
+openApiGenerate {
+	generatorName = 'java'
+	library = 'restclient'
+	inputSpec = System.getenv('OPENAPI_SPEC_PATH') ?: "$rootDir/../../api/openapi.yaml"
+	outputDir = layout.buildDirectory.dir('generated/openapi').get().asFile.path
+	// Named `api.model` rather than `client.model` (as in suggestions-service) because
+	// this service both *consumes* spec models (InvoiceResponse) and *serves* them
+	// (ExportSummaryResponse) — generating both keeps the contract un-drifted.
+	modelPackage = 'com.lotofopps.export.api.model'
+	globalProperties = [models: '']
+	configOptions = [
+		dateLibrary          : 'java8',
+		useJakartaEe         : 'true',
+		serializationLibrary : 'jackson',
+		openApiNullable      : 'false',
+		hideGenerationTimestamp: 'true',
+	]
+	typeMappings = ['DateTime': 'java.time.LocalDateTime']
+	importMappings = ['java.time.LocalDateTime': 'java.time.LocalDateTime']
+}
+
+sourceSets.main.java.srcDir(layout.buildDirectory.dir('generated/openapi/src/main/java'))
+tasks.named('openApiGenerate') {
+	doNotTrackState("openapi-generator 7.x uses /dev/stderr as inputSpec default, not a regular file on Gradle 9")
+}
+tasks.named('compileJava') { dependsOn tasks.named('openApiGenerate') }
+
+// gRPC contract shared from api/proto (mounted at /api/proto in the container build).
+sourceSets {
+	main {
+		proto {
+			srcDir System.getenv('PROTO_PATH') ?: "$rootDir/../../api/proto"
+		}
+	}
+}
+
+protobuf {
+	protoc {
+		artifact = "com.google.protobuf:protoc:${dependencyManagement.importedProperties['protobuf-java.version']}"
+	}
+	plugins {
+		grpc {
+			artifact = "io.grpc:protoc-gen-grpc-java:${dependencyManagement.importedProperties['grpc.version']}"
+		}
+	}
+	generateProtoTasks {
+		all()*.plugins {
+			grpc {}
+		}
+	}
+}

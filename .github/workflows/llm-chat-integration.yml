@@ -1,0 +1,76 @@
+name: LLM-chat RAG Integration Test
+
+# The RAG integration suite (tests/test_integration_rag.py) needs a real Postgres+pgvector
+# instance and a real LLM behind LLM_URL — CI's regular pytest run excludes it (see the
+# `integration` marker in llm-chat.yml / pyproject.toml). Run it here on a schedule instead,
+# against the same LLM endpoint used in prod (vars.LLM_URL / secrets.LLM_API_KEY), so RAG
+# correctness regressions get caught without slowing down every PR.
+
+on:
+  schedule:
+    - cron: "0 3 * * *" # 03:00 UTC nightly
+  workflow_dispatch:
+
+jobs:
+  integration-test:
+    name: Run RAG integration tests
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_USER: appuser
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      LLM_URL: ${{ vars.LLM_URL }}
+      LLM_MODEL: ${{ vars.LLM_MODEL }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # invoice-service is required, not optional: the agent's tool-calling can
+      # non-deterministically hit it (list_user_documents / suggest_missing_documents)
+      # even on requests that don't strictly need it, and an unresolvable hostname
+      # there surfaces as a spurious chat error. Starting it also pulls in its own
+      # `depends_on` (seaweedfs) automatically.
+      - name: Start db + llm-chat + invoice-service
+        working-directory: infra
+        run: docker compose up -d db llm-chat invoice-service
+
+      - name: Wait for llm-chat and invoice-service to be healthy
+        run: |
+          for i in $(seq 1 30); do
+            llm_ok=false; invoice_ok=false
+            curl -fsS http://localhost:8082/health >/dev/null 2>&1 && llm_ok=true
+            curl -fsS http://localhost:8080/actuator/health >/dev/null 2>&1 && invoice_ok=true
+            if [ "$llm_ok" = true ] && [ "$invoice_ok" = true ]; then
+              echo "llm-chat and invoice-service are healthy"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "services did not become healthy in time (llm-chat=$llm_ok, invoice-service=$invoice_ok)"
+          exit 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        working-directory: services/llm-chat
+        run: pip install -r requirements.txt
+
+      - name: Run RAG integration tests
+        working-directory: services/llm-chat
+        env:
+          LLM_CHAT_TEST_URL: http://localhost:8082
+        run: pytest tests/test_integration_rag.py -v -m integration
+
+      - name: Dump service logs on failure
+        if: failure()
+        working-directory: infra
+        run: docker compose logs db llm-chat invoice-service seaweedfs
+
+      - name: Tear down
+        if: always()
+        working-directory: infra
+        run: docker compose down -v

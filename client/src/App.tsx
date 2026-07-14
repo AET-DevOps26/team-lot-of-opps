@@ -7,6 +7,7 @@ import { useAppDispatch, useAppSelector } from './store/hooks'
 import { signedIn, signedOut, selectIsAuthenticated, selectAuthLoading } from './features/authSlice'
 import Dashboard from './pages/Dashboard'
 import Documents from './pages/Documents'
+import Export from './pages/Export'
 import Onboarding from './pages/Onboarding'
 import Upload from './pages/Upload'
 
@@ -57,6 +58,7 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="invoices" element={<Documents />} />
           <Route path="upload" element={<Upload />} />
+          <Route path="export" element={<Export />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

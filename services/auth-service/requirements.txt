@@ -4,4 +4,8 @@ firebase-admin
 # Pin away from cryptography 48.x: its bundled OpenSSL crashes (SIGILL)
 # inside the Docker Desktop VM on Apple Silicon. 44.x ships a compatible wheel.
 cryptography==44.0.2
-prometheus-fastapi-instrumentator
+# OpenTelemetry: `opentelemetry-instrument` auto-instruments FastAPI and outbound
+# HTTP, pushing metrics + traces over OTLP to the collector (see Dockerfile).
+opentelemetry-distro
+opentelemetry-exporter-otlp
+opentelemetry-instrumentation-fastapi

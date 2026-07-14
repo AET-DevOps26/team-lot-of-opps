@@ -180,7 +180,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/internal/v1/invoices/latest": {
+    "/api/v1/exports/years": {
         parameters: {
             query?: never;
             header?: never;
@@ -188,10 +188,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * [invoice-service] Latest accepted invoices for a user
-         * @description Consumed by suggestions-service. Returns only `ACCEPTED` invoices, most recent first. Not exposed through the public gateway.
+         * Tax years the user has accepted invoices for
+         * @description Descending. Invoices without an `invoiceDate` are not attributable to a tax year and are omitted.
          */
-        get: operations["getLatestInvoicesInternal"];
+        get: operations["listExportYears"];
         put?: never;
         post?: never;
         delete?: never;
@@ -200,45 +200,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/embed": {
+    "/api/v1/exports/summary": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
         /**
-         * [llm-chat] Update an invoice embedding
-         * @description Consumed by invoice-service. Not exposed through the public gateway.
+         * Per-category totals for one tax year
+         * @description The figures rendered into the PDF summary, exposed separately so the client can preview an export before downloading it.
          */
-        put: operations["updateEmbedding"];
-        /**
-         * [llm-chat] Embed an invoice into the chat vector store
-         * @description Consumed by invoice-service. Not exposed through the public gateway.
-         */
-        post: operations["createEmbedding"];
+        get: operations["getExportSummary"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/embed/{invoiceId}": {
+    "/api/v1/exports/csv": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Download the year's accepted invoices as CSV
+         * @description RFC 4180, UTF-8 with a byte-order mark so spreadsheet software reads the German umlauts correctly. One row per invoice line item.
+         */
+        get: operations["downloadExportCsv"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
         /**
-         * [llm-chat] Delete an invoice embedding
-         * @description Consumed by invoice-service. Not exposed through the public gateway.
+         * Download the year's Werbungskosten summary as PDF
+         * @description A German-language summary sheet: totals per deduction category, the itemized invoices behind them, and the amount exceeding that year's Arbeitnehmer-Pauschbetrag.
          */
-        delete: operations["deleteEmbedding"];
+        get: operations["downloadExportPdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports/zip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download the complete tax-year package as a ZIP archive
+         * @description Contains the PDF summary, the CSV and JSON renderings of the invoices, and every original receipt the invoices were extracted from.
+         */
+        get: operations["downloadExportZip"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -300,6 +336,23 @@ export interface components {
             documentId: number | null;
             status: components["schemas"]["InvoiceStatus"];
         };
+        ExportCategoryTotal: {
+            /** @description Null groups the invoices the AI could not categorize. */
+            category: (string & components["schemas"]["InvoiceCategory"]) | null;
+            invoiceCount: number;
+            total: number;
+        };
+        ExportSummaryResponse: {
+            year: number;
+            invoiceCount: number;
+            /** @description Sum of every accepted invoice dated in this year. */
+            totalExpenses: number;
+            /** @description The Arbeitnehmer-Pauschbetrag granted for this year without any receipts (§9a EStG). */
+            lumpSumAllowance: number;
+            /** @description `max(0, totalExpenses - lumpSumAllowance)` — what the collected receipts are worth beyond the automatic allowance. */
+            deductibleAboveLumpSum: number;
+            categories: components["schemas"]["ExportCategoryTotal"][];
+        };
         SuggestionResponse: {
             suggestion: string;
             /** Format: date-time */
@@ -307,25 +360,6 @@ export interface components {
         };
         AgentChatRequest: {
             question: string;
-        };
-        EmbedRequest: {
-            /** Format: int64 */
-            invoice_id: number;
-            text: string;
-            user_id: string;
-            /** @default N/A */
-            item_name: string;
-            /** @default N/A */
-            company: string;
-            price?: number | null;
-            category?: string | null;
-            invoice_date?: string | null;
-            /** Format: int64 */
-            document_id?: number | null;
-        };
-        StatusResponse: {
-            /** @example ok */
-            status?: string;
         };
         Error: {
             error?: string;
@@ -367,6 +401,8 @@ export interface components {
     };
     parameters: {
         IdPath: number;
+        /** @description Tax year, matched against the invoice date. */
+        YearQuery: number;
     };
     requestBodies: never;
     headers: never;
@@ -692,11 +728,32 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
-    getLatestInvoicesInternal: {
+    listExportYears: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of years */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": number[];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getExportSummary: {
         parameters: {
             query: {
-                userId: string;
-                limit?: number;
+                /** @description Tax year, matched against the invoice date. */
+                year: components["parameters"]["YearQuery"];
             };
             header?: never;
             path?: never;
@@ -704,85 +761,88 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of invoices */
+            /** @description Summary of the year's accepted invoices */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InvoiceResponse"][];
+                    "application/json": components["schemas"]["ExportSummaryResponse"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
         };
     };
-    updateEmbedding: {
+    downloadExportCsv: {
         parameters: {
-            query?: never;
+            query: {
+                /** @description Tax year, matched against the invoice date. */
+                year: components["parameters"]["YearQuery"];
+            };
             header?: never;
             path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EmbedRequest"];
-            };
-        };
-        responses: {
-            /** @description Embedding updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StatusResponse"];
-                };
-            };
-        };
-    };
-    createEmbedding: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EmbedRequest"];
-            };
-        };
-        responses: {
-            /** @description Embedding stored */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StatusResponse"];
-                };
-            };
-        };
-    };
-    deleteEmbedding: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                invoiceId: number;
-            };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Embedding deleted */
+            /** @description CSV file */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StatusResponse"];
+                    "text/csv": string;
                 };
             };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    downloadExportPdf: {
+        parameters: {
+            query: {
+                /** @description Tax year, matched against the invoice date. */
+                year: components["parameters"]["YearQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description PDF file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    downloadExportZip: {
+        parameters: {
+            query: {
+                /** @description Tax year, matched against the invoice date. */
+                year: components["parameters"]["YearQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ZIP archive */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
 }

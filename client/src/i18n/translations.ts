@@ -8,6 +8,7 @@ export interface TranslationDict {
     dashboard: string
     invoices: string
     upload: string
+    export: string
     settings: string
     signInRequired: string
     menu: string
@@ -167,6 +168,36 @@ export interface TranslationDict {
     error: string
     sources: { one: string; other: string; jump: string }
   }
+  export: {
+    title: string
+    subtitle: string
+    taxYear: string
+    noYears: string
+    loadFailed: string
+    summary: {
+      title: string
+      invoiceCount: string
+      totalExpenses: string
+      lumpSumAllowance: string
+      deductibleAboveLumpSum: string
+      lumpSumHint: string
+      belowAllowance: string
+      empty: string
+    }
+    table: { category: string; receipts: string; amount: string; uncategorized: string }
+    downloads: {
+      title: string
+      zip: string
+      zipHint: string
+      pdf: string
+      pdfHint: string
+      csv: string
+      csvHint: string
+      preparing: string
+      failed: string
+    }
+    disclaimer: string
+  }
   // Keys match the backend InvoiceCategory enum (see lib/invoices.ts CATEGORY_KEYS).
   categories: Record<string, string>
 }
@@ -182,6 +213,7 @@ const translations: Record<Language, TranslationDict> = {
       dashboard: 'Dashboard',
       invoices: 'Invoices',
       upload: 'Upload',
+      export: 'Export',
       settings: 'Settings',
       signInRequired: 'Sign in to access this section',
       menu: 'Menu',
@@ -370,6 +402,44 @@ const translations: Record<Language, TranslationDict> = {
       error: 'Something went wrong.',
       sources: { one: 'source', other: 'sources', jump: 'View this invoice' },
     },
+    export: {
+      title: 'Export',
+      subtitle: 'Everything one tax year needs, in the form the Finanzamt expects it.',
+      taxYear: 'Tax year',
+      noYears: 'Nothing to export yet — upload and accept a receipt first.',
+      loadFailed: 'Could not load this tax year.',
+      summary: {
+        title: 'Summary',
+        invoiceCount: 'Accepted invoices',
+        totalExpenses: 'Total work-related expenses',
+        lumpSumAllowance: 'Employee lump-sum allowance',
+        deductibleAboveLumpSum: 'Deductible above the allowance',
+        lumpSumHint:
+          'Every employee may deduct this without any receipt. Only what your receipts add on top of it is worth claiming.',
+        belowAllowance:
+          'Your receipts still add up to less than the lump-sum allowance for this year, so they gain you nothing extra yet.',
+        empty: 'No accepted invoices for this year.',
+      },
+      table: {
+        category: 'Category',
+        receipts: 'Invoices',
+        amount: 'Amount',
+        uncategorized: 'Uncategorized',
+      },
+      downloads: {
+        title: 'Download',
+        zip: 'Complete package (ZIP)',
+        zipHint: 'Summary, spreadsheet, and every original receipt.',
+        pdf: 'Summary sheet (PDF)',
+        pdfHint: 'The German-language page you hand over. Not tax advice.',
+        csv: 'Spreadsheet (CSV)',
+        csvHint: 'One row per invoice, for your tax advisor.',
+        preparing: 'Preparing…',
+        failed: 'Download failed. Please try again.',
+      },
+      disclaimer:
+        'Only invoices you reviewed and accepted are exported. The lump-sum allowance is set by legislation — check the figure for the tax year before you file.',
+    },
     categories: {
       KONTOFUEHRUNGSGEBUEHREN: 'Account maintenance fees',
       WEGE_ZUR_ARBEIT: 'Commuting to work',
@@ -398,6 +468,7 @@ const translations: Record<Language, TranslationDict> = {
       dashboard: 'Übersicht',
       invoices: 'Rechnungen',
       upload: 'Hochladen',
+      export: 'Export',
       settings: 'Einstellungen',
       signInRequired: 'Anmelden, um diesen Bereich zu nutzen',
       menu: 'Menü',
@@ -586,6 +657,44 @@ const translations: Record<Language, TranslationDict> = {
         'Frag mich zu deinen hochgeladenen Dokumenten oder was du für deine Steuererklärung noch hochladen solltest.',
       error: 'Etwas ist schiefgelaufen.',
       sources: { one: 'Quelle', other: 'Quellen', jump: 'Rechnung anzeigen' },
+    },
+    export: {
+      title: 'Export',
+      subtitle: 'Alles für ein Steuerjahr — in der Form, die das Finanzamt erwartet.',
+      taxYear: 'Steuerjahr',
+      noYears: 'Noch nichts zu exportieren — lade zuerst einen Beleg hoch und bestätige ihn.',
+      loadFailed: 'Dieses Steuerjahr konnte nicht geladen werden.',
+      summary: {
+        title: 'Zusammenfassung',
+        invoiceCount: 'Bestätigte Rechnungen',
+        totalExpenses: 'Summe der Werbungskosten',
+        lumpSumAllowance: 'Arbeitnehmer-Pauschbetrag',
+        deductibleAboveLumpSum: 'Zusätzlich absetzbar',
+        lumpSumHint:
+          'Diesen Betrag darf jede:r Arbeitnehmer:in ohne Belege absetzen. Nur was deine Belege darüber hinaus ergeben, bringt dir zusätzlich etwas.',
+        belowAllowance:
+          'Deine Belege liegen für dieses Jahr noch unter dem Pauschbetrag — sie bringen dir also bisher nichts zusätzlich.',
+        empty: 'Keine bestätigten Rechnungen für dieses Jahr.',
+      },
+      table: {
+        category: 'Kategorie',
+        receipts: 'Rechnungen',
+        amount: 'Betrag',
+        uncategorized: 'Ohne Kategorie',
+      },
+      downloads: {
+        title: 'Herunterladen',
+        zip: 'Komplettpaket (ZIP)',
+        zipHint: 'Aufstellung, Tabelle und alle Originalbelege.',
+        pdf: 'Aufstellung (PDF)',
+        pdfHint: 'Die Seite, die du abgibst. Keine Steuerberatung.',
+        csv: 'Tabelle (CSV)',
+        csvHint: 'Eine Zeile pro Rechnung, für dein Steuerbüro.',
+        preparing: 'Wird vorbereitet…',
+        failed: 'Download fehlgeschlagen. Bitte versuch es erneut.',
+      },
+      disclaimer:
+        'Exportiert werden nur Rechnungen, die du geprüft und bestätigt hast. Der Pauschbetrag ist gesetzlich festgelegt — prüfe den Wert für das Steuerjahr, bevor du abgibst.',
     },
     categories: {
       KONTOFUEHRUNGSGEBUEHREN: 'Kontoführungsgebühren',

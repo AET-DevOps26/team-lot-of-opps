@@ -14,10 +14,8 @@ info:
     `X-User-Sub` header before proxying to the owning service. Clients therefore
     only send `Authorization: Bearer <firebase-id-token>`.
 
-    **Internal API** (tag `Internal`) documents service-to-service contracts that
-    are **not** exposed through the public gateway (no Firebase auth). They are
-    reachable only on the internal Docker/Kubernetes network and are listed here
-    so the spec stays a complete source of truth.
+    **Internal** service-to-service contracts use gRPC, not REST — their
+    protobuf definitions live in `api/proto/` and are not covered by this spec.
 
 servers:
   - url: /
@@ -35,10 +33,10 @@ tags:
     description: Proactive, LLM-generated tax suggestions (suggestions-service).
   - name: Chat
     description: Conversational RAG agent over the user's invoices (llm-chat).
-  - name: Internal
+  - name: Exports
     description: >-
-      Service-to-service endpoints, not exposed through the public gateway and
-      not Firebase-authenticated. The hosting service is noted on each operation.
+      Tax-year exports of the user's accepted invoices — summary figures plus
+      downloadable CSV, PDF, and ZIP artifacts (export-service).
 
 security:
   - firebaseToken: []
@@ -336,98 +334,111 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /internal/v1/invoices/latest:
+  /api/v1/exports/years:
     get:
-      tags: [Internal]
-      operationId: getLatestInvoicesInternal
-      summary: "[invoice-service] Latest accepted invoices for a user"
+      tags: [Exports]
+      operationId: listExportYears
+      summary: Tax years the user has accepted invoices for
       description: >-
-        Consumed by suggestions-service. Returns only `ACCEPTED` invoices, most
-        recent first. Not exposed through the public gateway.
-      security: []
-      parameters:
-        - name: userId
-          in: query
-          required: true
-          schema:
-            type: string
-        - name: limit
-          in: query
-          required: false
-          schema:
-            type: integer
-            default: 10
+        Descending. Invoices without an `invoiceDate` are not attributable to a
+        tax year and are omitted.
       responses:
         "200":
-          description: List of invoices
+          description: List of years
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/InvoiceResponse"
+                  type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
-  /v1/embed:
-    post:
-      tags: [Internal]
-      operationId: createEmbedding
-      summary: "[llm-chat] Embed an invoice into the chat vector store"
-      description: Consumed by invoice-service. Not exposed through the public gateway.
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/EmbedRequest"
-      responses:
-        "200":
-          description: Embedding stored
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StatusResponse"
-    put:
-      tags: [Internal]
-      operationId: updateEmbedding
-      summary: "[llm-chat] Update an invoice embedding"
-      description: Consumed by invoice-service. Not exposed through the public gateway.
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/EmbedRequest"
-      responses:
-        "200":
-          description: Embedding updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StatusResponse"
-
-  /v1/embed/{invoiceId}:
-    delete:
-      tags: [Internal]
-      operationId: deleteEmbedding
-      summary: "[llm-chat] Delete an invoice embedding"
-      description: Consumed by invoice-service. Not exposed through the public gateway.
-      security: []
+  /api/v1/exports/summary:
+    get:
+      tags: [Exports]
+      operationId: getExportSummary
+      summary: Per-category totals for one tax year
+      description: >-
+        The figures rendered into the PDF summary, exposed separately so the
+        client can preview an export before downloading it.
       parameters:
-        - name: invoiceId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
+        - $ref: "#/components/parameters/YearQuery"
       responses:
         "200":
-          description: Embedding deleted
+          description: Summary of the year's accepted invoices
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StatusResponse"
+                $ref: "#/components/schemas/ExportSummaryResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/exports/csv:
+    get:
+      tags: [Exports]
+      operationId: downloadExportCsv
+      summary: Download the year's accepted invoices as CSV
+      description: >-
+        RFC 4180, UTF-8 with a byte-order mark so spreadsheet software reads the
+        German umlauts correctly. One row per invoice line item.
+      parameters:
+        - $ref: "#/components/parameters/YearQuery"
+      responses:
+        "200":
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/exports/pdf:
+    get:
+      tags: [Exports]
+      operationId: downloadExportPdf
+      summary: Download the year's Werbungskosten summary as PDF
+      description: >-
+        A German-language summary sheet: totals per deduction category, the
+        itemized invoices behind them, and the amount exceeding that year's
+        Arbeitnehmer-Pauschbetrag.
+      parameters:
+        - $ref: "#/components/parameters/YearQuery"
+      responses:
+        "200":
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/exports/zip:
+    get:
+      tags: [Exports]
+      operationId: downloadExportZip
+      summary: Download the complete tax-year package as a ZIP archive
+      description: >-
+        Contains the PDF summary, the CSV and JSON renderings of the invoices,
+        and every original receipt the invoices were extracted from.
+      parameters:
+        - $ref: "#/components/parameters/YearQuery"
+      responses:
+        "200":
+          description: ZIP archive
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # Internal service-to-service calls (latest-invoices, embed/delete) now use gRPC.
+  # Contracts live in api/proto/. This spec covers only the public REST surface.
 
 components:
   securitySchemes:
@@ -447,6 +458,13 @@ components:
       schema:
         type: integer
         format: int64
+    YearQuery:
+      name: year
+      in: query
+      required: true
+      description: Tax year, matched against the invoice date.
+      schema:
+        type: integer
 
   responses:
     Unauthorized:
@@ -588,6 +606,48 @@ components:
         status:
           $ref: "#/components/schemas/InvoiceStatus"
 
+    ExportCategoryTotal:
+      type: object
+      required: [category, invoiceCount, total]
+      properties:
+        category:
+          type: string
+          nullable: true
+          description: Null groups the invoices the AI could not categorize.
+          allOf:
+            - $ref: "#/components/schemas/InvoiceCategory"
+        invoiceCount:
+          type: integer
+        total:
+          type: number
+
+    ExportSummaryResponse:
+      type: object
+      required:
+        [year, invoiceCount, totalExpenses, lumpSumAllowance, deductibleAboveLumpSum, categories]
+      properties:
+        year:
+          type: integer
+        invoiceCount:
+          type: integer
+        totalExpenses:
+          type: number
+          description: Sum of every accepted invoice dated in this year.
+        lumpSumAllowance:
+          type: number
+          description: >-
+            The Arbeitnehmer-Pauschbetrag granted for this year without any
+            receipts (§9a EStG).
+        deductibleAboveLumpSum:
+          type: number
+          description: >-
+            `max(0, totalExpenses - lumpSumAllowance)` — what the collected
+            receipts are worth beyond the automatic allowance.
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportCategoryTotal"
+
     SuggestionResponse:
       type: object
       required: [suggestion, createdAt]
@@ -604,44 +664,6 @@ components:
       properties:
         question:
           type: string
-
-    EmbedRequest:
-      type: object
-      required: [invoice_id, text, user_id]
-      properties:
-        invoice_id:
-          type: integer
-          format: int64
-        text:
-          type: string
-        user_id:
-          type: string
-        item_name:
-          type: string
-          default: "N/A"
-        company:
-          type: string
-          default: "N/A"
-        price:
-          type: number
-          nullable: true
-        category:
-          type: string
-          nullable: true
-        invoice_date:
-          type: string
-          nullable: true
-        document_id:
-          type: integer
-          format: int64
-          nullable: true
-
-    StatusResponse:
-      type: object
-      properties:
-        status:
-          type: string
-          example: ok
 
     Error:
       type: object

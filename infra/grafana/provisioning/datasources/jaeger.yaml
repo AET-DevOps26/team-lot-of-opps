@@ -1,0 +1,20 @@
+apiVersion: 1
+
+datasources:
+  - name: Jaeger
+    uid: jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    isDefault: false
+    jsonData:
+      # Jump from a span straight to that request's logs in Loki.
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        filterByTraceID: true
+      # And to the RED metrics for the span's service in Prometheus.
+      tracesToMetrics:
+        datasourceUid: prometheus
+    version: 1
