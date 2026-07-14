@@ -1,0 +1,34 @@
+name: Stop Azure VM
+
+# Deallocates the VM so it stops billing compute while idle, WITHOUT deleting
+# anything: OS disk, k3s, Postgres data and SeaweedFS files all survive. Restart
+# with vm-start.yml (a couple of minutes). For a full zero-bill teardown that
+# also wipes data, use vm-destroy.yml instead.
+#
+# Azure auth is the same GitHub OIDC used by provision.yml (federated cred
+# gh-main, branch-scoped to refs/heads/main) — no client secret.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+# Share provision.yml's group so a stop can never race a provision/destroy apply.
+concurrency:
+  group: provision
+  cancel-in-progress: false
+
+jobs:
+  stop:
+    name: Deallocate VM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - name: Deallocate
+        run: az vm deallocate --resource-group lot-of-opps-rg --name lot-of-opps-vm

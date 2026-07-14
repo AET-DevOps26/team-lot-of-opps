@@ -22,7 +22,7 @@ on:
     paths:
       - infra/terraform/**
       - infra/ansible/**
-      - .github/workflows/provision.yml
+      - .github/workflows/vm-provision.yml
 
 # Never run two applies (or a plan against a moving state) at once.
 concurrency:

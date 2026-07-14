@@ -2,6 +2,11 @@
 
 TaxForward is a full-stack application that helps German students and trainees track study-related expenses and turn them into a future tax refund ("Verlustvortrag"). Users upload receipts and invoices; an AI pipeline extracts and classifies the line items, stores them, and surfaces suggestions for tax-deductible documents that might be missing.
 
+## Live deployments
+
+- **VM (Azure):** http://lot-of-opps-vm.swedencentral.cloudapp.azure.com/welcome
+- **AET (TUM cluster):** https://taxforward-devops-ss26.stud.k8s.aet.cit.tum.de/welcome
+
 ## Architecture
 
 ```
@@ -260,7 +265,7 @@ the allowlist in `.gitleaks.toml` over routinely skipping the hook.
 ## Deploy
 
 Production runs on **k3s** (a single Azure VM, or the shared AET cluster),
-not raw Docker Compose. [`provision.yml`](.github/workflows/provision.yml)
+not raw Docker Compose. [`vm-provision.yml`](.github/workflows/vm-provision.yml)
 provisions the VM with Terraform and installs k3s via Ansible;
 [`build.yml`](.github/workflows/build.yml) and
 [`deploy.yml`](.github/workflows/deploy.yml) build images and `helm upgrade`

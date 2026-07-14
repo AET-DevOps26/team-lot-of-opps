@@ -1,7 +1,7 @@
 import os
 import asyncio
 import asyncpg
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings import FastEmbedEmbeddings
 from langchain_postgres import PGEngine, PGVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
@@ -17,7 +17,7 @@ def _asyncpg_url(url: str) -> str:
     return url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 
-_embeddings: HuggingFaceEmbeddings | None = None
+_embeddings: FastEmbedEmbeddings | None = None
 _engine: PGEngine | None = None
 _vectorstore: PGVectorStore | None = None
 _init_lock = asyncio.Lock()
@@ -36,10 +36,12 @@ def chunk_text(text: str, invoice_id: int, user_id: str, **metadata) -> list[Doc
     return splits
 
 
-def get_embeddings() -> HuggingFaceEmbeddings:
+def get_embeddings() -> FastEmbedEmbeddings:
     global _embeddings
     if _embeddings is None:
-        _embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        # ONNX runtime (fastembed) instead of PyTorch: same all-MiniLM-L6-v2 model
+        # and 384-dim output, but a fraction of the memory footprint.
+        _embeddings = FastEmbedEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     return _embeddings
 
 
