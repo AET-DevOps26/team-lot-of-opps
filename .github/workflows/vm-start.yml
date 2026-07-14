@@ -1,11 +1,6 @@
 name: Start Azure VM
 
-# Boots a VM previously stopped by vm-stop.yml. k3s and its workloads come back
-# up on their own from the persisted disk — no redeploy needed. The static public
-# IP and its <vm_name>.<location>.cloudapp.azure.com DNS name are unchanged.
-#
-# Azure auth is the same GitHub OIDC used by provision.yml (federated cred
-# gh-main, branch-scoped to refs/heads/main) — no client secret.
+# Boots a VM previously stopped by vm-stop.yml. 
 on:
   workflow_dispatch:
 

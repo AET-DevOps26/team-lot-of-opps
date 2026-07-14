@@ -2,11 +2,7 @@ name: Stop Azure VM
 
 # Deallocates the VM so it stops billing compute while idle, WITHOUT deleting
 # anything: OS disk, k3s, Postgres data and SeaweedFS files all survive. Restart
-# with vm-start.yml (a couple of minutes). For a full zero-bill teardown that
-# also wipes data, use vm-destroy.yml instead.
-#
-# Azure auth is the same GitHub OIDC used by provision.yml (federated cred
-# gh-main, branch-scoped to refs/heads/main) — no client secret.
+# with vm-start.yml 
 on:
   workflow_dispatch:
 

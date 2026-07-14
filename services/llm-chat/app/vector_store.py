@@ -40,8 +40,12 @@ def get_embeddings() -> FastEmbedEmbeddings:
     global _embeddings
     if _embeddings is None:
         # ONNX runtime (fastembed) instead of PyTorch: same all-MiniLM-L6-v2 model
-        # and 384-dim output, but a fraction of the memory footprint.
-        _embeddings = FastEmbedEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        # and 384-dim output, but a fraction of the memory footprint. cache_dir
+        # follows HF_HOME so it hits the model baked into the image (see Dockerfile).
+        _embeddings = FastEmbedEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            cache_dir=os.getenv("HF_HOME"),
+        )
     return _embeddings
 
 
