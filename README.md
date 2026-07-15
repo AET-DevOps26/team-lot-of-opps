@@ -12,6 +12,10 @@ TaxForward is a full-stack application that helps German students and trainees t
 | [`docs/runbook-rollback.md`](docs/runbook-rollback.md) | Deployment rollback runbook |
 | [`docs/architecture-diagram.png`](docs/architecture-diagram.png) · [`docs/use-case.png`](docs/use-case.png) · [`docs/analysis-object-model.png`](docs/analysis-object-model.png) | Architecture, use-case and analysis-object-model diagrams |
 | [`api/README.md`](api/README.md) | OpenAPI spec and codegen |
+## Live deployments
+
+- **VM (Azure):** http://lot-of-opps-vm.swedencentral.cloudapp.azure.com/welcome
+- **AET (TUM cluster):** https://taxforward-devops-ss26.stud.k8s.aet.cit.tum.de/welcome
 
 ## Architecture
 
@@ -294,7 +298,7 @@ the allowlist in `.gitleaks.toml` over routinely skipping the hook.
 ## Deploy
 
 Production runs on **k3s** (a single Azure VM, or the shared AET cluster),
-not raw Docker Compose. [`provision.yml`](.github/workflows/provision.yml)
+not raw Docker Compose. [`vm-provision.yml`](.github/workflows/vm-provision.yml)
 provisions the VM with Terraform and installs k3s via Ansible;
 [`build.yml`](.github/workflows/build.yml) and
 [`deploy.yml`](.github/workflows/deploy.yml) build images and `helm upgrade`

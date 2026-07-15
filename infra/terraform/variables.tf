@@ -19,9 +19,13 @@ variable "vm_name" {
 variable "vm_size" {
   description = "Azure VM size"
   type        = string
-  # Bsv2 family (B-series v1 not offered in swedencentral). B4s_v2 = 4 vCPU / 16 GiB;
-  # 2 vCPU (B2s_v2) can't fit the RollingUpdate surge of all deployments at once.
-  default = "Standard_B4s_v2"
+  # B4als_v2 = 4 vCPU / 16 GiB (AMD Bsv2, ~10% cheaper than the Intel B4s_v2).
+  # 4 vCPU is enough: this single node has no ResourceQuota, so limits may
+  # overcommit — only requests (~2.5 vCPU incl. observability + k3s) must fit,
+  # and the maxSurge:0 rollout strategy keeps upgrades within it. Idle the box
+  # with vm-stop.yml to save more. If AMD Bsv2 is unavailable at apply time,
+  # fall back to the Intel "Standard_B4s_v2".
+  default = "Standard_B4als_v2"
 }
 
 variable "admin_username" {

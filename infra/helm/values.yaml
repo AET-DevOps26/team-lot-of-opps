@@ -91,12 +91,12 @@ tls:
 
 # ─── Resource limits / requests ──────────────────────────────────────────────
 # Total limits must stay within the per-namespace Rancher quota: 4 vCPU / 6 Gi
-# (enforced on limits, not requests). App totals: CPU 3400m, memory 4864Mi.
-# Most deployments use maxSurge:1/maxUnavailable:0 for zero-downtime rollouts;
-# their surge peak fits the ~600m/1280Mi headroom. llmChat is the exception: its
-# 1792Mi limit exceeds the headroom, so it rolls with maxSurge:0/maxUnavailable:1
-# (no surge pod, brief downtime) — otherwise its rollout deadlocks against the
-# quota. See infra/helm/templates/llm-chat-deployment.yaml.
+# (enforced on limits, not requests). App totals: CPU 3400m, memory 3840Mi.
+# Only the light services roll with a surge pod (maxSurge:1/maxUnavailable:0):
+# client (150m) + authService (200m) → +350m peak, well within headroom. All the
+# heavier services roll in place (maxSurge:0/maxUnavailable:1, brief downtime) so
+# their surge pods can't stack on a full `helm upgrade` and overrun the quota;
+# db and seaweedfs use Recreate (single stateful pod).
 resources:
   traefik:
     requests:
@@ -119,14 +119,14 @@ resources:
     limits:
       cpu: "600m"
       memory: "640Mi"
-  # llm-chat loads a sentence-transformers embedding model into memory.
+  # llm-chat runs the all-MiniLM-L6-v2 embedding model via fastembed (ONNX).
   llmChat:
     requests:
       cpu: "250m"
-      memory: "1Gi"
+      memory: "512Mi"
     limits:
       cpu: "700m"
-      memory: "1792Mi"
+      memory: "768Mi"
   suggestionsService:
     requests:
       cpu: "250m"
@@ -134,8 +134,6 @@ resources:
     limits:
       cpu: "600m"
       memory: "640Mi"
-  # Stateless and idle between exports; the burst is rendering a PDF and buffering
-  # one ZIP archive in memory.
   exportService:
     requests:
       cpu: "150m"

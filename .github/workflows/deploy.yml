@@ -53,7 +53,7 @@ jobs:
   # so it's a no-op when the VM already matches. Never runs for aet.
   provision:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'vm' }}
-    uses: ./.github/workflows/provision.yml
+    uses: ./.github/workflows/vm-provision.yml
     secrets: inherit
 
   build:
