@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && pip install uv
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install -r requirements.txt
-RUN python -c "from langchain_huggingface import HuggingFaceEmbeddings; HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')" \
+RUN python -c "from langchain_community.embeddings import FastEmbedEmbeddings; FastEmbedEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2', cache_dir='/opt/hf').embed_query('warmup')" \
     && chmod -R a+rX /opt/hf
 
 COPY app/ ./app/

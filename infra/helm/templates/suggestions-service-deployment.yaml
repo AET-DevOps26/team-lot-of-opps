@@ -14,8 +14,11 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+      # No surge pod: its 600m limit + the other 600m service surging on a full
+      # `helm upgrade` overruns the 4-vCPU namespace quota. Roll in place instead
+      # (brief downtime), same as llm-chat.
+      maxSurge: 0
+      maxUnavailable: 1
   template:
     metadata:
       labels:

@@ -1,13 +1,7 @@
 name: Destroy Azure VM
 
 # Tears down the whole VM stack (RG lot-of-opps-rg: VM, disk, public IP, vnet,
-# nsg) so it stops billing when idle. Dispatch only, guarded by a typed confirm.
-# Terraform state lives in a separate azurerm backend (TFSTATE_* storage), so it
-# survives the destroy — re-run provision.yml + deploy.yml to bring the VM back
-# (k3s and PVC data are gone; Postgres re-inits from infra/postgres/init.sql).
-#
-# Azure auth is the same GitHub OIDC used by provision.yml (federated cred
-# gh-main, branch-scoped to refs/heads/main) — no client secret, no extra setup.
+# nsg) so it stops billing when idle.
 on:
   workflow_dispatch:
     inputs:
@@ -19,7 +13,6 @@ permissions:
   contents: read
   id-token: write
 
-# Share provision.yml's group so a destroy can never race a provision apply.
 concurrency:
   group: provision
   cancel-in-progress: false

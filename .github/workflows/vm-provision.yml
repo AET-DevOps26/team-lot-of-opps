@@ -4,25 +4,15 @@ name: Provision and Configure Azure VM
 # apply + real Ansible run happen ONLY when a human dispatches this workflow
 # (or deploy.yml calls it with the provision toggle) — never automatically on
 # merge to main. The Azure VM line is optional; the AET cluster is the main one.
-#
-# Azure auth is GitHub OIDC — no stored client secret. One-time setup on the
-# app registration (appId = value of the ARM_CLIENT_ID secret):
-#   az ad app federated-credential create --id "$APP_ID" --parameters '{
-#     "name": "gh-main", "issuer": "https://token.actions.githubusercontent.com",
-#     "subject": "repo:AET-DevOps26/team-lot-of-opps:ref:refs/heads/main",
-#     "audiences": ["api://AzureADTokenExchange"]}'
-#   az ad app federated-credential create --id "$APP_ID" --parameters '{
-#     "name": "gh-pr", "issuer": "https://token.actions.githubusercontent.com",
-#     "subject": "repo:AET-DevOps26/team-lot-of-opps:pull_request",
-#     "audiences": ["api://AzureADTokenExchange"]}'
+
 on:
   workflow_dispatch:
-  workflow_call:                 # deploy.yml invokes this before a VM deploy
+  workflow_call:                 
   pull_request:
     paths:
       - infra/terraform/**
       - infra/ansible/**
-      - .github/workflows/provision.yml
+      - .github/workflows/vm-provision.yml
 
 # Never run two applies (or a plan against a moving state) at once.
 concurrency:
