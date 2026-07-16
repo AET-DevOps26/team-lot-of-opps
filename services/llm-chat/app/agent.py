@@ -1,6 +1,7 @@
 import os
 import logging
 import difflib
+from datetime import date
 from typing import AsyncIterator
 
 import grpc
@@ -256,6 +257,10 @@ async def _add_invoice_async(
         float(price)
     except ValueError:
         return f"'{price}' is not a valid price."
+    try:
+        date.fromisoformat(invoice_date)
+    except ValueError:
+        return f"'{invoice_date}' is not a valid date. Use YYYY-MM-DD."
     request_kwargs = {
         "user_id": user_id,
         "item_name": item_name,

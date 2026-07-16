@@ -387,6 +387,15 @@ class TestAddInvoiceAsync:
 
         assert "not a valid price" in result
 
+    def test_malformed_date_is_rejected_before_rpc(self):
+        result = run(
+            agent._add_invoice_async(
+                "Laptop", "Apple", "999.00", "ARBEITSMITTEL", "user-1", "22.03.2025"
+            )
+        )
+
+        assert "not a valid date" in result
+
     def test_creates_invoice_immediately_via_create_invoice_rpc(self, monkeypatch):
         class _FakeStub:
             async def CreateInvoice(self, request, timeout=None):

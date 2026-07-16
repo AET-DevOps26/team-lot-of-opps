@@ -13,6 +13,7 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -220,10 +221,16 @@ public class InternalInvoiceGrpcService
         invoice.setUserId(request.getUserId());
         invoice.setCategory(category);
         if (request.hasInvoiceDate()) {
-            invoice.setInvoiceDate(LocalDate.parse(request.getInvoiceDate()));
+            try {
+                invoice.setInvoiceDate(LocalDate.parse(request.getInvoiceDate()));
+            } catch (DateTimeParseException e) {
+                responseObserver.onError(
+                        Status.INVALID_ARGUMENT
+                                .withDescription("invalid date: " + request.getInvoiceDate())
+                                .asRuntimeException());
+                return;
+            }
         }
-        // Manually entered invoices need no review — accepted (and embedded) directly,
-        // same rule as POST /api/v1/invoices.
         invoice.setStatus(InvoiceStatus.ACCEPTED);
         com.lotofopps.backend.model.Invoice saved = invoiceRepository.save(invoice);
         embeddingService.embedInvoice(saved);

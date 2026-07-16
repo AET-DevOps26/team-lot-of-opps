@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -252,6 +253,25 @@ class InternalInvoiceGrpcServiceTest {
                 priceObserver);
         assertThat(((StatusRuntimeException) priceObserver.error).getStatus().getCode())
                 .isEqualTo(Status.INVALID_ARGUMENT.getCode());
+    }
+
+    @Test
+    void createInvoiceRejectsMalformedDate() {
+        RecordingObserver<CreateInvoiceResponse> observer = new RecordingObserver<>();
+        service.createInvoice(
+                CreateInvoiceRequest.newBuilder()
+                        .setUserId(USER)
+                        .setItemName("Laptop")
+                        .setCompany("Apple")
+                        .setPrice("999.00")
+                        .setCategory("ARBEITSMITTEL")
+                        .setInvoiceDate("22.03.2025")
+                        .build(),
+                observer);
+
+        assertThat(((StatusRuntimeException) observer.error).getStatus().getCode())
+                .isEqualTo(Status.INVALID_ARGUMENT.getCode());
+        verify(invoiceRepository, never()).save(any(Invoice.class));
     }
 
     @Test
