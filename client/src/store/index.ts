@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit'
 import authReducer from '../features/authSlice'
 import i18nReducer from '../features/i18nSlice'
 import uiReducer from '../features/uiSlice'
+import invoicesReducer from '../features/invoicesSlice'
 import { persistenceListener } from './persistence'
 
 export const store = configureStore({
@@ -9,6 +10,7 @@ export const store = configureStore({
     auth: authReducer,
     i18n: i18nReducer,
     ui: uiReducer,
+    invoices: invoicesReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().prepend(persistenceListener.middleware),

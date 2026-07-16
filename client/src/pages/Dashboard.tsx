@@ -8,6 +8,7 @@ import { usePersistentState } from '../hooks/usePersistentState'
 import { useCategoryLabel } from '../lib/invoices'
 import { useAppSelector } from '../store/hooks'
 import { selectLanguage } from '../features/i18nSlice'
+import { selectInvoicesRefreshToken } from '../features/invoicesSlice'
 
 const TAX_RATE_STORAGE_KEY = 'dashboard.taxRatePercent'
 const DEFAULT_TAX_RATE_PERCENT = 30
@@ -155,6 +156,7 @@ export default function Dashboard() {
   const [suggestions, setSuggestions] = useState<SuggestionResponse[]>([])
   const [suggestionsLoading, setSuggestionsLoading] = useState(true)
   const [suggestionsError, setSuggestionsError] = useState(false)
+  const invoicesRefreshToken = useAppSelector(selectInvoicesRefreshToken)
 
   useEffect(() => {
     // The endpoint defaults to ACCEPTED only, so fetch both review states to get
@@ -165,7 +167,7 @@ export default function Dashboard() {
     ])
       .then(([accepted, pending]) => setInvoices([...(accepted || []), ...(pending || [])]))
       .catch(() => setInvoices([]))
-  }, [])
+  }, [invoicesRefreshToken])
 
   useEffect(() => {
     let cancelled = false

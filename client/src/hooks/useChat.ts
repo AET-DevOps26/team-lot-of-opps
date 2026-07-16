@@ -1,5 +1,16 @@
 import { useCallback, useRef, useState } from 'react'
 import { authHeaders, BASE_URL } from '../api/client'
+import { invoicesChanged } from '../features/invoicesSlice'
+import { useAppDispatch } from '../store/hooks'
+
+/** Tool calls that mutate invoice data — a successful result means pages showing
+ * invoices are now stale and should refetch. */
+const INVOICE_WRITE_TOOLS = new Set(['edit_invoice', 'add_invoice'])
+
+function toolWriteSucceeded(result: string | undefined): boolean {
+  if (!result) return false
+  return result.includes('Updated invoice') || result.includes('Created invoice')
+}
 
 /** An invoice the agent referenced while answering, surfaced to the user as a source. */
 export interface ChatSource {
@@ -62,6 +73,7 @@ export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+  const dispatch = useAppDispatch()
 
   const updateAssistant = useCallback(
     (id: string, updater: (msg: ChatMessage) => ChatMessage) => {
@@ -178,6 +190,15 @@ export function useChat() {
                 break
               case 'references':
                 addSources(normalizeReferences(evt.invoices))
+                break
+              case 'tool_end':
+                if (
+                  evt.tool &&
+                  INVOICE_WRITE_TOOLS.has(evt.tool) &&
+                  toolWriteSucceeded(evt.result)
+                ) {
+                  dispatch(invoicesChanged())
+                }
                 break
               case 'error':
                 updateAssistant(assistantId, (m) => ({
