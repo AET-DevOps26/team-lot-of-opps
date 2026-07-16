@@ -20,6 +20,7 @@ for PR review routing.
 | `client/` (React) | R/A | C | C |
 | `services/suggestions-service/` (Spring Boot) | R/A | C | C |
 | `services/invoice-service/` (Spring Boot, core service) | C | R/A | C |
+| `services/export-service/` (Spring Boot, PDF/CSV/ZIP exports) | R/A | I | I |
 | `services/invoice-service/.../ExtractionService` (OCR/categorization) | I | C | R/A |
 | `services/llm-chat/` — Chat-Agent (orchestration, `agent.py`/`main.py`) | I | R/A | C |
 | `services/llm-chat/` — RAG/vector store (`vector_store.py`) | I | C | R/A |
