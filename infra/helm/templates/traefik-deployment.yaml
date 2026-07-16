@@ -14,9 +14,8 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      # Roll in place: no surge pod, to stay within the 4-vCPU namespace quota.
-      maxSurge: 0
-      maxUnavailable: 1
+      maxSurge: 1
+      maxUnavailable: 0
   template:
     metadata:
       annotations:

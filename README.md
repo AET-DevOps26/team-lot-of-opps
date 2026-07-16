@@ -287,7 +287,7 @@ Each Deployment sets a Kubernetes rollout `strategy` (in its
 |---|---|---|---|---|
 | auth-service | RollingUpdate | 1 | 0 | Zero-downtime, spare vCPU headroom |
 | client | RollingUpdate | 1 | 0 | Zero-downtime, spare vCPU headroom |
-| traefik | RollingUpdate | 0 | 1 | Roll in place — stay within the 4-vCPU namespace quota |
+| traefik | RollingUpdate | 1 | 0 | Zero-downtime — no dropped requests at the ingress during rollout |
 | invoice-service | RollingUpdate | 0 | 1 | Roll in place — stay within the 4-vCPU namespace quota |
 | export-service | RollingUpdate | 0 | 1 | Roll in place — stay within the 4-vCPU namespace quota |
 | suggestions-service | RollingUpdate | 0 | 1 | Roll in place — surge pod would overrun the vCPU quota |
