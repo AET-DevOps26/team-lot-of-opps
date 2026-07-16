@@ -1,9 +1,11 @@
 name: Deploy
 
 # One app deploy for both targets (both run k3s/Helm):
-#   push to main          -> auto-deploy to the AET cluster
+#   push to main          -> auto-deploy to BOTH the AET cluster and the VM
 #   workflow_dispatch     -> choose target: aet (AET cluster) or vm
 # Monitoring is NOT deployed here — see deploy-observability.yml.
+# Push-to-main does NOT provision the VM (see vm-provision.yml) — it must
+# already be up (vm-start.yml) or the vm leg of the matrix will fail to connect.
 #
 # Rolling back: for the fast path use rollback.yml (helm rollback, no build). To
 # redeploy a known-good commit instead, dispatch this with ref + image_tag both
@@ -84,6 +86,12 @@ jobs:
          && (needs.build.result == 'success' || needs.build.result == 'skipped')
          && (needs.provision.result == 'success' || needs.provision.result == 'skipped') }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Push to main fans out to both clusters; a manual dispatch/call still
+      # targets just the one target it asked for.
+      matrix:
+        target: ${{ github.event_name == 'push' && fromJSON('["aet","vm"]') || fromJSON(format('["{0}"]', inputs.target)) }}
     steps:
       # Empty ref = the triggering commit, i.e. the normal push-to-main path.
       - uses: actions/checkout@v4
@@ -108,7 +116,7 @@ jobs:
             exit 1
           fi
 
-          TARGET="${{ github.event_name == 'push' && 'aet' || inputs.target }}"
+          TARGET="${{ matrix.target }}"
           case "$TARGET" in
             vm)
               echo "storage_class=local-path"

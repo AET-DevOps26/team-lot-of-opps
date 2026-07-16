@@ -2,10 +2,12 @@
 
 TaxForward is a full-stack application that helps German students and trainees track study-related expenses and turn them into a future tax refund ("Verlustvortrag"). Users upload receipts and invoices; an AI pipeline extracts and classifies the line items, stores them, and surfaces suggestions for tax-deductible documents that might be missing.
 
-## Deploy (quick start)
+## Deploy (quick start, for the tutors)
 
+To deploy manually to the AET cluster: GitHub → **Actions** → **`deploy.yml`** ("Deploy") → **Run workflow** with `target: aet` (see images below).
 
-**To deploy the app to the AET cluster:** GitHub → **Actions** → **`deploy.yml`** ("Deploy") → **Run workflow** with `target: aet`. That's it — it builds images and `helm upgrade`s the app.
+**Merging to `main` auto-deploys the app to both the AET cluster and the VM** (parallel jobs in [`deploy.yml`](.github/workflows/deploy.yml); a failure on one target doesn't block the other). 
+The **VM** deploy also auto-provisions a VM on azure and sets it up using ansibel. 
 
 **!!! DISCLAIMER**: `deploy.yml` only deploys the app, not the observablility stack. We reccomend this, since the last time we checked (16.07.2026, 16:01) deploying the observablility stack on the AET cluster did not work, due to a known, unsolved problem.
 If you want to see the observabiliyt stack in action go to the [azure deployment](http://lot-of-opps-vm.swedencentral.cloudapp.azure.com/grafana) with username: `admin`, password: `pleaseGiveUseAGoodGrade1.0Thanks`.
@@ -318,9 +320,45 @@ not raw Docker Compose. [`vm-provision.yml`](.github/workflows/vm-provision.yml)
 provisions the VM with Terraform and installs k3s via Ansible;
 [`build.yml`](.github/workflows/build.yml) and
 [`deploy.yml`](.github/workflows/deploy.yml) build images and `helm upgrade`
-the app chart ([`infra/helm`](infra/helm)) on push to `main` or manual
-dispatch. The monitoring stack deploys separately — see
-[Observability](#observability) above.
+the app chart ([`infra/helm`](infra/helm)). The monitoring stack deploys
+separately — see [Observability](#observability) above.
+
+### Provisioning the VM
+
+[`vm-provision.yml`](.github/workflows/vm-provision.yml) has three triggers:
+
+- **Pull request** touching `infra/terraform/**` or `infra/ansible/**` — lint
+  + `terraform plan` + Ansible syntax-check only. Nothing is applied; this is
+  just visibility into what a merge would change.
+- **Push to `main`** touching those same paths — runs the real `terraform
+  apply` and the Ansible playbook automatically. The gate here is the PR
+  review required to merge, not a separate approval step: this repo has no
+  GitHub Environments (no admin rights to create one), so there is no
+  post-merge pause before infra changes actually land. If you need to double
+  check a plan before it takes effect, review it on the PR before approving.
+- **Manual dispatch** — same `apply` + Ansible run, on demand (e.g. after a
+  VM was deallocated and recreated, or to force a re-run).
+
+The Azure VM line is optional infrastructure — the AET cluster is the primary
+deployment target and doesn't go through this workflow at all.
+
+The VM itself isn't always on: [`vm-start.yml`](.github/workflows/vm-start.yml)
+and [`vm-stop.yml`](.github/workflows/vm-stop.yml) start/deallocate it on
+demand to save cost, without touching its disk (k3s, Postgres, and SeaweedFS
+data all survive a stop). Neither `vm-provision.yml` nor `deploy.yml` starts
+a stopped VM automatically — if the VM is deallocated, the `vm` leg of a
+deploy will simply fail to connect until someone runs `vm-start.yml`.
+
+### Deploying the app
+
+On push to `main`, [`deploy.yml`](.github/workflows/deploy.yml) builds images
+once and then runs a `helm upgrade` **in parallel for both the AET cluster
+and the VM** (a matrix over `target: [aet, vm]`, `fail-fast: false` — a
+failure or connectivity problem on one target doesn't cancel the other).
+Manual dispatch instead deploys to a single target you choose (`aet` or
+`vm`), and can also pin an already-built image tag / chart ref — see
+[`docs/runbook-rollback.md`](docs/runbook-rollback.md) for the rollback
+workflow.
 
 To bring up a whole environment in one click, run
 [`deploy-all.yml`](.github/workflows/deploy-all.yml) ("Deploy Everything")
@@ -335,8 +373,8 @@ already exists on the cluster.
 **If observability is broken on a target and you just need the app running**
 (e.g. for grading), don't use `deploy-all.yml` — run
 [`deploy.yml`](.github/workflows/deploy.yml) directly instead (push to `main`
-already triggers it for the AET cluster, or dispatch it manually with
-`target: vm`). It has no dependency on observability and deploys the app
+already triggers it for both clusters, or dispatch it manually with a single
+`target`). It has no dependency on observability and deploys the app
 standalone.
 
 ### Update strategies

@@ -1,13 +1,22 @@
 name: Provision and Configure Azure VM
 
 # Lint + Terraform plan + Ansible syntax-check on PRs touching the infra.
-# apply + real Ansible run happen ONLY when a human dispatches this workflow
-# (or deploy.yml calls it with the provision toggle) — never automatically on
-# merge to main. The Azure VM line is optional; the AET cluster is the main one.
+# apply + real Ansible run happen when a human dispatches this workflow, when
+# deploy.yml calls it with the provision toggle, or automatically on merge to
+# main IF the merge touched infra/terraform or infra/ansible — the gate there
+# is the PR review required to merge, not a separate approval step (no repo
+# admin to set up a GitHub Environment). The Azure VM line is optional; the
+# AET cluster is the main one.
 
 on:
   workflow_dispatch:
-  workflow_call:                 
+  workflow_call:
+  push:
+    branches: [main]
+    paths:
+      - infra/terraform/**
+      - infra/ansible/**
+      - .github/workflows/vm-provision.yml
   pull_request:
     paths:
       - infra/terraform/**
@@ -69,7 +78,7 @@ jobs:
             -var="ssh_public_key=${{ secrets.VM_SSH_PUBLIC_KEY }}"
 
       - name: Terraform Apply
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         working-directory: infra/terraform
         run: |
           terraform apply -auto-approve \
@@ -79,7 +88,7 @@ jobs:
       # variable. Fail loudly if Terraform's actual FQDN drifts from it
       # (e.g. vm_name or location changed).
       - name: Verify deploy host matches Terraform
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         working-directory: infra/terraform
         run: |
           ACTUAL=$(terraform output -raw vm_fqdn)
@@ -109,7 +118,7 @@ jobs:
           ansible-playbook -i inventory.ini playbook.yml --syntax-check
 
       - name: Setup SSH key
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.VM_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
@@ -119,7 +128,7 @@ jobs:
       # just been created, but unlike '=no' it still fails if a known host's
       # key changes mid-run. Ansible then reuses the recorded ~/.ssh/known_hosts.
       - name: Wait for VM to be ready
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         run: |
           echo "Waiting for SSH to become available..."
           for i in $(seq 1 20); do
@@ -129,7 +138,7 @@ jobs:
           done
 
       - name: Run Ansible playbook
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         working-directory: infra/ansible
         run: ansible-playbook -i inventory.ini playbook.yml
 
@@ -137,7 +146,7 @@ jobs:
       # If the VM was recreated its keys changed — fail with the fresh scan
       # so it gets committed (host public keys are not secret).
       - name: Check committed host keys
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         run: |
           ssh-keyscan -t rsa,ecdsa,ed25519 "$VM_HOST" 2>/dev/null | sort > /tmp/fresh
           grep -Ev '^\s*(#|$)' infra/known_hosts | sort > /tmp/pinned || true
@@ -155,7 +164,7 @@ jobs:
           fi
 
       - name: Summary
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         run: |
           {
             echo "### VM ready — k3s installed"
