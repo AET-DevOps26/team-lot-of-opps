@@ -51,6 +51,21 @@ class InternalInvoiceServiceStub:
                 request_serializer=invoice__pb2.GetDocumentContentRequest.SerializeToString,
                 response_deserializer=invoice__pb2.GetDocumentContentResponse.FromString,
                 _registered_method=True)
+        self.UpdateInvoice = channel.unary_unary(
+                '/taxforward.invoice.v1.InternalInvoiceService/UpdateInvoice',
+                request_serializer=invoice__pb2.UpdateInvoiceRequest.SerializeToString,
+                response_deserializer=invoice__pb2.UpdateInvoiceResponse.FromString,
+                _registered_method=True)
+        self.FindPotentialDuplicates = channel.unary_unary(
+                '/taxforward.invoice.v1.InternalInvoiceService/FindPotentialDuplicates',
+                request_serializer=invoice__pb2.FindPotentialDuplicatesRequest.SerializeToString,
+                response_deserializer=invoice__pb2.FindPotentialDuplicatesResponse.FromString,
+                _registered_method=True)
+        self.CreateInvoice = channel.unary_unary(
+                '/taxforward.invoice.v1.InternalInvoiceService/CreateInvoice',
+                request_serializer=invoice__pb2.CreateInvoiceRequest.SerializeToString,
+                response_deserializer=invoice__pb2.CreateInvoiceResponse.FromString,
+                _registered_method=True)
 
 
 class InternalInvoiceServiceServicer:
@@ -76,6 +91,24 @@ class InternalInvoiceServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def UpdateInvoice(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def FindPotentialDuplicates(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateInvoice(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_InternalInvoiceServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -93,6 +126,21 @@ def add_InternalInvoiceServiceServicer_to_server(servicer, server):
                     servicer.GetDocumentContent,
                     request_deserializer=invoice__pb2.GetDocumentContentRequest.FromString,
                     response_serializer=invoice__pb2.GetDocumentContentResponse.SerializeToString,
+            ),
+            'UpdateInvoice': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateInvoice,
+                    request_deserializer=invoice__pb2.UpdateInvoiceRequest.FromString,
+                    response_serializer=invoice__pb2.UpdateInvoiceResponse.SerializeToString,
+            ),
+            'FindPotentialDuplicates': grpc.unary_unary_rpc_method_handler(
+                    servicer.FindPotentialDuplicates,
+                    request_deserializer=invoice__pb2.FindPotentialDuplicatesRequest.FromString,
+                    response_serializer=invoice__pb2.FindPotentialDuplicatesResponse.SerializeToString,
+            ),
+            'CreateInvoice': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateInvoice,
+                    request_deserializer=invoice__pb2.CreateInvoiceRequest.FromString,
+                    response_serializer=invoice__pb2.CreateInvoiceResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -178,6 +226,87 @@ class InternalInvoiceService:
             '/taxforward.invoice.v1.InternalInvoiceService/GetDocumentContent',
             invoice__pb2.GetDocumentContentRequest.SerializeToString,
             invoice__pb2.GetDocumentContentResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateInvoice(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/taxforward.invoice.v1.InternalInvoiceService/UpdateInvoice',
+            invoice__pb2.UpdateInvoiceRequest.SerializeToString,
+            invoice__pb2.UpdateInvoiceResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FindPotentialDuplicates(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/taxforward.invoice.v1.InternalInvoiceService/FindPotentialDuplicates',
+            invoice__pb2.FindPotentialDuplicatesRequest.SerializeToString,
+            invoice__pb2.FindPotentialDuplicatesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateInvoice(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/taxforward.invoice.v1.InternalInvoiceService/CreateInvoice',
+            invoice__pb2.CreateInvoiceRequest.SerializeToString,
+            invoice__pb2.CreateInvoiceResponse.FromString,
             options,
             channel_credentials,
             insecure,

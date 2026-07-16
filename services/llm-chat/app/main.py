@@ -39,8 +39,17 @@ app.add_middleware(
 _client = AsyncOpenAI(base_url=f"{LLM_URL}/v1", api_key=LLM_API_KEY, timeout=120)
 
 
+class ChatHistoryMessage(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
 class AgentChatRequest(BaseModel):
     question: str
+    # Prior turns of this conversation, oldest first. Required for multi-turn flows
+    # like the confirm-gated invoice edit/add tools — each request is otherwise a
+    # fresh, stateless agent invocation with no memory of what it just proposed.
+    history: list[ChatHistoryMessage] = []
 
 
 class StatusResponse(BaseModel):
@@ -64,7 +73,8 @@ class StatusResponse(BaseModel):
 )
 async def agent_chat(request: AgentChatRequest, x_user_sub: str = Header(...)):
     async def _gen():
-        async for event_dict in run_agent_streaming(request.question, x_user_sub):
+        history = [{"role": m.role, "content": m.content} for m in request.history]
+        async for event_dict in run_agent_streaming(request.question, x_user_sub, history):
             yield f"data: {json.dumps(event_dict)}\n\n"
 
     return StreamingResponse(_gen(), media_type="text/event-stream")

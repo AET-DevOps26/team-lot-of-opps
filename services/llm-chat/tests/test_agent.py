@@ -167,6 +167,29 @@ class TestRunAgentStreaming:
 
         assert events == [{"type": "error", "message": "LLM unavailable"}]
 
+    def test_history_is_prepended_to_the_current_question(self, monkeypatch):
+        capturing_agent = _CapturingAgent()
+        monkeypatch.setattr(agent, "_build_agent", lambda user_id, referenced: capturing_agent)
+        history = [
+            {"role": "user", "content": "Change invoice 1's category to ARBEITSMITTEL"},
+            {"role": "assistant", "content": "Proposed change... reply to confirm."},
+        ]
+
+        run(_collect(agent.run_agent_streaming("yes", "user-1", history)))
+
+        assert capturing_agent.received_messages == [
+            *history,
+            {"role": "user", "content": "yes"},
+        ]
+
+    def test_missing_history_defaults_to_just_the_question(self, monkeypatch):
+        capturing_agent = _CapturingAgent()
+        monkeypatch.setattr(agent, "_build_agent", lambda user_id, referenced: capturing_agent)
+
+        run(_collect(agent.run_agent_streaming("question", "user-1")))
+
+        assert capturing_agent.received_messages == [{"role": "user", "content": "question"}]
+
 
 class TestFetchInvoices:
     def test_proto_response_maps_to_camelcase_dicts(self, monkeypatch):
@@ -224,6 +247,237 @@ class TestFetchInvoices:
         ]
 
 
+class TestResolveCategory:
+    def test_exact_match_passes_through(self):
+        assert agent._resolve_category("BEWIRTUNG") == "BEWIRTUNG"
+
+    def test_close_typo_snaps_to_correct_category(self):
+        # Regression: the LLM once produced "WEG_ZUR_ARBEIT" (missing the E),
+        # which must resolve to the real enum value rather than hard-failing.
+        assert agent._resolve_category("WEG_ZUR_ARBEIT") == "WEGE_ZUR_ARBEIT"
+
+    def test_lowercase_and_spaces_are_normalized(self):
+        assert agent._resolve_category("weg zur arbeit") == "WEGE_ZUR_ARBEIT"
+
+    def test_unrelated_input_does_not_match(self):
+        assert agent._resolve_category("NOT_A_REAL_CATEGORY") is None
+
+
+class TestEditInvoiceAsync:
+    def test_rejects_non_editable_field(self):
+        result = run(agent._edit_invoice_async(1, "user_id", "hacked", "user-1"))
+
+        assert "Cannot edit field" in result
+
+    def test_applies_change_immediately_via_update_invoice_rpc(self, monkeypatch):
+        class _FakeStub:
+            async def UpdateInvoice(self, request, timeout=None):
+                assert request.user_id == "user-1"
+                assert request.invoice_id == 1
+                assert request.category == "ARBEITSMITTEL"
+                return invoice_pb2.UpdateInvoiceResponse(
+                    invoice=invoice_pb2.Invoice(id=1, category="ARBEITSMITTEL")
+                )
+
+        monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
+
+        result = run(agent._edit_invoice_async(1, "category", "ARBEITSMITTEL", "user-1"))
+
+        assert "Updated invoice 1" in result
+        assert "ARBEITSMITTEL" in result
+
+    def test_rpc_error_is_reported_not_raised(self, monkeypatch):
+        import grpc
+
+        class _FailingStub:
+            async def UpdateInvoice(self, request, timeout=None):
+                error = grpc.RpcError()
+                error.details = lambda: "invoice 1"
+                raise error
+
+        monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FailingStub())
+
+        result = run(agent._edit_invoice_async(1, "price", "1.00", "user-1"))
+
+        assert "Could not update invoice 1" in result
+
+    def test_typo_d_category_is_corrected_before_the_rpc_call(self, monkeypatch):
+        # Regression for the silent-failure bug: a near-miss category name must
+        # resolve to the real enum value and actually reach the RPC, not error out.
+        class _FakeStub:
+            async def UpdateInvoice(self, request, timeout=None):
+                assert request.category == "WEGE_ZUR_ARBEIT"
+                return invoice_pb2.UpdateInvoiceResponse(
+                    invoice=invoice_pb2.Invoice(id=1, category="WEGE_ZUR_ARBEIT")
+                )
+
+        monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
+
+        result = run(agent._edit_invoice_async(1, "category", "WEG_ZUR_ARBEIT", "user-1"))
+
+        assert "Updated invoice 1" in result
+
+    def test_unresolvable_category_fails_before_any_rpc_call(self, monkeypatch):
+        called = False
+
+        class _FakeStub:
+            async def UpdateInvoice(self, request, timeout=None):
+                nonlocal called
+                called = True
+
+        monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
+
+        result = run(
+            agent._edit_invoice_async(1, "category", "NOT_A_REAL_CATEGORY", "user-1")
+        )
+
+        assert "Unknown category" in result
+        assert called is False
+
+
+class TestAddInvoiceAsync:
+    def test_unknown_category_is_rejected_before_any_rpc_call(self, monkeypatch):
+        called = False
+
+        class _FakeStub:
+            async def CreateInvoice(self, request, timeout=None):
+                nonlocal called
+                called = True
+
+        monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
+
+        result = run(
+            agent._add_invoice_async("Laptop", "Apple", "999.00", "NOT_REAL", "user-1")
+        )
+
+        assert "Unknown category" in result
+        assert called is False
+
+    def test_invalid_price_is_rejected(self):
+        result = run(
+            agent._add_invoice_async(
+                "Laptop", "Apple", "not-a-number", "ARBEITSMITTEL", "user-1"
+            )
+        )
+
+        assert "not a valid price" in result
+
+    def test_creates_invoice_immediately_via_create_invoice_rpc(self, monkeypatch):
+        class _FakeStub:
+            async def CreateInvoice(self, request, timeout=None):
+                assert request.user_id == "user-1"
+                assert request.item_name == "Laptop"
+                assert request.category == "ARBEITSMITTEL"
+                return invoice_pb2.CreateInvoiceResponse(
+                    invoice=invoice_pb2.Invoice(id=42, item_name="Laptop")
+                )
+
+        monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
+
+        result = run(
+            agent._add_invoice_async(
+                "Laptop", "Apple", "999.00", "arbeitsmittel", "user-1"
+            )
+        )
+
+        assert "Created invoice 42" in result
+        assert "Laptop" in result
+
+    def test_rpc_error_is_reported_not_raised(self, monkeypatch):
+        import grpc
+
+        class _FailingStub:
+            async def CreateInvoice(self, request, timeout=None):
+                error = grpc.RpcError()
+                error.details = lambda: "boom"
+                raise error
+
+        monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FailingStub())
+
+        result = run(
+            agent._add_invoice_async(
+                "Laptop", "Apple", "999.00", "ARBEITSMITTEL", "user-1"
+            )
+        )
+
+        assert "Could not create invoice" in result
+
+
+class TestSummarizeInvoiceCategoriesAsync:
+    def test_no_invoices_returns_message(self, monkeypatch):
+        monkeypatch.setattr(agent, "_fetch_invoices", _async_return([]))
+
+        result = run(agent._summarize_invoice_categories_async("user-1"))
+
+        assert "No accepted invoices" in result
+
+    def test_sums_price_by_category(self, monkeypatch):
+        invoices = [
+            {"category": "ARBEITSMITTEL", "price": "100.00"},
+            {"category": "ARBEITSMITTEL", "price": "50.00"},
+            {"category": "REISEKOSTEN", "price": "20.00"},
+        ]
+        monkeypatch.setattr(agent, "_fetch_invoices", _async_return(invoices))
+
+        result = run(agent._summarize_invoice_categories_async("user-1"))
+
+        assert "ARBEITSMITTEL: 150.00€" in result
+        assert "REISEKOSTEN: 20.00€" in result
+        assert "not a tax refund estimate" in result
+
+
+class TestExplainDeductionRuleAsync:
+    def test_known_category_returns_suggestion_text(self):
+        result = run(agent._explain_deduction_rule_async("BEWIRTUNG"))
+
+        assert "70" in result
+
+    def test_unknown_category_lists_valid_options(self):
+        result = run(agent._explain_deduction_rule_async("NOT_REAL"))
+
+        assert "Unknown category" in result
+        assert "BEWIRTUNG" in result
+
+
+class TestCheckDuplicateInvoicesAsync:
+    def test_no_matches_reports_none_found(self, monkeypatch):
+        class _FakeStub:
+            async def FindPotentialDuplicates(self, request, timeout=None):
+                return invoice_pb2.FindPotentialDuplicatesResponse(invoices=[])
+
+        monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
+
+        result = run(agent._check_duplicate_invoices_async("Amazon", "9.99", "user-1"))
+
+        assert "No potential duplicates" in result
+
+    def test_matches_are_listed(self, monkeypatch):
+        class _FakeStub:
+            async def FindPotentialDuplicates(self, request, timeout=None):
+                assert request.user_id == "user-1"
+                assert request.company == "Amazon"
+                assert request.price == "9.99"
+                assert request.invoice_date == "2026-06-01"
+                return invoice_pb2.FindPotentialDuplicatesResponse(
+                    invoices=[
+                        invoice_pb2.Invoice(
+                            id=1, item_name="Cable", company="Amazon", price="9.99"
+                        )
+                    ]
+                )
+
+        monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
+
+        result = run(
+            agent._check_duplicate_invoices_async(
+                "Amazon", "9.99", "user-1", "2026-06-01"
+            )
+        )
+
+        assert "Found 1 potential duplicate" in result
+        assert "Cable" in result
+
+
 def _async_return(value):
     async def _fn(*args, **kwargs):
         return value
@@ -267,6 +521,18 @@ class _FakeAgent:
 class _FakeChunk:
     def __init__(self, content):
         self.content = content
+
+
+class _CapturingAgent:
+    """Records the `messages` payload it was invoked with, yielding nothing else."""
+
+    def __init__(self):
+        self.received_messages = None
+
+    async def astream_events(self, payload, *args, **kwargs):
+        self.received_messages = payload["messages"]
+        return
+        yield  # pragma: no cover - makes this an async generator
 
 
 class _FailingAgent:

@@ -3,12 +3,16 @@ package com.lotofopps.backend.grpc;
 import com.google.protobuf.ByteString;
 import com.lotofopps.backend.dto.InvoiceResponse;
 import com.lotofopps.backend.model.Document;
+import com.lotofopps.backend.model.InvoiceCategory;
 import com.lotofopps.backend.model.InvoiceStatus;
 import com.lotofopps.backend.repository.DocumentRepository;
 import com.lotofopps.backend.repository.InvoiceRepository;
 import com.lotofopps.backend.service.DocumentStorageService;
+import com.lotofopps.backend.service.LlmChatEmbeddingService;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -21,14 +25,17 @@ public class InternalInvoiceGrpcService
     private final InvoiceRepository invoiceRepository;
     private final DocumentRepository documentRepository;
     private final DocumentStorageService documentStorageService;
+    private final LlmChatEmbeddingService embeddingService;
 
     public InternalInvoiceGrpcService(
             InvoiceRepository invoiceRepository,
             DocumentRepository documentRepository,
-            DocumentStorageService documentStorageService) {
+            DocumentStorageService documentStorageService,
+            LlmChatEmbeddingService embeddingService) {
         this.invoiceRepository = invoiceRepository;
         this.documentRepository = documentRepository;
         this.documentStorageService = documentStorageService;
+        this.embeddingService = embeddingService;
     }
 
     @Override
@@ -94,6 +101,135 @@ public class InternalInvoiceGrpcService
         responseObserver.onNext(
                 GetDocumentContentResponse.newBuilder()
                         .setContent(ByteString.copyFrom(content))
+                        .build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void updateInvoice(
+            UpdateInvoiceRequest request, StreamObserver<UpdateInvoiceResponse> responseObserver) {
+        com.lotofopps.backend.model.Invoice invoice =
+                invoiceRepository.findById(request.getInvoiceId()).orElse(null);
+        // One NOT_FOUND for both missing and foreign invoices: no existence oracle.
+        if (invoice == null || !request.getUserId().equals(invoice.getUserId())) {
+            responseObserver.onError(
+                    Status.NOT_FOUND
+                            .withDescription("invoice " + request.getInvoiceId())
+                            .asRuntimeException());
+            return;
+        }
+        if (request.hasItemName()) {
+            invoice.setItemName(request.getItemName());
+        }
+        if (request.hasPrice()) {
+            try {
+                invoice.setPrice(new BigDecimal(request.getPrice()));
+            } catch (NumberFormatException e) {
+                responseObserver.onError(
+                        Status.INVALID_ARGUMENT
+                                .withDescription("invalid price: " + request.getPrice())
+                                .asRuntimeException());
+                return;
+            }
+        }
+        if (request.hasCategory()) {
+            try {
+                invoice.setCategory(InvoiceCategory.valueOf(request.getCategory()));
+            } catch (IllegalArgumentException e) {
+                responseObserver.onError(
+                        Status.INVALID_ARGUMENT
+                                .withDescription("invalid category: " + request.getCategory())
+                                .asRuntimeException());
+                return;
+            }
+        }
+        com.lotofopps.backend.model.Invoice saved = invoiceRepository.save(invoice);
+        // Only accepted invoices belong in the chat vector store (same rule as the REST
+        // PUT endpoint) — re-embed so an agent-driven edit is reflected in chat context.
+        if (saved.getStatus() == InvoiceStatus.ACCEPTED) {
+            embeddingService.embedInvoice(saved);
+        }
+        responseObserver.onNext(
+                UpdateInvoiceResponse.newBuilder()
+                        .setInvoice(toProto(InvoiceResponse.from(saved)))
+                        .build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void findPotentialDuplicates(
+            FindPotentialDuplicatesRequest request,
+            StreamObserver<FindPotentialDuplicatesResponse> responseObserver) {
+        BigDecimal price;
+        try {
+            price = new BigDecimal(request.getPrice());
+        } catch (NumberFormatException e) {
+            responseObserver.onError(
+                    Status.INVALID_ARGUMENT
+                            .withDescription("invalid price: " + request.getPrice())
+                            .asRuntimeException());
+            return;
+        }
+        var candidates =
+                invoiceRepository.findByUserIdAndCompanyIgnoreCaseAndPrice(
+                        request.getUserId(), request.getCompany(), price);
+        FindPotentialDuplicatesResponse.Builder response =
+                FindPotentialDuplicatesResponse.newBuilder();
+        candidates.stream()
+                .filter(
+                        i ->
+                                !request.hasInvoiceDate()
+                                        || request.getInvoiceDate()
+                                                .equals(
+                                                        i.getInvoiceDate() != null
+                                                                ? i.getInvoiceDate().toString()
+                                                                : null))
+                .map(InvoiceResponse::from)
+                .map(InternalInvoiceGrpcService::toProto)
+                .forEach(response::addInvoices);
+        responseObserver.onNext(response.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void createInvoice(
+            CreateInvoiceRequest request, StreamObserver<CreateInvoiceResponse> responseObserver) {
+        BigDecimal price;
+        try {
+            price = new BigDecimal(request.getPrice());
+        } catch (NumberFormatException e) {
+            responseObserver.onError(
+                    Status.INVALID_ARGUMENT
+                            .withDescription("invalid price: " + request.getPrice())
+                            .asRuntimeException());
+            return;
+        }
+        InvoiceCategory category;
+        try {
+            category = InvoiceCategory.valueOf(request.getCategory());
+        } catch (IllegalArgumentException e) {
+            responseObserver.onError(
+                    Status.INVALID_ARGUMENT
+                            .withDescription("invalid category: " + request.getCategory())
+                            .asRuntimeException());
+            return;
+        }
+        com.lotofopps.backend.model.Invoice invoice =
+                new com.lotofopps.backend.model.Invoice(
+                        request.getItemName(), request.getCompany(), price);
+        invoice.setUserId(request.getUserId());
+        invoice.setCategory(category);
+        if (request.hasInvoiceDate()) {
+            invoice.setInvoiceDate(LocalDate.parse(request.getInvoiceDate()));
+        }
+        // Manually entered invoices need no review — accepted (and embedded) directly,
+        // same rule as POST /api/v1/invoices.
+        invoice.setStatus(InvoiceStatus.ACCEPTED);
+        com.lotofopps.backend.model.Invoice saved = invoiceRepository.save(invoice);
+        embeddingService.embedInvoice(saved);
+        responseObserver.onNext(
+                CreateInvoiceResponse.newBuilder()
+                        .setInvoice(toProto(InvoiceResponse.from(saved)))
                         .build());
         responseObserver.onCompleted();
     }

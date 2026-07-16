@@ -2,6 +2,7 @@ package com.lotofopps.backend.repository;
 
 import com.lotofopps.backend.model.Invoice;
 import com.lotofopps.backend.model.InvoiceStatus;
+import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -37,6 +38,11 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
             @Param("status") InvoiceStatus status,
             @Param("invoiceYear") int invoiceYear,
             Pageable pageable);
+
+    // Candidates for duplicate flagging: same user, company and price. Date (if given) is
+    // compared in-code so a caller can omit it for a looser match.
+    List<Invoice> findByUserIdAndCompanyIgnoreCaseAndPrice(
+            String userId, String company, BigDecimal price);
 
     List<Invoice> findByDocumentId(Long documentId);
 

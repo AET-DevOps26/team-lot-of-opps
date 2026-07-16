@@ -11,6 +11,9 @@ service InternalInvoiceService {
   rpc GetLatestInvoices(GetLatestInvoicesRequest) returns (GetLatestInvoicesResponse);
   rpc GetDocuments(GetDocumentsRequest) returns (GetDocumentsResponse);
   rpc GetDocumentContent(GetDocumentContentRequest) returns (GetDocumentContentResponse);
+  rpc UpdateInvoice(UpdateInvoiceRequest) returns (UpdateInvoiceResponse);
+  rpc FindPotentialDuplicates(FindPotentialDuplicatesRequest) returns (FindPotentialDuplicatesResponse);
+  rpc CreateInvoice(CreateInvoiceRequest) returns (CreateInvoiceResponse);
 }
 
 message GetLatestInvoicesRequest {
@@ -69,4 +72,46 @@ message GetDocumentContentRequest {
 // NOT_FOUND covers both a missing document and one owned by another user.
 message GetDocumentContentResponse {
   bytes content = 1;
+}
+
+// Only fields present are patched. NOT_FOUND covers both a missing invoice and
+// one owned by another user (same no-existence-oracle rule as GetDocumentContent).
+message UpdateInvoiceRequest {
+  string user_id = 1;
+  int64 invoice_id = 2;
+  optional string item_name = 3;
+  optional string price = 4;      // BigDecimal -> plain string
+  optional string category = 5;   // InvoiceCategory enum name
+}
+
+message UpdateInvoiceResponse {
+  Invoice invoice = 1;
+}
+
+// Flags invoices for the same user with matching company, price and (if given) date —
+// a likely duplicate submission, not a strict uniqueness check.
+message FindPotentialDuplicatesRequest {
+  string user_id = 1;
+  string company = 2;
+  string price = 3;               // BigDecimal -> plain string
+  optional string invoice_date = 4;  // ISO LocalDate
+}
+
+message FindPotentialDuplicatesResponse {
+  repeated Invoice invoices = 1;
+}
+
+// Manually created invoices need no review — mirrors POST /api/v1/invoices, they are
+// accepted (and embedded) directly rather than starting PENDING like uploaded ones.
+message CreateInvoiceRequest {
+  string user_id = 1;
+  string item_name = 2;
+  string company = 3;
+  string price = 4;               // BigDecimal -> plain string
+  string category = 5;            // InvoiceCategory enum name
+  optional string invoice_date = 6;  // ISO LocalDate
+}
+
+message CreateInvoiceResponse {
+  Invoice invoice = 1;
 }
