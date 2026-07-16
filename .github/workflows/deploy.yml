@@ -124,6 +124,11 @@ jobs:
           # AET uses a team-prefixed namespace in the shared Rancher project.
           [ "$TARGET" = "aet" ] && echo "APP_NAMESPACE=team-lot-of-opps" >> "$GITHUB_ENV" \
                                || echo "APP_NAMESPACE=taxforward" >> "$GITHUB_ENV"
+          # The observability release lives in its own namespace, which differs per
+          # target (see deploy-observability.yml). The /grafana Traefik backend and the
+          # OTLP collector endpoint both resolve into it, so they track the target too.
+          [ "$TARGET" = "aet" ] && echo "OBS_NAMESPACE=team-lot-of-opps-observ" >> "$GITHUB_ENV" \
+                               || echo "OBS_NAMESPACE=taxforward-observ" >> "$GITHUB_ENV"
           TAG="${{ inputs.image_tag }}"
           [ -n "$TAG" ] || TAG="${{ needs.build.outputs.image_tag }}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -187,7 +192,9 @@ jobs:
             --set-file firebase.serviceAccountJson=firebase-sa.json \
             --set-file db.initSql=infra/postgres/init.sql \
             --set persistence.storageClassName="${{ steps.vars.outputs.storage_class }}" \
-            --set traefik.service.type="${{ steps.vars.outputs.traefik_service_type }}"
+            --set traefik.service.type="${{ steps.vars.outputs.traefik_service_type }}" \
+            --set grafana.backendUrl="http://monitoring-grafana.${OBS_NAMESPACE}.svc.cluster.local:80" \
+            --set otel.collectorEndpoint="http://otel-collector.${OBS_NAMESPACE}.svc.cluster.local:4318"
 
       # --atomic only proves the pods went ready. A service that answers /health but
       # 500s on every real request is a successful deploy as far as Helm is concerned.
