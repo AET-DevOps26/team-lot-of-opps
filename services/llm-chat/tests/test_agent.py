@@ -334,6 +334,31 @@ class TestEditInvoiceAsync:
 
 
 class TestAddInvoiceAsync:
+    def test_missing_date_is_rejected_before_any_rpc_call(self, monkeypatch):
+        called = False
+
+        class _FakeStub:
+            async def CreateInvoice(self, request, timeout=None):
+                nonlocal called
+                called = True
+
+        monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
+
+        result = run(
+            agent._add_invoice_async("Laptop", "Apple", "999.00", "ARBEITSMITTEL", "user-1", "")
+        )
+
+        assert "Cannot add this invoice" in result
+        assert "invoice date" in result
+        assert called is False
+
+    def test_missing_multiple_fields_are_all_listed(self):
+        result = run(agent._add_invoice_async("", "Apple", "999.00", "", "user-1", ""))
+
+        assert "item name" in result
+        assert "category" in result
+        assert "invoice date" in result
+
     def test_unknown_category_is_rejected_before_any_rpc_call(self, monkeypatch):
         called = False
 
@@ -344,14 +369,20 @@ class TestAddInvoiceAsync:
 
         monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
 
-        result = run(agent._add_invoice_async("Laptop", "Apple", "999.00", "NOT_REAL", "user-1"))
+        result = run(
+            agent._add_invoice_async(
+                "Laptop", "Apple", "999.00", "NOT_REAL", "user-1", "2026-01-15"
+            )
+        )
 
         assert "Unknown category" in result
         assert called is False
 
     def test_invalid_price_is_rejected(self):
         result = run(
-            agent._add_invoice_async("Laptop", "Apple", "not-a-number", "ARBEITSMITTEL", "user-1")
+            agent._add_invoice_async(
+                "Laptop", "Apple", "not-a-number", "ARBEITSMITTEL", "user-1", "2026-01-15"
+            )
         )
 
         assert "not a valid price" in result
@@ -362,6 +393,7 @@ class TestAddInvoiceAsync:
                 assert request.user_id == "user-1"
                 assert request.item_name == "Laptop"
                 assert request.category == "ARBEITSMITTEL"
+                assert request.invoice_date == "2026-01-15"
                 return invoice_pb2.CreateInvoiceResponse(
                     invoice=invoice_pb2.Invoice(id=42, item_name="Laptop")
                 )
@@ -369,7 +401,9 @@ class TestAddInvoiceAsync:
         monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
 
         result = run(
-            agent._add_invoice_async("Laptop", "Apple", "999.00", "arbeitsmittel", "user-1")
+            agent._add_invoice_async(
+                "Laptop", "Apple", "999.00", "arbeitsmittel", "user-1", "2026-01-15"
+            )
         )
 
         assert "Created invoice 42" in result
@@ -387,7 +421,9 @@ class TestAddInvoiceAsync:
         monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FailingStub())
 
         result = run(
-            agent._add_invoice_async("Laptop", "Apple", "999.00", "ARBEITSMITTEL", "user-1")
+            agent._add_invoice_async(
+                "Laptop", "Apple", "999.00", "ARBEITSMITTEL", "user-1", "2026-01-15"
+            )
         )
 
         assert "Could not create invoice" in result

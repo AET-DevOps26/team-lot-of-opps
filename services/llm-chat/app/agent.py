@@ -80,11 +80,17 @@ add_invoice as soon as the user asks, with no separate confirmation step. If the
 change or add several invoices at once, call the tool separately for EACH one — one call per
 invoice, never skip any.
 
+add_invoice requires item_name, company, price, category, AND invoice_date — all five. If the
+user's message is missing any of them (the date is the one most often left out), do NOT call
+add_invoice and do NOT guess or invent a value (e.g. never assume today's date). Instead, ask the
+user for exactly the missing field(s) and wait for their reply before calling the tool.
+
 CRITICAL: after calling edit_invoice or add_invoice, read its returned text carefully. If it
-starts with "Could not" or "Unknown", the change FAILED — you must tell the user it failed and
-why, and never claim it succeeded. Only report success if the tool result literally confirms the
-update/creation (e.g. starts with "Updated invoice" or "Created invoice"). Never say a change was
-made unless every single tool call for it actually returned success."""
+starts with "Could not", "Unknown", or "Cannot add", the change FAILED — you must tell the user
+it failed and why (e.g. relay which fields are missing), and never claim it succeeded. Only report
+success if the tool result literally confirms the update/creation (e.g. starts with "Updated
+invoice" or "Created invoice"). Never say a change was made unless every single tool call for it
+actually returned success."""
 
 
 async def _search_documents_async(query: str, user_id: str, referenced: list[dict]) -> str:
@@ -222,9 +228,26 @@ async def _add_invoice_async(
     price: str,
     category: str,
     user_id: str,
-    invoice_date: str | None = None,
+    invoice_date: str,
 ) -> str:
-    # Creates the invoice immediately via invoice-service's CreateInvoice RPC.
+    # Creates the invoice immediately via invoice-service's CreateInvoice RPC. All
+    # fields are required — never create with a guessed/missing value; ask instead.
+    missing = [
+        label
+        for label, value in [
+            ("item name", item_name),
+            ("company", company),
+            ("price", price),
+            ("category", category),
+            ("invoice date", invoice_date),
+        ]
+        if not value or not value.strip()
+    ]
+    if missing:
+        return (
+            "Cannot add this invoice yet — missing: "
+            f"{', '.join(missing)}. Please ask the user for it before calling this tool again."
+        )
     resolved_category = _resolve_category(category)
     if resolved_category is None:
         valid = ", ".join(sorted(CATEGORY_SUGGESTIONS.keys()))
@@ -239,9 +262,8 @@ async def _add_invoice_async(
         "company": company,
         "price": price,
         "category": resolved_category,
+        "invoice_date": invoice_date,
     }
-    if invoice_date:
-        request_kwargs["invoice_date"] = invoice_date
     try:
         resp = await _get_invoice_stub().CreateInvoice(
             invoice_pb2.CreateInvoiceRequest(**request_kwargs),
@@ -320,7 +342,7 @@ class _AddInvoiceInput(BaseModel):
     company: str
     price: str
     category: str
-    invoice_date: str | None = None
+    invoice_date: str
 
 
 class _ExplainDeductionRuleInput(BaseModel):
@@ -347,7 +369,7 @@ def _make_tools(user_id: str, referenced: list[dict]) -> list[Tool]:
         return await _edit_invoice_async(invoice_id, field, new_value, user_id)
 
     async def _async_add_invoice(
-        item_name: str, company: str, price: str, category: str, invoice_date: str | None = None
+        item_name: str, company: str, price: str, category: str, invoice_date: str
     ) -> str:
         return await _add_invoice_async(item_name, company, price, category, user_id, invoice_date)
 
@@ -407,10 +429,11 @@ def _make_tools(user_id: str, referenced: list[dict]) -> list[Tool]:
         StructuredTool(
             name="add_invoice",
             description=(
-                "Immediately creates a new invoice — no separate confirmation step, call this as "
-                "soon as the user describes the invoice. Input: item_name (string), company "
-                "(string), price (string, e.g. '9.99'), category (enum name, e.g. ARBEITSMITTEL), "
-                "invoice_date (optional ISO date)."
+                "Immediately creates a new invoice — no separate confirmation step, call this "
+                "once ALL fields are known. Input (all required, ask the user for any you don't "
+                "have — never guess or omit one): item_name (string), company (string), price "
+                "(string, e.g. '9.99'), category (enum name, e.g. ARBEITSMITTEL), invoice_date "
+                "(ISO date, e.g. '2026-03-22')."
             ),
             args_schema=_AddInvoiceInput,
             func=lambda **_: "Async only — use coroutine path",
