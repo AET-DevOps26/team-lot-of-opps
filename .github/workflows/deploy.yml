@@ -26,6 +26,22 @@ on:
         description: Take the chart from this commit/tag instead of the current one. Requires image_tag.
         type: string
         required: false
+  # Called by deploy-all.yml (the one-click app + observability dispatcher).
+  # workflow_call inputs can't be type: choice, so target is a string here.
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        required: false
+        default: aet
+      image_tag:
+        type: string
+        required: false
+        default: ""
+      ref:
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read

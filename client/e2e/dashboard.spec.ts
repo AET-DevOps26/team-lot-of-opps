@@ -1,27 +1,7 @@
 import { test, expect } from './fixtures'
 import { defaultInvoices, sumPrices } from './mocks/data'
-import { refundPrognose, verlustvortrag, type StudyYearInput } from '../src/lib/taxCalculator'
 
 const eur = (n: number) => `€${n.toFixed(2)}`
-
-const yearInput = (belegausgaben: number, extra: Partial<StudyYearInput> = {}): StudyYearInput => ({
-  belegausgaben,
-  pendlertage: 0,
-  entfernungKm: 0,
-  homeofficeTage: 0,
-  bewerbungenSchriftlich: 0,
-  bewerbungenOnline: 0,
-  umzug: false,
-  einnahmenWerkstudent: 0,
-  ...extra,
-})
-
-const belegByYear = (): Record<string, number> =>
-  defaultInvoices().reduce<Record<string, number>>((acc, inv) => {
-    const year = String(new Date(inv.invoiceDate!).getFullYear())
-    acc[year] = (acc[year] || 0) + inv.price
-    return acc
-  }, {})
 
 test.describe('Dashboard', () => {
   test('shows expense totals computed from the invoices', async ({ authedPage: page, mockApi }) => {
@@ -32,55 +12,19 @@ test.describe('Dashboard', () => {
     await expect(page.getByText(eur(total)).first()).toBeVisible()
   })
 
-  test('recalculates the refund when the gross salary changes', async ({ authedPage: page, mockApi }) => {
+  test('recalculates the future refund when the tax rate changes', async ({ authedPage: page, mockApi }) => {
     mockApi.setInvoices(defaultInvoices())
     await page.goto('/')
+    const total = sumPrices(defaultInvoices())
 
-    const carryforward = verlustvortrag(Object.values(belegByYear()).map((b) => yearInput(b)))
-    await expect(page.getByText(eur(carryforward)).first()).toBeVisible()
+    const taxRate = page.getByRole('spinbutton', { name: 'Future tax rate (Est. 30%)' })
+    await taxRate.fill('50')
+    await expect(page.getByText(eur(total * 0.5), { exact: true })).toBeVisible()
 
-    const salary = page.getByRole('spinbutton', { name: 'Expected gross starting salary (€/year)' })
-    await salary.fill('48000')
-    await expect(
-      page.getByText(eur(refundPrognose(48000, carryforward).erstattung), { exact: true }),
-    ).toBeVisible()
-
-    await salary.fill('0')
+    await taxRate.fill('0')
     await expect(page.getByText(eur(0), { exact: true }).first()).toBeVisible()
-  })
-
-  test('per-year pauschale inputs increase the carryforward', async ({ authedPage: page, mockApi }) => {
-    mockApi.setInvoices(defaultInvoices())
-    await page.goto('/')
-
-    const beleg = belegByYear()
-    const year2024 = page.locator('details', { hasText: 'Study year 2024' })
-    await year2024.locator('summary').click()
-    await year2024.getByLabel('Home-office days').fill('100')
-
-    const carryforward = verlustvortrag(
-      Object.entries(beleg).map(([year, b]) =>
-        yearInput(b, year === '2024' ? { homeofficeTage: 100 } : {}),
-      ),
-    )
-    await expect(page.getByText(eur(carryforward)).first()).toBeVisible()
-  })
-
-  test('advanced deduction rate changes the projected refund', async ({ authedPage: page, mockApi }) => {
-    mockApi.setInvoices(defaultInvoices())
-    await page.goto('/')
-
-    const carryforward = verlustvortrag(Object.values(belegByYear()).map((b) => yearInput(b)))
-    const salary = page.getByRole('spinbutton', { name: 'Expected gross starting salary (€/year)' })
-    await salary.fill('48000')
-
-    const advanced = page.locator('details', { hasText: 'Advanced assumptions' })
-    await advanced.locator('summary').click()
-    await advanced.getByLabel('Est. deductions on salary (%)').fill('30')
-
-    await expect(
-      page.getByText(eur(refundPrognose(48000, carryforward, 0.3).erstattung), { exact: true }),
-    ).toBeVisible()
+    // At 0% the decrement control is disabled.
+    await expect(page.getByRole('button', { name: 'Future tax rate (Est. 30%) -' })).toBeDisabled()
   })
 
   test('renders AI suggestions', async ({ authedPage: page }) => {

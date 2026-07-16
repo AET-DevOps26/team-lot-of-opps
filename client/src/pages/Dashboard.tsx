@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import useT from '../i18n/useT'
 import Icon from '../components/Icon'
@@ -8,46 +8,14 @@ import { usePersistentState } from '../hooks/usePersistentState'
 import { useCategoryLabel } from '../lib/invoices'
 import { useAppSelector } from '../store/hooks'
 import { selectLanguage } from '../features/i18nSlice'
-import {
-  jahresverlust,
-  refundPrognose,
-  TAX_2024,
-  verlustvortrag,
-  type StudyYearInput,
-} from '../lib/taxCalculator'
 
-const TAX_PLANNER_STORAGE_KEY = 'dashboard.taxPlanner'
+const TAX_RATE_STORAGE_KEY = 'dashboard.taxRatePercent'
+const DEFAULT_TAX_RATE_PERCENT = 30
+const MIN_TAX_RATE_PERCENT = 0
+const MAX_TAX_RATE_PERCENT = 50
 
-type ManualYearInput = Omit<StudyYearInput, 'belegausgaben'>
-
-interface TaxPlannerState {
-  brutto: number
-  years: Record<string, ManualYearInput>
-  vorsorgeRate: number
-  pauschbetrag: number
-}
-
-const EMPTY_YEAR: ManualYearInput = {
-  pendlertage: 0,
-  entfernungKm: 0,
-  homeofficeTage: 0,
-  bewerbungenSchriftlich: 0,
-  bewerbungenOnline: 0,
-  umzug: false,
-  einnahmenWerkstudent: 0,
-}
-
-const DEFAULT_VORSORGE_RATE = 20
-const DEFAULT_PAUSCHBETRAG = 1230
-
-const DEFAULT_PLANNER: TaxPlannerState = {
-  brutto: 45000,
-  years: {},
-  vorsorgeRate: DEFAULT_VORSORGE_RATE,
-  pauschbetrag: DEFAULT_PAUSCHBETRAG,
-}
-
-const toNonNegative = (value: string) => Math.max(0, Number(value) || 0)
+const clampTaxRate = (value: number) =>
+  Math.max(MIN_TAX_RATE_PERCENT, Math.min(MAX_TAX_RATE_PERCENT, value))
 
 interface ExpenseBar {
   label: string
@@ -161,46 +129,14 @@ function SummaryCard({ label, value, icon, hint, hintIcon, hintColor, highlight 
   )
 }
 
-interface YearFieldProps {
-  label: string
-  value: number
-  onChange: (value: number) => void
-}
-
-function YearField({ label, value, onChange }: YearFieldProps) {
-  return (
-    <label className="flex items-center justify-between gap-2">
-      <span className="font-body-sm text-body-sm text-on-surface-variant">{label}</span>
-      <input
-        type="number"
-        min={0}
-        value={value}
-        onChange={(e) => onChange(toNonNegative(e.target.value))}
-        className="w-24 rounded border border-surface-container-highest bg-surface px-2 py-1 text-right font-data-mono text-data-mono text-primary"
-      />
-    </label>
-  )
-}
-
-function FieldGroup({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="space-y-2 rounded-lg bg-surface px-3 py-2">
-      <p className="font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant/70">
-        {title}
-      </p>
-      {children}
-    </div>
-  )
-}
-
 export default function Dashboard() {
   const t = useT()
   const categoryLabel = useCategoryLabel()
   const language = useAppSelector(selectLanguage)
   const [reversed, setReversed] = useState(false)
-  const [planner, setPlanner] = usePersistentState<TaxPlannerState>(
-    TAX_PLANNER_STORAGE_KEY,
-    DEFAULT_PLANNER,
+  const [taxRatePercent, setTaxRatePercent] = usePersistentState(
+    TAX_RATE_STORAGE_KEY,
+    DEFAULT_TAX_RATE_PERCENT,
   )
   const [invoices, setInvoices] = useState<
     {
@@ -260,42 +196,8 @@ export default function Dashboard() {
     .filter((inv) => inv.status === 'ACCEPTED')
     .reduce((s, inv) => s + Number(inv.price || 0), 0)
 
-  const currentYear = new Date().getFullYear()
-  const belegByYear = invoices.reduce<Record<string, number>>((acc, inv) => {
-    const parsed = inv.invoiceDate ? new Date(inv.invoiceDate).getFullYear() : NaN
-    const year = String(Number.isNaN(parsed) ? currentYear : parsed)
-    acc[year] = (acc[year] || 0) + Number(inv.price || 0)
-    return acc
-  }, {})
-
-  const studyYears = Object.keys(belegByYear).length
-    ? Object.keys(belegByYear).sort()
-    : [String(currentYear)]
-
-  const yearInputs = studyYears.map((year) => ({
-    year,
-    input: {
-      belegausgaben: belegByYear[year] || 0,
-      ...(planner.years[year] ?? EMPTY_YEAR),
-    } satisfies StudyYearInput,
-  }))
-
-  const pauschbetrag = planner.pauschbetrag ?? DEFAULT_PAUSCHBETRAG
-  const vorsorgeRate = planner.vorsorgeRate ?? DEFAULT_VORSORGE_RATE
-  const constants = { ...TAX_2024, arbeitnehmerPauschbetrag: pauschbetrag }
-
-  const carryforward = verlustvortrag(
-    yearInputs.map((y) => y.input),
-    constants,
-  )
-  const prognose = refundPrognose(planner.brutto, carryforward, vorsorgeRate / 100, constants)
-  const futureRefund = prognose.erstattung
-
-  const setYearField = (year: string, patch: Partial<ManualYearInput>) =>
-    setPlanner((p) => ({
-      ...p,
-      years: { ...p.years, [year]: { ...(p.years[year] ?? EMPTY_YEAR), ...patch } },
-    }))
+  const taxRate = taxRatePercent / 100
+  const futureRefund = totalExpenses * taxRate
 
   // How much the most recent upload added. Invoices from one upload share a
   // documentId, so the newest upload is the batch of the most recently created
@@ -412,134 +314,65 @@ export default function Dashboard() {
           </section>
 
           <section className={CARD_BASE}>
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex justify-between items-center mb-4">
               <h3 className="font-h3 text-h3 text-primary flex items-center gap-2">
                 <Icon name="calculate" className="text-surface-tint" />
                 {t('dashboard.savings.title')}
               </h3>
+              <div
+                className="flex items-center gap-0.5 rounded-lg border border-surface-container-highest bg-surface pl-2 pr-1 py-0.5"
+                role="group"
+                aria-label={t('dashboard.savings.futureTaxRate')}
+              >
+                <input
+                  type="number"
+                  min={MIN_TAX_RATE_PERCENT}
+                  max={MAX_TAX_RATE_PERCENT}
+                  value={taxRatePercent}
+                  onChange={(e) => setTaxRatePercent(clampTaxRate(Number(e.target.value)))}
+                  aria-label={t('dashboard.savings.futureTaxRate')}
+                  className="w-9 bg-transparent text-right font-data-mono text-data-mono text-primary border-0 outline-none focus:outline-none focus:ring-0 p-0 m-0 appearance-none [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <span className="font-data-mono text-data-mono text-on-surface-variant">%</span>
+                <div className="flex flex-col">
+                  <button
+                    type="button"
+                    onClick={() => setTaxRatePercent((p) => clampTaxRate(p + 1))}
+                    disabled={taxRatePercent >= MAX_TAX_RATE_PERCENT}
+                    aria-label={`${t('dashboard.savings.futureTaxRate')} +`}
+                    className="text-surface-tint hover:text-primary disabled:opacity-30 disabled:hover:text-surface-tint transition-colors leading-none"
+                  >
+                    <Icon name="keyboard_arrow_up" size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTaxRatePercent((p) => clampTaxRate(p - 1))}
+                    disabled={taxRatePercent <= MIN_TAX_RATE_PERCENT}
+                    aria-label={`${t('dashboard.savings.futureTaxRate')} -`}
+                    className="text-surface-tint hover:text-primary disabled:opacity-30 disabled:hover:text-surface-tint transition-colors leading-none"
+                  >
+                    <Icon name="keyboard_arrow_down" size={16} />
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="bg-surface p-4 rounded-lg border border-surface-container-highest">
               <p className="font-body-sm text-body-sm text-on-surface-variant mb-4">
                 {t('dashboard.savings.intro')}
               </p>
-
-              <label className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-surface-container-highest bg-surface-container-lowest p-3">
-                <span className="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Icon name="work" size={16} />
-                  </span>
-                  {t('dashboard.savings.grossSalary')}
-                </span>
-                <span className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    min={0}
-                    value={planner.brutto}
-                    onChange={(e) => setPlanner((p) => ({ ...p, brutto: toNonNegative(e.target.value) }))}
-                    aria-label={t('dashboard.savings.grossSalary')}
-                    className="w-28 rounded border border-surface-container-highest bg-surface px-2 py-1 text-right font-data-mono text-data-mono text-primary"
-                  />
-                  <span className="font-data-mono text-data-mono text-on-surface-variant">€</span>
-                </span>
-              </label>
-
-              <div className="space-y-2 mb-4">
-                {yearInputs.map(({ year, input }) => (
-                  <details
-                    key={year}
-                    className="rounded-lg border border-surface-container-highest bg-surface-container-lowest px-4 py-2"
-                  >
-                    <summary className="flex cursor-pointer items-center justify-between gap-2">
-                      <span className="font-body-md text-body-md font-semibold text-primary">
-                        {t('dashboard.savings.yearHeading')} {year}
-                      </span>
-                      <span className="font-data-mono text-data-mono text-primary">
-                        {t('dashboard.savings.yearLoss')}: €{jahresverlust(input, constants).toFixed(2)}
-                      </span>
-                    </summary>
-                    <div className="mt-3 space-y-3">
-                      <div className="flex items-center justify-between gap-2 rounded-lg bg-surface px-3 py-2">
-                        <span className="font-body-sm text-body-sm text-on-surface-variant">
-                          {t('dashboard.savings.invoiceExpenses')}
-                        </span>
-                        <span className="font-data-mono text-data-mono text-primary">
-                          €{input.belegausgaben.toFixed(2)}
-                        </span>
-                      </div>
-                      <FieldGroup title={t('dashboard.savings.groupCommute')}>
-                        <YearField
-                          label={t('dashboard.savings.pendlertage')}
-                          value={input.pendlertage}
-                          onChange={(v) => setYearField(year, { pendlertage: v })}
-                        />
-                        <YearField
-                          label={t('dashboard.savings.entfernungKm')}
-                          value={input.entfernungKm}
-                          onChange={(v) => setYearField(year, { entfernungKm: v })}
-                        />
-                      </FieldGroup>
-                      <FieldGroup title={t('dashboard.savings.groupHomeoffice')}>
-                        <YearField
-                          label={t('dashboard.savings.homeofficeTage')}
-                          value={input.homeofficeTage}
-                          onChange={(v) => setYearField(year, { homeofficeTage: v })}
-                        />
-                      </FieldGroup>
-                      <FieldGroup title={t('dashboard.savings.groupApplications')}>
-                        <YearField
-                          label={t('dashboard.savings.bewerbungenSchriftlich')}
-                          value={input.bewerbungenSchriftlich}
-                          onChange={(v) => setYearField(year, { bewerbungenSchriftlich: v })}
-                        />
-                        <YearField
-                          label={t('dashboard.savings.bewerbungenOnline')}
-                          value={input.bewerbungenOnline}
-                          onChange={(v) => setYearField(year, { bewerbungenOnline: v })}
-                        />
-                      </FieldGroup>
-                      <FieldGroup title={t('dashboard.savings.groupIncome')}>
-                        <YearField
-                          label={t('dashboard.savings.werkstudentIncome')}
-                          value={input.einnahmenWerkstudent}
-                          onChange={(v) => setYearField(year, { einnahmenWerkstudent: v })}
-                        />
-                        <label className="flex items-center justify-between gap-2">
-                          <span className="font-body-sm text-body-sm text-on-surface-variant">
-                            {t('dashboard.savings.umzug')}
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={input.umzug}
-                            onChange={(e) => setYearField(year, { umzug: e.target.checked })}
-                            className="h-4 w-4 accent-primary"
-                          />
-                        </label>
-                      </FieldGroup>
-                    </div>
-                  </details>
-                ))}
-              </div>
               <div className="space-y-2 border-l-2 border-primary-fixed-dim pl-4">
                 <div className="flex justify-between items-center">
                   <span className="font-body-sm text-body-sm text-on-surface-variant">
-                    {t('dashboard.savings.carryforwardTotal')}
+                    {t('dashboard.savings.recordedExpenses')}
                   </span>
-                  <span className="font-data-mono text-data-mono text-primary">€{carryforward.toFixed(2)}</span>
+                  <span className="font-data-mono text-data-mono text-primary">€{totalExpenses.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="font-body-sm text-body-sm text-on-surface-variant">
-                    {t('dashboard.savings.taxRegular')}
+                    {t('dashboard.savings.futureTaxRate')}
                   </span>
                   <span className="font-data-mono text-data-mono text-primary">
-                    €{prognose.estRegulaer.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="font-body-sm text-body-sm text-on-surface-variant">
-                    {t('dashboard.savings.taxWithCarryforward')}
-                  </span>
-                  <span className="font-data-mono text-data-mono text-primary">
-                    €{prognose.estNeu.toFixed(2)}
+                    x {taxRate.toFixed(2)} ({taxRatePercent}%)
                   </span>
                 </div>
                 <div className="w-full h-px bg-surface-container-highest my-2" />
@@ -552,28 +385,6 @@ export default function Dashboard() {
                   </span>
                 </div>
               </div>
-
-              <details className="mt-4 rounded-lg border border-surface-container-highest bg-surface-container-lowest px-4 py-2">
-                <summary className="flex cursor-pointer items-center gap-2 font-body-sm text-body-sm font-semibold text-on-surface-variant">
-                  <Icon name="tune" size={16} className="text-surface-tint" />
-                  {t('dashboard.savings.advanced')}
-                </summary>
-                <div className="mt-3 space-y-2">
-                  <p className="font-body-sm text-body-sm text-on-surface-variant/80">
-                    {t('dashboard.savings.advancedNote')}
-                  </p>
-                  <YearField
-                    label={t('dashboard.savings.vorsorgeRate')}
-                    value={vorsorgeRate}
-                    onChange={(v) => setPlanner((p) => ({ ...p, vorsorgeRate: v }))}
-                  />
-                  <YearField
-                    label={t('dashboard.savings.pauschbetrag')}
-                    value={pauschbetrag}
-                    onChange={(v) => setPlanner((p) => ({ ...p, pauschbetrag: v }))}
-                  />
-                </div>
-              </details>
             </div>
           </section>
         </div>

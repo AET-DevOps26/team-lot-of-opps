@@ -1,0 +1,35 @@
+name: Deploy Everything
+
+# One click, full environment: observability + app to one target.
+# Chains the two existing reusable workflows instead of duplicating their logic.
+# Observability runs first: on the VM the monitoring chart installs the
+# monitoring.coreos.com/v1 CRD that the app chart's PrometheusRule is gated on.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Cluster to deploy app + observability to
+        type: choice
+        options: [aet, vm]
+        default: aet
+
+# Called workflows can't be granted more than the caller; deploy.yml needs
+# packages:write (GHCR) and id-token:write (VM provision OIDC -> Azure).
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  observability:
+    uses: ./.github/workflows/deploy-observability.yml
+    secrets: inherit
+    with:
+      target: ${{ inputs.target }}
+
+  app:
+    needs: observability
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
+    with:
+      target: ${{ inputs.target }}
