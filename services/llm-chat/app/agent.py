@@ -58,10 +58,9 @@ def _resolve_category(raw: str) -> str | None:
     normalized = raw.strip().upper().replace(" ", "_")
     if normalized in CATEGORY_SUGGESTIONS:
         return normalized
-    matches = difflib.get_close_matches(
-        normalized, CATEGORY_SUGGESTIONS.keys(), n=1, cutoff=0.75
-    )
+    matches = difflib.get_close_matches(normalized, CATEGORY_SUGGESTIONS.keys(), n=1, cutoff=0.75)
     return matches[0] if matches else None
+
 
 SYSTEM_PROMPT = """You are a helpful German tax document assistant for the app "TaxForward". Your job is to help users find their uploaded tax documents, discover what they should still upload to maximize their German income tax refund (Einkommensteuererklärung), add invoices they describe to you directly, and correct mistakes on invoices they've already uploaded.
 
@@ -207,16 +206,10 @@ async def _edit_invoice_async(invoice_id: int, field: str, new_value: str, user_
             valid = ", ".join(sorted(CATEGORY_SUGGESTIONS.keys()))
             return f"Unknown category '{new_value}'. Valid categories: {valid}"
         new_value = resolved
-    request_kwargs = {
-        "user_id": user_id,
-        "invoice_id": invoice_id,
-        _INVOICE_FIELD_TO_PROTO[field]: new_value,
-    }
+    request = invoice_pb2.UpdateInvoiceRequest(user_id=user_id, invoice_id=invoice_id)
+    setattr(request, _INVOICE_FIELD_TO_PROTO[field], new_value)
     try:
-        resp = await _get_invoice_stub().UpdateInvoice(
-            invoice_pb2.UpdateInvoiceRequest(**request_kwargs),
-            timeout=10.0,
-        )
+        resp = await _get_invoice_stub().UpdateInvoice(request, timeout=10.0)
     except grpc.RpcError as e:
         detail = e.details() if hasattr(e, "details") else str(e)
         return f"Could not update invoice {invoice_id}: {detail}"

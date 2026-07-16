@@ -53,7 +53,16 @@ class InternalInvoiceGrpcServiceTest {
                         documentStorageService,
                         embeddingService);
         when(invoiceRepository.save(any(Invoice.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+                .thenAnswer(
+                        invocation -> {
+                            Invoice saved = invocation.getArgument(0);
+                            // Mirrors IDENTITY generation: real save() populates a null id
+                            // synchronously. Only createInvoice's brand-new entities hit this.
+                            if (saved.getId() == null) {
+                                ReflectionTestUtils.setField(saved, "id", 99L);
+                            }
+                            return saved;
+                        });
     }
 
     @Test

@@ -327,9 +327,7 @@ class TestEditInvoiceAsync:
 
         monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
 
-        result = run(
-            agent._edit_invoice_async(1, "category", "NOT_A_REAL_CATEGORY", "user-1")
-        )
+        result = run(agent._edit_invoice_async(1, "category", "NOT_A_REAL_CATEGORY", "user-1"))
 
         assert "Unknown category" in result
         assert called is False
@@ -346,18 +344,14 @@ class TestAddInvoiceAsync:
 
         monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
 
-        result = run(
-            agent._add_invoice_async("Laptop", "Apple", "999.00", "NOT_REAL", "user-1")
-        )
+        result = run(agent._add_invoice_async("Laptop", "Apple", "999.00", "NOT_REAL", "user-1"))
 
         assert "Unknown category" in result
         assert called is False
 
     def test_invalid_price_is_rejected(self):
         result = run(
-            agent._add_invoice_async(
-                "Laptop", "Apple", "not-a-number", "ARBEITSMITTEL", "user-1"
-            )
+            agent._add_invoice_async("Laptop", "Apple", "not-a-number", "ARBEITSMITTEL", "user-1")
         )
 
         assert "not a valid price" in result
@@ -375,9 +369,7 @@ class TestAddInvoiceAsync:
         monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
 
         result = run(
-            agent._add_invoice_async(
-                "Laptop", "Apple", "999.00", "arbeitsmittel", "user-1"
-            )
+            agent._add_invoice_async("Laptop", "Apple", "999.00", "arbeitsmittel", "user-1")
         )
 
         assert "Created invoice 42" in result
@@ -395,9 +387,7 @@ class TestAddInvoiceAsync:
         monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FailingStub())
 
         result = run(
-            agent._add_invoice_async(
-                "Laptop", "Apple", "999.00", "ARBEITSMITTEL", "user-1"
-            )
+            agent._add_invoice_async("Laptop", "Apple", "999.00", "ARBEITSMITTEL", "user-1")
         )
 
         assert "Could not create invoice" in result
@@ -460,18 +450,14 @@ class TestCheckDuplicateInvoicesAsync:
                 assert request.invoice_date == "2026-06-01"
                 return invoice_pb2.FindPotentialDuplicatesResponse(
                     invoices=[
-                        invoice_pb2.Invoice(
-                            id=1, item_name="Cable", company="Amazon", price="9.99"
-                        )
+                        invoice_pb2.Invoice(id=1, item_name="Cable", company="Amazon", price="9.99")
                     ]
                 )
 
         monkeypatch.setattr(agent, "_get_invoice_stub", lambda: _FakeStub())
 
         result = run(
-            agent._check_duplicate_invoices_async(
-                "Amazon", "9.99", "user-1", "2026-06-01"
-            )
+            agent._check_duplicate_invoices_async("Amazon", "9.99", "user-1", "2026-06-01")
         )
 
         assert "Found 1 potential duplicate" in result
