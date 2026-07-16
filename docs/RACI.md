@@ -10,7 +10,7 @@ for PR review routing.
 | Team member | GitHub | Primary subsystem |
 |---|---|---|
 | Simon Fritz | `simon-fritz` | Suggestions Service, Export Service, Client (React) |
-| Lukas Ketzer | `lukasketzer` | Kubernetes Infrastructure (Helm/Terraform/Ansible), Invoice Service, Chat-Agent (partially) |
+| Lukas Ketzer | `lukasketzer` | Kubernetes Infrastructure (Helm/Terraform/Ansible), Invoice Service, Chat-Agent |
 | Tareq | `Tareqahr` | Invoice-Service Extraction (OCR/categorization), GenAI RAG (`llm-chat`) |
 
 ## Matrix
