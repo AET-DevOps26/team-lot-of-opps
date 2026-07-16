@@ -171,7 +171,7 @@ export interface paths {
         put?: never;
         /**
          * Ask the RAG agent a question
-         * @description Streams the answer back as Server-Sent Events (`text/event-stream`). Each event is a `data: <json>` line whose payload is an agent event.
+         * @description Streams the answer back as Server-Sent Events (`text/event-stream`). Each event is a `data: <json>` line whose payload is an agent event. Beyond answering questions, the agent can add a new invoice, edit an existing one (item, price, category), summarize spending by category, explain a tax category's deduction rules, and flag likely duplicate invoices — writes apply immediately, with no separate confirmation step. Pass prior turns via `history` so multi-turn exchanges (e.g. the agent asking a follow-up) have the context they need.
          */
         post: operations["agentChat"];
         delete?: never;
@@ -360,6 +360,16 @@ export interface components {
         };
         AgentChatRequest: {
             question: string;
+            /**
+             * @description Prior turns of this conversation, oldest first. Required for multi-turn flows (e.g. the agent asking a clarifying question, or the user correcting a value it got wrong) — each request is otherwise a stateless, single-turn agent invocation.
+             * @default []
+             */
+            history: components["schemas"]["ChatHistoryMessage"][];
+        };
+        ChatHistoryMessage: {
+            /** @enum {string} */
+            role: "user" | "assistant";
+            content: string;
         };
         Error: {
             error?: string;
