@@ -4,7 +4,7 @@ import useT from '../i18n/useT'
 import Icon from '../components/Icon'
 import InvoiceFormModal from '../components/InvoiceFormModal'
 import { api, unwrap, authHeaders, BASE_URL } from '../api/client'
-import { useCategoryLabel, type InvoiceResponse } from '../lib/invoices'
+import { formatEuro, useCategoryLabel, type InvoiceResponse } from '../lib/invoices'
 
 type SortKey = 'date' | 'vendor' | 'category' | 'amount'
 type SortDir = 'asc' | 'desc'
@@ -33,10 +33,6 @@ function fmtDate(iso: string | null): string {
   if (!iso) return '—'
   const [y, m, d] = iso.split('-')
   return `${d}.${m}.${y}`
-}
-
-function fmtEur(n: number): string {
-  return `€ ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export default function Invoices() {
@@ -226,7 +222,7 @@ export default function Invoices() {
               <p className="font-label-caps text-label-caps text-on-secondary-container/80 uppercase tracking-wider mb-1">
                 {t('invoices.totalFiltered')}
               </p>
-              <p className="font-h2 text-h2 text-on-secondary-container">{fmtEur(total)}</p>
+              <p className="font-h2 text-h2 text-on-secondary-container">{formatEuro(total)}</p>
             </div>
           </div>
         </div>
@@ -413,7 +409,7 @@ export default function Invoices() {
                     </span>
                   </td>
                   <td className="py-4 px-6 font-data-mono text-data-mono text-on-surface text-right font-medium">
-                    {fmtEur(inv.price)}
+                    {formatEuro(inv.price)}
                   </td>
                   <td className="py-4 px-6 text-center">
                     <div className="flex items-center justify-center gap-2">

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useChat, type ChatMessage } from '../hooks/useChat'
 import useT, { type Translator } from '../i18n/useT'
 import Icon from './Icon'
-import { useCategoryLabel } from '../lib/invoices'
+import { formatEuro, useCategoryLabel } from '../lib/invoices'
 
 interface ChatPopupProps {
   open: boolean
@@ -181,10 +181,6 @@ function MessageBubble({
   )
 }
 
-function fmtEur(n: number): string {
-  return `€ ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
-
 function fmtDate(iso: string | null): string {
   if (!iso) return ''
   const [y, m, d] = iso.split('-')
@@ -242,7 +238,7 @@ function Sources({
                     </p>
                     {source.price !== null && (
                       <p className="shrink-0 font-body-sm text-body-sm text-on-surface">
-                        {fmtEur(source.price)}
+                        {formatEuro(source.price)}
                       </p>
                     )}
                   </div>

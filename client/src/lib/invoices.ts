@@ -34,3 +34,10 @@ export function useCategoryLabel(): (value: string | null) => string {
   const t = useT()
   return useCallback((value) => (value ? t(`categories.${value}`) : '—'), [t])
 }
+
+// Formats an amount the way German tax documents expect it: `€ 1.234,56`.
+// Used everywhere money is shown so on-screen figures match the exported PDF,
+// which renders the same de-DE convention.
+export function formatEuro(amount: number): string {
+  return `€ ${amount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}

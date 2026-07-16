@@ -67,6 +67,7 @@ export interface TranslationDict {
       totalExpenses: string
       sinceLastUpload: string
       carryforward: string
+      carryforwardNote: string
       aiVerified: string
       futureRefund: string
       taxRateNote: string
@@ -75,9 +76,29 @@ export interface TranslationDict {
     savings: {
       title: string
       intro: string
-      recordedExpenses: string
-      futureTaxRate: string
+      grossSalary: string
+      yearHeading: string
+      invoiceExpenses: string
+      pendlertage: string
+      entfernungKm: string
+      homeofficeTage: string
+      bewerbungenSchriftlich: string
+      bewerbungenOnline: string
+      umzug: string
+      werkstudentIncome: string
+      yearLoss: string
+      carryforwardTotal: string
+      taxRegular: string
+      taxWithCarryforward: string
       futureRefund: string
+      groupCommute: string
+      groupHomeoffice: string
+      groupApplications: string
+      groupIncome: string
+      advanced: string
+      advancedNote: string
+      vorsorgeRate: string
+      pauschbetrag: string
     }
     ai: {
       title: string
@@ -176,15 +197,10 @@ export interface TranslationDict {
     loadFailed: string
     summary: {
       title: string
-      invoiceCount: string
-      totalExpenses: string
-      lumpSumAllowance: string
-      deductibleAboveLumpSum: string
-      lumpSumHint: string
-      belowAllowance: string
+      loading: string
       empty: string
     }
-    table: { category: string; receipts: string; amount: string; uncategorized: string }
+    table: { category: string; receipts: string; amount: string; total: string; uncategorized: string }
     downloads: {
       title: string
       zip: string
@@ -280,20 +296,41 @@ const translations: Record<Language, TranslationDict> = {
       subtitle: 'Here is the current state of your academic tax loss carryforward.',
       cards: {
         totalExpenses: 'Total Expenses',
-        sinceLastUpload: '+€350 since last upload',
+        sinceLastUpload: 'since last upload',
         carryforward: 'Est. Loss Carryforward',
+        carryforwardNote: 'From confirmed invoices only',
         aiVerified: 'AI Verified',
         futureRefund: 'Estimated Future Refund',
-        taxRateNote: 'Based on your assumed tax rate',
+        taxRateNote: 'Based on § 32a EStG 2024 and your expected salary',
       },
       categories: { title: 'Expenses by Category', reverseOrder: 'Reverse order' },
       savings: {
         title: 'How Your Savings Work',
         intro:
           'A "Verlustvortrag" records your study costs now, to offset against your future income when you start working.',
-        recordedExpenses: 'Your recorded expenses',
-        futureTaxRate: 'Future tax rate (Est. 30%)',
+        grossSalary: 'Expected gross starting salary (€/year)',
+        yearHeading: 'Study year',
+        invoiceExpenses: 'Recorded expenses (invoices)',
+        pendlertage: 'Commuting days to university',
+        entfernungKm: 'One-way distance (km)',
+        homeofficeTage: 'Home-office days',
+        bewerbungenSchriftlich: 'Paper job applications',
+        bewerbungenOnline: 'Online job applications',
+        umzug: 'Study-related move',
+        werkstudentIncome: 'Working-student gross income (€)',
+        yearLoss: 'Loss for the year',
+        carryforwardTotal: 'Total loss carryforward',
+        taxRegular: 'Income tax without carryforward',
+        taxWithCarryforward: 'Income tax with carryforward',
         futureRefund: 'Future Cash Refund',
+        groupCommute: 'Commute',
+        groupHomeoffice: 'Home office',
+        groupApplications: 'Job applications',
+        groupIncome: 'Income & relocation',
+        advanced: 'Advanced assumptions',
+        advancedNote: 'These estimates drive the projected refund. Adjust them to match your situation.',
+        vorsorgeRate: 'Est. deductions on salary (%)',
+        pauschbetrag: 'Employee lump-sum allowance (€)',
       },
       ai: {
         title: 'AI Suggestions',
@@ -410,20 +447,14 @@ const translations: Record<Language, TranslationDict> = {
       loadFailed: 'Could not load this tax year.',
       summary: {
         title: 'Summary',
-        invoiceCount: 'Accepted invoices',
-        totalExpenses: 'Total work-related expenses',
-        lumpSumAllowance: 'Employee lump-sum allowance',
-        deductibleAboveLumpSum: 'Deductible above the allowance',
-        lumpSumHint:
-          'Every employee may deduct this without any receipt. Only what your receipts add on top of it is worth claiming.',
-        belowAllowance:
-          'Your receipts still add up to less than the lump-sum allowance for this year, so they gain you nothing extra yet.',
+        loading: 'Loading…',
         empty: 'No accepted invoices for this year.',
       },
       table: {
         category: 'Category',
         receipts: 'Invoices',
         amount: 'Amount',
+        total: 'Total',
         uncategorized: 'Uncategorized',
       },
       downloads: {
@@ -437,8 +468,7 @@ const translations: Record<Language, TranslationDict> = {
         preparing: 'Preparing…',
         failed: 'Download failed. Please try again.',
       },
-      disclaimer:
-        'Only invoices you reviewed and accepted are exported. The lump-sum allowance is set by legislation — check the figure for the tax year before you file.',
+      disclaimer: 'Only reviewed invoices are exported.',
     },
     categories: {
       KONTOFUEHRUNGSGEBUEHREN: 'Account maintenance fees',
@@ -536,20 +566,41 @@ const translations: Record<Language, TranslationDict> = {
       subtitle: 'Hier ist der aktuelle Stand deines akademischen Verlustvortrags.',
       cards: {
         totalExpenses: 'Gesamtausgaben',
-        sinceLastUpload: '+350 € seit letztem Upload',
+        sinceLastUpload: 'seit letztem Upload',
         carryforward: 'Geschätzter Verlustvortrag',
+        carryforwardNote: 'Nur aus bestätigten Rechnungen',
         aiVerified: 'KI-geprüft',
         futureRefund: 'Geschätzte zukünftige Rückerstattung',
-        taxRateNote: 'Basierend auf deinem angenommenen Steuersatz',
+        taxRateNote: 'Basierend auf § 32a EStG 2024 und deinem erwarteten Gehalt',
       },
       categories: { title: 'Ausgaben nach Kategorie', reverseOrder: 'Reihenfolge umkehren' },
       savings: {
         title: 'So funktionieren deine Einsparungen',
         intro:
           'Ein „Verlustvortrag" erfasst deine Studienkosten jetzt, um sie später mit deinem zukünftigen Einkommen zu verrechnen.',
-        recordedExpenses: 'Erfasste Ausgaben',
-        futureTaxRate: 'Zukünftiger Steuersatz (geschätzt 30 %)',
+        grossSalary: 'Erwartetes Brutto-Einstiegsgehalt (€/Jahr)',
+        yearHeading: 'Studienjahr',
+        invoiceExpenses: 'Erfasste Ausgaben (Rechnungen)',
+        pendlertage: 'Pendeltage zur Uni',
+        entfernungKm: 'Einfache Entfernung (km)',
+        homeofficeTage: 'Home-Office-Tage',
+        bewerbungenSchriftlich: 'Bewerbungen (Papier)',
+        bewerbungenOnline: 'Bewerbungen (online)',
+        umzug: 'Studienbedingter Umzug',
+        werkstudentIncome: 'Werkstudenten-Brutto (€)',
+        yearLoss: 'Verlust des Jahres',
+        carryforwardTotal: 'Gesamter Verlustvortrag',
+        taxRegular: 'Einkommensteuer ohne Verlustvortrag',
+        taxWithCarryforward: 'Einkommensteuer mit Verlustvortrag',
         futureRefund: 'Zukünftige Rückerstattung',
+        groupCommute: 'Pendeln',
+        groupHomeoffice: 'Home-Office',
+        groupApplications: 'Bewerbungen',
+        groupIncome: 'Einkommen & Umzug',
+        advanced: 'Erweiterte Annahmen',
+        advancedNote: 'Diese Schätzwerte bestimmen die prognostizierte Rückerstattung. Passe sie an deine Situation an.',
+        vorsorgeRate: 'Gesch. Abzüge vom Gehalt (%)',
+        pauschbetrag: 'Arbeitnehmer-Pauschbetrag (€)',
       },
       ai: {
         title: 'KI-Vorschläge',
@@ -666,20 +717,14 @@ const translations: Record<Language, TranslationDict> = {
       loadFailed: 'Dieses Steuerjahr konnte nicht geladen werden.',
       summary: {
         title: 'Zusammenfassung',
-        invoiceCount: 'Bestätigte Rechnungen',
-        totalExpenses: 'Summe der Werbungskosten',
-        lumpSumAllowance: 'Arbeitnehmer-Pauschbetrag',
-        deductibleAboveLumpSum: 'Zusätzlich absetzbar',
-        lumpSumHint:
-          'Diesen Betrag darf jede:r Arbeitnehmer:in ohne Belege absetzen. Nur was deine Belege darüber hinaus ergeben, bringt dir zusätzlich etwas.',
-        belowAllowance:
-          'Deine Belege liegen für dieses Jahr noch unter dem Pauschbetrag — sie bringen dir also bisher nichts zusätzlich.',
+        loading: 'Wird geladen…',
         empty: 'Keine bestätigten Rechnungen für dieses Jahr.',
       },
       table: {
         category: 'Kategorie',
         receipts: 'Rechnungen',
         amount: 'Betrag',
+        total: 'Gesamt',
         uncategorized: 'Ohne Kategorie',
       },
       downloads: {
@@ -693,8 +738,7 @@ const translations: Record<Language, TranslationDict> = {
         preparing: 'Wird vorbereitet…',
         failed: 'Download fehlgeschlagen. Bitte versuch es erneut.',
       },
-      disclaimer:
-        'Exportiert werden nur Rechnungen, die du geprüft und bestätigt hast. Der Pauschbetrag ist gesetzlich festgelegt — prüfe den Wert für das Steuerjahr, bevor du abgibst.',
+      disclaimer: 'Es werden nur geprüfte Rechnungen exportiert.',
     },
     categories: {
       KONTOFUEHRUNGSGEBUEHREN: 'Kontoführungsgebühren',
