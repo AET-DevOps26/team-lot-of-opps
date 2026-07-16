@@ -2,6 +2,22 @@
 
 TaxForward is a full-stack application that helps German students and trainees track study-related expenses and turn them into a future tax refund ("Verlustvortrag"). Users upload receipts and invoices; an AI pipeline extracts and classifies the line items, stores them, and surfaces suggestions for tax-deductible documents that might be missing.
 
+## Deploy (quick start)
+
+
+**To deploy the app to the AET cluster:** GitHub → **Actions** → **`deploy.yml`** ("Deploy") → **Run workflow** with `target: aet`. That's it — it builds images and `helm upgrade`s the app.
+
+**!!! DISCLAIMER**: `deploy.yml` only deploys the app, not the observablility stack. We reccomend this, since the last time we checked (16.07.2026, 16:01) deploying the observablility stack on the AET cluster did not work, due to a known, unsolved problem.
+If you want to see the observabiliyt stack in action go to the [azure deployment](http://lot-of-opps-vm.swedencentral.cloudapp.azure.com/grafana) with username: `admin`, password: `pleaseGiveUseAGoodGrade1.0Thanks`.
+
+Full details (VM target, one-click deploy-all, rollout strategies) are in [Deploy](#deploy) below.
+
+![alt text](docs/step1.jpg)
+![alt text](docs/step2.jpg)
+![alt text](docs/step3.jpg)
+
+
+
 ## Documentation
 
 | Doc | What it covers |
@@ -309,6 +325,19 @@ dispatch. The monitoring stack deploys separately — see
 To bring up a whole environment in one click, run
 [`deploy-all.yml`](.github/workflows/deploy-all.yml) ("Deploy Everything")
 and pick a target — it deploys observability then the app to that cluster.
+The `app` job `needs: observability`, so if the observability deploy fails,
+the app job is skipped rather than proceeding: the app chart's
+`PrometheusRule` depends on the `monitoring.coreos.com/v1` CRD that the
+monitoring chart installs, so deploying the app without a working
+observability stack can fail unpredictably depending on whether that CRD
+already exists on the cluster.
+
+**If observability is broken on a target and you just need the app running**
+(e.g. for grading), don't use `deploy-all.yml` — run
+[`deploy.yml`](.github/workflows/deploy.yml) directly instead (push to `main`
+already triggers it for the AET cluster, or dispatch it manually with
+`target: vm`). It has no dependency on observability and deploys the app
+standalone.
 
 ### Update strategies
 
