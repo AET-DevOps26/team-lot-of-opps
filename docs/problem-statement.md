@@ -45,6 +45,11 @@ organized, tax-ready overview of deductible expenses.
    their own documents in plain language ("What did I spend on training this
    year?", "What should I still upload?") and answers with references to specific
    invoices.
+6. **Tax-year export** — When it's time to file, the user picks a tax year and
+   downloads it in the form the Finanzamt expects: a German summary sheet with
+   the totals per deduction category, a spreadsheet with one row per invoice for
+   a tax advisor, and every original receipt as proof. Only invoices the user has
+   reviewed and accepted are exported.
 
 ## Intended users
 
@@ -115,6 +120,14 @@ Lena asks, *"What should I still upload to get the most back?"* The assistant
 checks which tax categories she has no documents in and replies with concrete
 recommendations — commuting tickets, internet bill, union membership proof — so
 she can gather the last few receipts before filing.
+
+**Scenario E — Filing the year.**
+Once the year is over, Lena opens the export page and picks 2026. She sees her
+accepted expenses totalled per category — *Further education* 149.00 €, *Work
+equipment* 1,240.00 € — and downloads the complete package: a German summary
+sheet with the totals per category, a spreadsheet with one row per invoice for
+her tax advisor, and every original receipt as proof. The receipts she used to
+throw away are now a single file she can hand over.
 
 The result: a student who would have skipped filing entirely ends the year with a
 clean, categorized, AI-assisted record that becomes a real tax refund later.

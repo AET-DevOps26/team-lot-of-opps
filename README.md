@@ -2,6 +2,16 @@
 
 TaxForward is a full-stack application that helps German students and trainees track study-related expenses and turn them into a future tax refund ("Verlustvortrag"). Users upload receipts and invoices; an AI pipeline extracts and classifies the line items, stores them, and surfaces suggestions for tax-deductible documents that might be missing.
 
+## Documentation
+
+| Doc | What it covers |
+|---|---|
+| [`docs/problem-statement.md`](docs/problem-statement.md) | Problem statement and product motivation |
+| [`docs/RACI.md`](docs/RACI.md) | Team subsystem ownership and responsibilities |
+| [`docs/database-schema.md`](docs/database-schema.md) | Database schema — tables, columns, migrations |
+| [`docs/runbook-rollback.md`](docs/runbook-rollback.md) | Deployment rollback runbook |
+| [`docs/architecture-diagram.png`](docs/architecture-diagram.png) · [`docs/use-case.png`](docs/use-case.png) · [`docs/analysis-object-model.png`](docs/analysis-object-model.png) | Architecture, use-case and analysis-object-model diagrams |
+| [`api/README.md`](api/README.md) | OpenAPI spec and codegen |
 ## Live deployments
 
 - **VM (Azure):** http://lot-of-opps-vm.swedencentral.cloudapp.azure.com/welcome
@@ -59,6 +69,7 @@ server is just three environment variables, set once for the whole stack (`infra
 |---|---|---|---|
 | **Local** (LM Studio / Ollama) | `http://host.docker.internal:1234` | model id loaded in the local server, e.g. `google/gemma-4-e2b` | `EMPTY` (unused, but required by the OpenAI client) |
 | **Cloud** (OpenAI) | `https://api.openai.com` | an OpenAI model, e.g. `gpt-4o-mini` | your real OpenAI API key |
+| **Logos** (TUM AET) | `https://logos.aet.cit.tum.de` | `openai/gpt-oss-120b` | your `lg-…` key (from your tutor) |
 
 The default in `infra/.env.example` is local (LM Studio/Ollama on the host). To switch to a cloud
 provider, set the three variables above — no code changes required, since every service reads them
@@ -72,6 +83,29 @@ llm = ChatOpenAI(
 )
 ```
 Any OpenAI-compatible endpoint works this way, not just OpenAI and LM Studio/Ollama specifically.
+
+### Logos (TUM AET)
+
+The AI deployment uses **`openai/gpt-oss-120b` via [Logos](https://logos.aet.cit.tum.de)**,
+TUM AET's OpenAI-compatible gateway. Set the three variables to the Logos row above
+(`LLM_API_KEY` is the `lg-…` key you receive from your tutor). Gotchas:
+
+- The model id is `openai/gpt-oss-120b` — keep the `openai/` prefix, it is part of the id.
+- Services already append `/v1/...`, so `LLM_URL` is the bare host (`https://logos.aet.cit.tum.de`), no path.
+- **Network:** the prod instance is only reachable from the **TUM network** — off-campus you must be on **eduVPN**.
+
+Smoke-test your key and list the models it may use:
+
+```bash
+# chat completion
+curl -X POST https://logos.aet.cit.tum.de/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $LLM_API_KEY" \
+  -d '{"model": "openai/gpt-oss-120b", "messages": [{"role": "user", "content": "Say hi in 3 words."}]}'
+
+# models allowed for your key
+curl https://logos.aet.cit.tum.de/v1/models -H "Authorization: Bearer $LLM_API_KEY"
+```
 
 ## Services
 
@@ -91,7 +125,6 @@ Any OpenAI-compatible endpoint works this way, not just OpenAI and LM Studio/Oll
 | `loki`            | Grafana Loki 2.9                  | `3100`        | `loki`            |
 | `grafana`         | Grafana OSS                       | `3001` (→`3000`) | `grafana`      |
 
-Database schema (tables, columns, migrations) is documented in [`docs/database-schema.md`](docs/database-schema.md).
 `export-service` owns no schema — it is stateless and derives every export from `invoice-service`.
 
 ## Tax-year export
