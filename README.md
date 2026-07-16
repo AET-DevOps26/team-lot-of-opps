@@ -273,6 +273,32 @@ the app chart ([`infra/helm`](infra/helm)) on push to `main` or manual
 dispatch. The monitoring stack deploys separately — see
 [Observability](#observability) above.
 
+### Update strategies
+
+Each Deployment sets a Kubernetes rollout `strategy` (in its
+`infra/helm/templates/*-deployment.yaml`). Two are used:
+
+- **RollingUpdate** — replaces pods gradually so the service stays reachable.
+- **Recreate** — kills the old pod before starting the new one (brief
+  downtime). Used for the stateful services that own a
+  ReadWriteOnce volume, which a second pod can't mount simultaneously.
+
+| Service | Strategy | maxSurge | maxUnavailable | Why |
+|---|---|---|---|---|
+| auth-service | RollingUpdate | 1 | 0 | Zero-downtime, spare vCPU headroom |
+| client | RollingUpdate | 1 | 0 | Zero-downtime, spare vCPU headroom |
+| traefik | RollingUpdate | 0 | 1 | Roll in place — stay within the 4-vCPU namespace quota |
+| invoice-service | RollingUpdate | 0 | 1 | Roll in place — stay within the 4-vCPU namespace quota |
+| export-service | RollingUpdate | 0 | 1 | Roll in place — stay within the 4-vCPU namespace quota |
+| suggestions-service | RollingUpdate | 0 | 1 | Roll in place — surge pod would overrun the vCPU quota |
+| llm-chat | RollingUpdate | 0 | 1 | Roll in place — stay within the 4-vCPU namespace quota |
+| db (postgres) | Recreate | — | — | ReadWriteOnce volume can't be mounted by two pods |
+| seaweedfs | Recreate | — | — | ReadWriteOnce volume can't be mounted by two pods |
+
+`maxSurge: 0` means the rollout accepts a brief downtime (old pod stops
+before the new one is ready) rather than temporarily running an extra pod,
+which keeps CPU requests inside the shared cluster's 4-vCPU namespace quota.
+
 ---
 
 ## Notes
