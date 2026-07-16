@@ -21,14 +21,14 @@ for PR review routing.
 | `services/suggestions-service/` (Spring Boot) | R/A | C | C |
 | `services/invoice-service/` (Spring Boot, core service) | C | R/A | C |
 | `services/invoice-service/.../ExtractionService` (OCR/categorization) | I | C | R/A |
-| `services/llm-chat/` — Chat-Agent (orchestration, `agent.py`/`main.py`) | I | R/A (partial) | C |
+| `services/llm-chat/` — Chat-Agent (orchestration, `agent.py`/`main.py`) | I | R/A | C |
 | `services/llm-chat/` — RAG/vector store (`vector_store.py`) | I | C | R/A |
 | `services/auth-service/` (FastAPI, Firebase) | C | R/A | C |
 | `infra/` (Kubernetes, Helm, Terraform, Ansible) | I | R/A | I |
 | `.github/workflows/` (CI/CD) | C | R/A | C |
 | `infra/monitoring/`, `infra/grafana/`, `infra/prometheus/` (Observability) | I | R/A | I |
 | `api/openapi.yaml` (API contract) | C | C | C — jointly owned; changes need agreement from whichever services are affected |
-| `docs/` (architecture, schema, diagrams) | C | R/A | C |
+| `docs/` (architecture, schema, diagrams) | R/A | R/A | R/A |
 
 ## Notes
 
