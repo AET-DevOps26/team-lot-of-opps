@@ -273,6 +273,10 @@ the app chart ([`infra/helm`](infra/helm)) on push to `main` or manual
 dispatch. The monitoring stack deploys separately — see
 [Observability](#observability) above.
 
+To bring up a whole environment in one click, run
+[`deploy-all.yml`](.github/workflows/deploy-all.yml) ("Deploy Everything")
+and pick a target — it deploys observability then the app to that cluster.
+
 ### Update strategies
 
 Each Deployment sets a Kubernetes rollout `strategy` (in its

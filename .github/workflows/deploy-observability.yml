@@ -11,6 +11,13 @@ on:
         type: choice
         options: [aet, vm]
         default: aet
+  # Called by deploy-all.yml. workflow_call inputs can't be type: choice.
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        required: false
+        default: aet
   push:
     branches: [main]
     paths:

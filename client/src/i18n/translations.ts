@@ -76,29 +76,9 @@ export interface TranslationDict {
     savings: {
       title: string
       intro: string
-      grossSalary: string
-      yearHeading: string
-      invoiceExpenses: string
-      pendlertage: string
-      entfernungKm: string
-      homeofficeTage: string
-      bewerbungenSchriftlich: string
-      bewerbungenOnline: string
-      umzug: string
-      werkstudentIncome: string
-      yearLoss: string
-      carryforwardTotal: string
-      taxRegular: string
-      taxWithCarryforward: string
+      recordedExpenses: string
+      futureTaxRate: string
       futureRefund: string
-      groupCommute: string
-      groupHomeoffice: string
-      groupApplications: string
-      groupIncome: string
-      advanced: string
-      advancedNote: string
-      vorsorgeRate: string
-      pauschbetrag: string
     }
     ai: {
       title: string
@@ -301,36 +281,16 @@ const translations: Record<Language, TranslationDict> = {
         carryforwardNote: 'From confirmed invoices only',
         aiVerified: 'AI Verified',
         futureRefund: 'Estimated Future Refund',
-        taxRateNote: 'Based on § 32a EStG 2024 and your expected salary',
+        taxRateNote: 'Based on your assumed tax rate',
       },
       categories: { title: 'Expenses by Category', reverseOrder: 'Reverse order' },
       savings: {
         title: 'How Your Savings Work',
         intro:
           'A "Verlustvortrag" records your study costs now, to offset against your future income when you start working.',
-        grossSalary: 'Expected gross starting salary (€/year)',
-        yearHeading: 'Study year',
-        invoiceExpenses: 'Recorded expenses (invoices)',
-        pendlertage: 'Commuting days to university',
-        entfernungKm: 'One-way distance (km)',
-        homeofficeTage: 'Home-office days',
-        bewerbungenSchriftlich: 'Paper job applications',
-        bewerbungenOnline: 'Online job applications',
-        umzug: 'Study-related move',
-        werkstudentIncome: 'Working-student gross income (€)',
-        yearLoss: 'Loss for the year',
-        carryforwardTotal: 'Total loss carryforward',
-        taxRegular: 'Income tax without carryforward',
-        taxWithCarryforward: 'Income tax with carryforward',
+        recordedExpenses: 'Your recorded expenses',
+        futureTaxRate: 'Future tax rate (Est. 30%)',
         futureRefund: 'Future Cash Refund',
-        groupCommute: 'Commute',
-        groupHomeoffice: 'Home office',
-        groupApplications: 'Job applications',
-        groupIncome: 'Income & relocation',
-        advanced: 'Advanced assumptions',
-        advancedNote: 'These estimates drive the projected refund. Adjust them to match your situation.',
-        vorsorgeRate: 'Est. deductions on salary (%)',
-        pauschbetrag: 'Employee lump-sum allowance (€)',
       },
       ai: {
         title: 'AI Suggestions',
@@ -571,36 +531,16 @@ const translations: Record<Language, TranslationDict> = {
         carryforwardNote: 'Nur aus bestätigten Rechnungen',
         aiVerified: 'KI-geprüft',
         futureRefund: 'Geschätzte zukünftige Rückerstattung',
-        taxRateNote: 'Basierend auf § 32a EStG 2024 und deinem erwarteten Gehalt',
+        taxRateNote: 'Basierend auf deinem angenommenen Steuersatz',
       },
       categories: { title: 'Ausgaben nach Kategorie', reverseOrder: 'Reihenfolge umkehren' },
       savings: {
         title: 'So funktionieren deine Einsparungen',
         intro:
           'Ein „Verlustvortrag" erfasst deine Studienkosten jetzt, um sie später mit deinem zukünftigen Einkommen zu verrechnen.',
-        grossSalary: 'Erwartetes Brutto-Einstiegsgehalt (€/Jahr)',
-        yearHeading: 'Studienjahr',
-        invoiceExpenses: 'Erfasste Ausgaben (Rechnungen)',
-        pendlertage: 'Pendeltage zur Uni',
-        entfernungKm: 'Einfache Entfernung (km)',
-        homeofficeTage: 'Home-Office-Tage',
-        bewerbungenSchriftlich: 'Bewerbungen (Papier)',
-        bewerbungenOnline: 'Bewerbungen (online)',
-        umzug: 'Studienbedingter Umzug',
-        werkstudentIncome: 'Werkstudenten-Brutto (€)',
-        yearLoss: 'Verlust des Jahres',
-        carryforwardTotal: 'Gesamter Verlustvortrag',
-        taxRegular: 'Einkommensteuer ohne Verlustvortrag',
-        taxWithCarryforward: 'Einkommensteuer mit Verlustvortrag',
+        recordedExpenses: 'Erfasste Ausgaben',
+        futureTaxRate: 'Zukünftiger Steuersatz (geschätzt 30 %)',
         futureRefund: 'Zukünftige Rückerstattung',
-        groupCommute: 'Pendeln',
-        groupHomeoffice: 'Home-Office',
-        groupApplications: 'Bewerbungen',
-        groupIncome: 'Einkommen & Umzug',
-        advanced: 'Erweiterte Annahmen',
-        advancedNote: 'Diese Schätzwerte bestimmen die prognostizierte Rückerstattung. Passe sie an deine Situation an.',
-        vorsorgeRate: 'Gesch. Abzüge vom Gehalt (%)',
-        pauschbetrag: 'Arbeitnehmer-Pauschbetrag (€)',
       },
       ai: {
         title: 'KI-Vorschläge',
