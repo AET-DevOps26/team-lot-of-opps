@@ -44,7 +44,10 @@ organized, tax-ready overview of deductible expenses.
 5. **Conversational assistant** — A chatbot lets the user ask questions about
    their own documents in plain language ("What did I spend on training this
    year?", "What should I still upload?") and answers with references to specific
-   invoices.
+   invoices. The same chat can also add a new invoice, correct a mistake on an
+   existing one, summarize spending by category, explain why a category is
+   deductible, or flag likely duplicate submissions — all in plain language,
+   applied immediately.
 6. **Tax-year export** — When it's time to file, the user picks a tax year and
    downloads it in the form the Finanzamt expects: a German summary sheet with
    the totals per deduction category, a spreadsheet with one row per invoice for
@@ -88,7 +91,11 @@ the user doesn't leave money on the table.
 ### 3. Conversational RAG assistant
 The `llm-chat` service runs a LangChain agent over a **pgvector** semantic index
 of the user's documents. The agent has tools to list documents, run semantic
-search, and analyze missing categories. It answers natural-language questions,
+search, analyze missing categories, summarize spending by category, explain a
+tax category's deduction rules, and flag likely duplicate invoices. It can also
+add a new invoice or edit an existing one (item, price, category) directly from
+the conversation — small typos in a category name are fuzzy-matched to the
+correct one instead of failing outright. It answers natural-language questions,
 responds in the user's language (German or English), and **cites the specific
 invoices** (company, date, amount) behind every answer, so responses are
 grounded and verifiable rather than hallucinated.
@@ -121,7 +128,15 @@ checks which tax categories she has no documents in and replies with concrete
 recommendations — commuting tickets, internet bill, union membership proof — so
 she can gather the last few receipts before filing.
 
-**Scenario E — Filing the year.**
+**Scenario E — Fixing a mistake in chat.**
+Lena notices a train ticket got auto-categorized as *Reisekosten* when it should
+be *Wege zur Arbeit*. She types, *"Change the category of my invoice from
+22.03.2025 to Wege zur Arbeit"* — the assistant applies the change immediately
+and confirms it. She could just as easily have said *"Add a new invoice: train
+ticket, Deutsche Bahn, 12.40€, Wege zur Arbeit"* to log a receipt she never
+photographed.
+
+**Scenario F — Filing the year.**
 Once the year is over, Lena opens the export page and picks 2026. She sees her
 accepted expenses totalled per category — *Further education* 149.00 €, *Work
 equipment* 1,240.00 € — and downloads the complete package: a German summary

@@ -40,7 +40,7 @@ Full details (VM target, one-click deploy-all, rollout strategies) are in [Deplo
 ├── client/                    # React + Vite + Redux + TypeScript SPA
 ├── services/
 │   ├── invoice-service/       # Spring Boot REST API — document upload, OCR, invoice persistence
-│   ├── llm-chat/              # FastAPI — conversational RAG agent (pgvector)
+│   ├── llm-chat/              # FastAPI — conversational RAG agent (pgvector), can add/edit invoices
 │   ├── suggestions-service/   # Spring Boot REST API — proactive tax suggestions (LLM-generated)
 │   ├── export-service/        # Spring Boot REST API — tax-year exports (PDF/CSV/ZIP), stateless
 │   └── auth-service/          # FastAPI — Firebase token verification (Traefik forward-auth)

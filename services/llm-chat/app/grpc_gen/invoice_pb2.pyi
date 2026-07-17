@@ -89,3 +89,63 @@ class GetDocumentContentResponse(_message.Message):
     CONTENT_FIELD_NUMBER: _ClassVar[int]
     content: bytes
     def __init__(self, content: _Optional[bytes] = ...) -> None: ...
+
+class UpdateInvoiceRequest(_message.Message):
+    __slots__ = ("user_id", "invoice_id", "item_name", "price", "category")
+    USER_ID_FIELD_NUMBER: _ClassVar[int]
+    INVOICE_ID_FIELD_NUMBER: _ClassVar[int]
+    ITEM_NAME_FIELD_NUMBER: _ClassVar[int]
+    PRICE_FIELD_NUMBER: _ClassVar[int]
+    CATEGORY_FIELD_NUMBER: _ClassVar[int]
+    user_id: str
+    invoice_id: int
+    item_name: str
+    price: str
+    category: str
+    def __init__(self, user_id: _Optional[str] = ..., invoice_id: _Optional[int] = ..., item_name: _Optional[str] = ..., price: _Optional[str] = ..., category: _Optional[str] = ...) -> None: ...
+
+class UpdateInvoiceResponse(_message.Message):
+    __slots__ = ("invoice",)
+    INVOICE_FIELD_NUMBER: _ClassVar[int]
+    invoice: Invoice
+    def __init__(self, invoice: _Optional[_Union[Invoice, _Mapping]] = ...) -> None: ...
+
+class FindPotentialDuplicatesRequest(_message.Message):
+    __slots__ = ("user_id", "company", "price", "invoice_date")
+    USER_ID_FIELD_NUMBER: _ClassVar[int]
+    COMPANY_FIELD_NUMBER: _ClassVar[int]
+    PRICE_FIELD_NUMBER: _ClassVar[int]
+    INVOICE_DATE_FIELD_NUMBER: _ClassVar[int]
+    user_id: str
+    company: str
+    price: str
+    invoice_date: str
+    def __init__(self, user_id: _Optional[str] = ..., company: _Optional[str] = ..., price: _Optional[str] = ..., invoice_date: _Optional[str] = ...) -> None: ...
+
+class FindPotentialDuplicatesResponse(_message.Message):
+    __slots__ = ("invoices",)
+    INVOICES_FIELD_NUMBER: _ClassVar[int]
+    invoices: _containers.RepeatedCompositeFieldContainer[Invoice]
+    def __init__(self, invoices: _Optional[_Iterable[_Union[Invoice, _Mapping]]] = ...) -> None: ...
+
+class CreateInvoiceRequest(_message.Message):
+    __slots__ = ("user_id", "item_name", "company", "price", "category", "invoice_date")
+    USER_ID_FIELD_NUMBER: _ClassVar[int]
+    ITEM_NAME_FIELD_NUMBER: _ClassVar[int]
+    COMPANY_FIELD_NUMBER: _ClassVar[int]
+    PRICE_FIELD_NUMBER: _ClassVar[int]
+    CATEGORY_FIELD_NUMBER: _ClassVar[int]
+    INVOICE_DATE_FIELD_NUMBER: _ClassVar[int]
+    user_id: str
+    item_name: str
+    company: str
+    price: str
+    category: str
+    invoice_date: str
+    def __init__(self, user_id: _Optional[str] = ..., item_name: _Optional[str] = ..., company: _Optional[str] = ..., price: _Optional[str] = ..., category: _Optional[str] = ..., invoice_date: _Optional[str] = ...) -> None: ...
+
+class CreateInvoiceResponse(_message.Message):
+    __slots__ = ("invoice",)
+    INVOICE_FIELD_NUMBER: _ClassVar[int]
+    invoice: Invoice
+    def __init__(self, invoice: _Optional[_Union[Invoice, _Mapping]] = ...) -> None: ...

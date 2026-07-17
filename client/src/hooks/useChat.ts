@@ -1,5 +1,16 @@
 import { useCallback, useRef, useState } from 'react'
 import { authHeaders, BASE_URL } from '../api/client'
+import { invoicesChanged } from '../features/invoicesSlice'
+import { useAppDispatch } from '../store/hooks'
+
+/** Tool calls that mutate invoice data — a successful result means pages showing
+ * invoices are now stale and should refetch. */
+const INVOICE_WRITE_TOOLS = new Set(['edit_invoice', 'add_invoice'])
+
+function toolWriteSucceeded(result: string | undefined): boolean {
+  if (!result) return false
+  return result.includes('Updated invoice') || result.includes('Created invoice')
+}
 
 /** An invoice the agent referenced while answering, surfaced to the user as a source. */
 export interface ChatSource {
@@ -62,6 +73,7 @@ export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+  const dispatch = useAppDispatch()
 
   const updateAssistant = useCallback(
     (id: string, updater: (msg: ChatMessage) => ChatMessage) => {
@@ -85,6 +97,12 @@ export function useChat() {
     async (question: string) => {
       const trimmed = question.trim()
       if (!trimmed || isStreaming) return
+
+      // Prior turns, sent so the backend agent can resolve confirm-gated tools
+      // (e.g. "yes" after a proposed invoice edit) — each request is otherwise stateless.
+      const history = messages
+        .filter((m) => m.content.trim().length > 0)
+        .map((m) => ({ role: m.role, content: m.content }))
 
       const userMsg: ChatMessage = {
         id: randomId(),
@@ -116,7 +134,7 @@ export function useChat() {
         const res = await fetch(`${BASE_URL}/api/v1/agent/chat`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ question: trimmed }),
+          body: JSON.stringify({ question: trimmed, history }),
           signal: controller.signal,
         })
 
@@ -173,6 +191,15 @@ export function useChat() {
               case 'references':
                 addSources(normalizeReferences(evt.invoices))
                 break
+              case 'tool_end':
+                if (
+                  evt.tool &&
+                  INVOICE_WRITE_TOOLS.has(evt.tool) &&
+                  toolWriteSucceeded(evt.result)
+                ) {
+                  dispatch(invoicesChanged())
+                }
+                break
               case 'error':
                 updateAssistant(assistantId, (m) => ({
                   ...m,
@@ -203,7 +230,7 @@ export function useChat() {
         setIsStreaming(false)
       }
     },
-    [isStreaming, updateAssistant],
+    [isStreaming, updateAssistant, messages],
   )
 
   return { messages, isStreaming, sendMessage, stop, reset }

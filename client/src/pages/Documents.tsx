@@ -5,6 +5,8 @@ import Icon from '../components/Icon'
 import InvoiceFormModal from '../components/InvoiceFormModal'
 import { api, unwrap, authHeaders, BASE_URL } from '../api/client'
 import { formatEuro, useCategoryLabel, type InvoiceResponse } from '../lib/invoices'
+import { selectInvoicesRefreshToken } from '../features/invoicesSlice'
+import { useAppSelector } from '../store/hooks'
 
 type SortKey = 'date' | 'vendor' | 'category' | 'amount'
 type SortDir = 'asc' | 'desc'
@@ -51,12 +53,13 @@ export default function Invoices() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null)
   const [editingInvoice, setEditingInvoice] = useState<InvoiceResponse | null>(null)
+  const invoicesRefreshToken = useAppSelector(selectInvoicesRefreshToken)
 
   useEffect(() => {
     unwrap(api.GET('/api/v1/invoices'))
       .then((data) => setInvoices(data || []))
       .catch(() => {})
-  }, [])
+  }, [invoicesRefreshToken])
 
   // When arriving from a chat source (?invoice=<id>), clear any active filters
   // so the row is guaranteed visible, then mark it for highlight + scroll.

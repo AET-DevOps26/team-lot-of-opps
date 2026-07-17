@@ -1,5 +1,7 @@
 import os
 import logging
+import difflib
+from datetime import date
 from typing import AsyncIterator
 
 import grpc
@@ -47,7 +49,21 @@ CATEGORY_SUGGESTIONS: dict[str, str] = {
     "SONSTIGE_AUSGABEN": "Sonstige berufsbedingte Ausgaben mit Belegen",
 }
 
-SYSTEM_PROMPT = """You are a helpful German tax document assistant for the app "TaxForward". Your job is to help users find their uploaded tax documents and discover what they should still upload to maximize their German income tax refund (Einkommensteuererklärung).
+EDITABLE_INVOICE_FIELDS = {"item_name", "price", "category"}
+
+
+def _resolve_category(raw: str) -> str | None:
+    # LLMs occasionally misspell/abbreviate the exact enum name (e.g. dropping a
+    # letter from WEGE_ZUR_ARBEIT). Snap close matches to the real value instead of
+    # hard-failing on a near-correct guess.
+    normalized = raw.strip().upper().replace(" ", "_")
+    if normalized in CATEGORY_SUGGESTIONS:
+        return normalized
+    matches = difflib.get_close_matches(normalized, CATEGORY_SUGGESTIONS.keys(), n=1, cutoff=0.75)
+    return matches[0] if matches else None
+
+
+SYSTEM_PROMPT = """You are a helpful German tax document assistant for the app "TaxForward". Your job is to help users find their uploaded tax documents, discover what they should still upload to maximize their German income tax refund (Einkommensteuererklärung), add invoices they describe to you directly, and correct mistakes on invoices they've already uploaded.
 
 Always respond in the same language the user writes in. If the user writes in German, respond in German. If in English, respond in English.
 
@@ -55,7 +71,27 @@ When helping users:
 1. Use list_user_documents first to get an overview of what documents exist
 2. Use search_documents for specific content or keyword queries
 3. Use suggest_missing_documents when the user asks what they should still upload
-4. Always cite specific invoices (company, date, amount) when answering"""
+4. Use summarize_invoice_categories when the user asks what they've spent by category
+5. Use explain_deduction_rule when the user asks why or how a category is deductible
+6. Use check_duplicate_invoices when the user asks to check for duplicate invoices
+7. Always cite specific invoices (company, date, amount) when answering
+
+Editing an invoice, and adding a new one, both apply immediately — call edit_invoice /
+add_invoice as soon as the user asks, with no separate confirmation step. If the user asks to
+change or add several invoices at once, call the tool separately for EACH one — one call per
+invoice, never skip any.
+
+add_invoice requires item_name, company, price, category, AND invoice_date — all five. If the
+user's message is missing any of them (the date is the one most often left out), do NOT call
+add_invoice and do NOT guess or invent a value (e.g. never assume today's date). Instead, ask the
+user for exactly the missing field(s) and wait for their reply before calling the tool.
+
+CRITICAL: after calling edit_invoice or add_invoice, read its returned text carefully. If it
+starts with "Could not", "Unknown", or "Cannot add", the change FAILED — you must tell the user
+it failed and why (e.g. relay which fields are missing), and never claim it succeeded. Only report
+success if the tool result literally confirms the update/creation (e.g. starts with "Updated
+invoice" or "Created invoice"). Never say a change was made unless every single tool call for it
+actually returned success."""
 
 
 async def _search_documents_async(query: str, user_id: str, referenced: list[dict]) -> str:
@@ -159,8 +195,169 @@ async def _suggest_missing_documents_async(user_id: str) -> str:
     return "\n".join(lines)
 
 
+_INVOICE_FIELD_TO_PROTO = {"item_name": "item_name", "price": "price", "category": "category"}
+_INVOICE_FIELD_TO_LEGACY_KEY = {"item_name": "itemName", "price": "price", "category": "category"}
+
+
+def _invalid_field_message(field: str) -> str:
+    return f"Cannot edit field '{field}'. Editable fields are: {', '.join(sorted(EDITABLE_INVOICE_FIELDS))}."
+
+
+async def _edit_invoice_async(invoice_id: int, field: str, new_value: str, user_id: str) -> str:
+    # Writes the change immediately via invoice-service's UpdateInvoice RPC.
+    if field not in EDITABLE_INVOICE_FIELDS:
+        return _invalid_field_message(field)
+    if field == "category":
+        resolved = _resolve_category(new_value)
+        if resolved is None:
+            valid = ", ".join(sorted(CATEGORY_SUGGESTIONS.keys()))
+            return f"Unknown category '{new_value}'. Valid categories: {valid}"
+        new_value = resolved
+    request = invoice_pb2.UpdateInvoiceRequest(user_id=user_id, invoice_id=invoice_id)
+    setattr(request, _INVOICE_FIELD_TO_PROTO[field], new_value)
+    try:
+        resp = await _get_invoice_stub().UpdateInvoice(request, timeout=10.0)
+    except grpc.RpcError as e:
+        detail = e.details() if hasattr(e, "details") else str(e)
+        return f"Could not update invoice {invoice_id}: {detail}"
+    return f"Updated invoice {resp.invoice.id}: {field} is now '{new_value}'."
+
+
+async def _add_invoice_async(
+    item_name: str,
+    company: str,
+    price: str,
+    category: str,
+    user_id: str,
+    invoice_date: str,
+) -> str:
+    # Creates the invoice immediately via invoice-service's CreateInvoice RPC. All
+    # fields are required — never create with a guessed/missing value; ask instead.
+    missing = [
+        label
+        for label, value in [
+            ("item name", item_name),
+            ("company", company),
+            ("price", price),
+            ("category", category),
+            ("invoice date", invoice_date),
+        ]
+        if not value or not value.strip()
+    ]
+    if missing:
+        return (
+            "Cannot add this invoice yet — missing: "
+            f"{', '.join(missing)}. Please ask the user for it before calling this tool again."
+        )
+    resolved_category = _resolve_category(category)
+    if resolved_category is None:
+        valid = ", ".join(sorted(CATEGORY_SUGGESTIONS.keys()))
+        return f"Unknown category '{category}'. Valid categories: {valid}"
+    try:
+        float(price)
+    except ValueError:
+        return f"'{price}' is not a valid price."
+    try:
+        date.fromisoformat(invoice_date)
+    except ValueError:
+        return f"'{invoice_date}' is not a valid date. Use YYYY-MM-DD."
+    request_kwargs = {
+        "user_id": user_id,
+        "item_name": item_name,
+        "company": company,
+        "price": price,
+        "category": resolved_category,
+        "invoice_date": invoice_date,
+    }
+    try:
+        resp = await _get_invoice_stub().CreateInvoice(
+            invoice_pb2.CreateInvoiceRequest(**request_kwargs),
+            timeout=10.0,
+        )
+    except grpc.RpcError as e:
+        detail = e.details() if hasattr(e, "details") else str(e)
+        return f"Could not create invoice: {detail}"
+    return f"Created invoice {resp.invoice.id}: {item_name} from {company}, {price}€."
+
+
+async def _summarize_invoice_categories_async(user_id: str) -> str:
+    invoices = await _fetch_invoices(user_id)
+    if not invoices:
+        return "No accepted invoices yet to summarize."
+
+    sums: dict[str, float] = {}
+    for inv in invoices:
+        category = inv.get("category") or "SONSTIGE_AUSGABEN"
+        price = float(inv["price"]) if inv.get("price") is not None else 0.0
+        sums[category] = sums.get(category, 0.0) + price
+
+    lines = ["Spending by category (accepted invoices only):"]
+    for category, total in sorted(sums.items(), key=lambda kv: -kv[1]):
+        lines.append(f"  • {category}: {total:.2f}€")
+    lines.append(
+        "\nNote: these are spending totals, not a tax refund estimate — no official "
+        "German deduction rates/Pauschale amounts are configured yet."
+    )
+    return "\n".join(lines)
+
+
+async def _explain_deduction_rule_async(category: str) -> str:
+    resolved = _resolve_category(category)
+    if resolved is None:
+        valid = ", ".join(sorted(CATEGORY_SUGGESTIONS.keys()))
+        return f"Unknown category '{category}'. Valid categories: {valid}"
+    return f"{resolved}: {CATEGORY_SUGGESTIONS[resolved]}"
+
+
+async def _check_duplicate_invoices_async(
+    company: str, price: str, user_id: str, invoice_date: str | None = None
+) -> str:
+    request_kwargs = {"user_id": user_id, "company": company, "price": price}
+    if invoice_date:
+        request_kwargs["invoice_date"] = invoice_date
+    try:
+        resp = await _get_invoice_stub().FindPotentialDuplicates(
+            invoice_pb2.FindPotentialDuplicatesRequest(**request_kwargs),
+            timeout=10.0,
+        )
+    except grpc.RpcError as e:
+        detail = e.details() if hasattr(e, "details") else str(e)
+        return f"Could not check for duplicates: {detail}"
+    if not resp.invoices:
+        return f"No potential duplicates found for {company} at {price}."
+    lines = [f"Found {len(resp.invoices)} potential duplicate(s):"]
+    for inv in resp.invoices:
+        date_str = inv.invoice_date if inv.HasField("invoice_date") else "no date"
+        lines.append(f"  • id={inv.id} {inv.item_name} ({inv.company}, {inv.price}€, {date_str})")
+    return "\n".join(lines)
+
+
 class _EmptyInput(BaseModel):
     pass
+
+
+class _EditInvoiceInput(BaseModel):
+    invoice_id: int
+    field: str
+    new_value: str
+
+
+class _AddInvoiceInput(BaseModel):
+    item_name: str
+    company: str
+    price: str
+    category: str
+    invoice_date: str
+
+
+class _ExplainDeductionRuleInput(BaseModel):
+    category: str
+
+
+class _CheckDuplicateInvoicesInput(BaseModel):
+    company: str
+    price: str
+    invoice_date: str | None = None
 
 
 def _make_tools(user_id: str, referenced: list[dict]) -> list[Tool]:
@@ -172,6 +369,25 @@ def _make_tools(user_id: str, referenced: list[dict]) -> list[Tool]:
 
     async def _async_suggest() -> str:
         return await _suggest_missing_documents_async(user_id)
+
+    async def _async_edit_invoice(invoice_id: int, field: str, new_value: str) -> str:
+        return await _edit_invoice_async(invoice_id, field, new_value, user_id)
+
+    async def _async_add_invoice(
+        item_name: str, company: str, price: str, category: str, invoice_date: str
+    ) -> str:
+        return await _add_invoice_async(item_name, company, price, category, user_id, invoice_date)
+
+    async def _async_summarize_categories() -> str:
+        return await _summarize_invoice_categories_async(user_id)
+
+    async def _async_explain_rule(category: str) -> str:
+        return await _explain_deduction_rule_async(category)
+
+    async def _async_check_duplicates(
+        company: str, price: str, invoice_date: str | None = None
+    ) -> str:
+        return await _check_duplicate_invoices_async(company, price, user_id, invoice_date)
 
     return [
         Tool(
@@ -204,6 +420,61 @@ def _make_tools(user_id: str, referenced: list[dict]) -> list[Tool]:
             func=lambda: "Async only — use coroutine path",
             coroutine=_async_suggest,
         ),
+        StructuredTool(
+            name="edit_invoice",
+            description=(
+                "Immediately changes one field (item_name, price, or category) of an existing "
+                "invoice — no separate confirmation step, call this as soon as the user asks. "
+                "Input: invoice_id (int), field (one of item_name/price/category), new_value (string)."
+            ),
+            args_schema=_EditInvoiceInput,
+            func=lambda **_: "Async only — use coroutine path",
+            coroutine=_async_edit_invoice,
+        ),
+        StructuredTool(
+            name="add_invoice",
+            description=(
+                "Immediately creates a new invoice — no separate confirmation step, call this "
+                "once ALL fields are known. Input (all required, ask the user for any you don't "
+                "have — never guess or omit one): item_name (string), company (string), price "
+                "(string, e.g. '9.99'), category (enum name, e.g. ARBEITSMITTEL), invoice_date "
+                "(ISO date, e.g. '2026-03-22')."
+            ),
+            args_schema=_AddInvoiceInput,
+            func=lambda **_: "Async only — use coroutine path",
+            coroutine=_async_add_invoice,
+        ),
+        StructuredTool(
+            name="summarize_invoice_categories",
+            description=(
+                "Sums the user's accepted invoices by tax category. Use when the user asks what "
+                "they've spent by category. Does not estimate a tax refund. No input required."
+            ),
+            args_schema=_EmptyInput,
+            func=lambda: "Async only — use coroutine path",
+            coroutine=_async_summarize_categories,
+        ),
+        StructuredTool(
+            name="explain_deduction_rule",
+            description=(
+                "Explains why/how a given German tax category is deductible. "
+                "Input: category (the category enum name, e.g. BEWIRTUNG)."
+            ),
+            args_schema=_ExplainDeductionRuleInput,
+            func=lambda **_: "Async only — use coroutine path",
+            coroutine=_async_explain_rule,
+        ),
+        StructuredTool(
+            name="check_duplicate_invoices",
+            description=(
+                "Flags the user's existing invoices that match a given company, price, and "
+                "(optionally) date — a likely duplicate submission. "
+                "Input: company (string), price (string, e.g. '9.99'), invoice_date (optional ISO date)."
+            ),
+            args_schema=_CheckDuplicateInvoicesInput,
+            func=lambda **_: "Async only — use coroutine path",
+            coroutine=_async_check_duplicates,
+        ),
     ]
 
 
@@ -220,12 +491,15 @@ def _build_agent(user_id: str, referenced: list[dict]):
     return create_agent(llm, tools, system_prompt=SYSTEM_PROMPT)
 
 
-async def run_agent_streaming(question: str, user_id: str) -> AsyncIterator[dict]:
+async def run_agent_streaming(
+    question: str, user_id: str, history: list[dict] | None = None
+) -> AsyncIterator[dict]:
     referenced_invoices: list[dict] = []
     try:
         agent = _build_agent(user_id, referenced_invoices)
+        messages = [*(history or []), {"role": "user", "content": question}]
         async for event in agent.astream_events(
-            {"messages": [{"role": "user", "content": question}]},
+            {"messages": messages},
             version="v2",
         ):
             kind = event["event"]
