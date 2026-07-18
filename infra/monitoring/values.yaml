@@ -2,13 +2,20 @@ loki:
   storageClassName: csi-rbd-sc
 
 kube-prometheus-stack:
-  # Privileged per-node DaemonSet; not runnable on the shared AET cluster.
   nodeExporter:
     enabled: false
   prometheus-node-exporter:
     enabled: false
 
-  # Rancher project quota rejects pods without limits; chart defaults set none.
+  kubeControllerManager:
+    enabled: false
+  kubeScheduler:
+    enabled: false
+  kubeProxy:
+    enabled: false
+  kubeEtcd:
+    enabled: false
+
   prometheusOperator:
     resources:
       requests:
@@ -19,7 +26,6 @@ kube-prometheus-stack:
         memory: "256Mi"
 
   kube-state-metrics:
-    # Without an allowlist, kube_pod_labels carries no label_* columns.
     metricLabelsAllowlist:
       - pods=[app.kubernetes.io/name,app.kubernetes.io/version]
     resources:
@@ -32,7 +38,6 @@ kube-prometheus-stack:
 
   prometheus:
     prometheusSpec:
-      # Discover ServiceMonitors from all namespaces, not just the chart's own
       serviceMonitorSelectorNilUsesHelmValues: false
       serviceMonitorNamespaceSelector: {}
       serviceMonitorSelector: {}
@@ -58,9 +63,6 @@ kube-prometheus-stack:
   alertmanager:
     enabled: true
     alertmanagerSpec:
-      # Mounted at /etc/alertmanager/secrets/telegram-bot-token/token. Created by
-      # deploy-observability.yml from the TELEGRAM_BOT_TOKEN repo secret; the token
-      # never passes through --set, which would leak it into `helm get values`.
       secrets:
         - telegram-bot-token
       resources:
@@ -78,8 +80,6 @@ kube-prometheus-stack:
         repeat_interval: 4h
         receiver: telegram
         routes:
-          # kube-prometheus-stack's Watchdog fires permanently by design as a
-          # dead-man's switch; routing it to Telegram would be constant spam.
           - receiver: "null"
             matchers:
               - alertname = "Watchdog"
@@ -87,23 +87,16 @@ kube-prometheus-stack:
         - name: "null"
         - name: telegram
           telegram_configs:
-            # "TaxForwardTeam" group. Plain group, not a supergroup: if Telegram ever
-            # promotes it, this id changes to a -100... form and alerts stop silently.
             - chat_id: -5461258895
               bot_token_file: /etc/alertmanager/secrets/telegram-bot-token/token
               parse_mode: HTML
               send_resolved: true
-              # Rendered by Alertmanager, not Helm (alertmanager.tplConfig is false),
-              # so these braces must survive into the generated Secret verbatim.
               message: |-
                 <b>[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}</b>
                 {{ range .Alerts }}{{ .Annotations.summary }}
                 {{ end }}
 
   grafana:
-    # adminPassword is NOT set here (kept out of git) — injected via --set from the
-    # GRAFANA_ADMIN_PASSWORD secret in deploy-observability.yml. Without this the chart
-    # generates a random password no one knows.
     adminUser: admin
     resources:
       requests:
@@ -118,22 +111,19 @@ kube-prometheus-stack:
       size: 2Gi
     "grafana.ini":
       server:
-        # Reached through the app's Traefik at /grafana (see infra/helm/templates/traefik-configmap.yaml).
         domain: taxforward-devops-ss26.stud.k8s.aet.cit.tum.de
         root_url: "%(protocol)s://%(domain)s/grafana/"
         serve_from_sub_path: true
-      # The /grafana route has no auth middleware in front of it, so Grafana's own login
-      # is the only gate — make sure anonymous access is off.
       "auth.anonymous":
         enabled: false
     sidecar:
       dashboards:
         enabled: true
         label: grafana_dashboard
-        searchNamespace: ALL   # pick up dashboard ConfigMaps from the app namespace too
+        searchNamespace: ALL
     additionalDataSources:
       - name: Loki
-        uid: loki                    # dashboard log panel references this uid explicitly
+        uid: loki
         type: loki
         access: proxy
         url: http://loki:3100
@@ -143,7 +133,7 @@ kube-prometheus-stack:
         uid: jaeger
         type: jaeger
         access: proxy
-        url: http://jaeger:16686     # in-namespace, see templates/jaeger.yaml
+        url: http://jaeger:16686
         jsonData:
           tracesToLogsV2:
             datasourceUid: loki
