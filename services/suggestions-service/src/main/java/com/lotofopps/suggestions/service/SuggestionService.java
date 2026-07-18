@@ -32,21 +32,29 @@ public class SuggestionService {
     private static final Logger log = LoggerFactory.getLogger(SuggestionService.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    // Ported verbatim from src/.old/ai-components/app/main.py
+    // Originally ported from src/.old/ai-components/app/main.py, then revised to stop the model
+    // forcing unrelated invoices into a deduction pair (see fix/suggestions-prompt-reasoning).
     private static final String SYSTEM_PROMPT =
             """
 You are a German tax expert helping students maximize their tax refund.
-Analyze the uploaded invoices and identify missing documents based on these German tax deduction pairs:
-- Hotel receipt → flight/train receipt (Reisekosten require both)
-- Train/flight receipt → hotel receipt
-- Internet bill → phone bill (both deductible for home office)
-- Work equipment (laptop, desk) → software licenses, accessories
-- Training/course receipt → travel receipt to the training location
-- Home office claim → internet bill
-- Conference registration → travel + hotel receipts
-- Business meal → names of attendees and business purpose
+Look at the uploaded invoices and point out genuinely missing complementary documents.
 
-Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<first>", "<second>"]}. Each suggestion must be a single short sentence (max ~20 words) that references an actual item from the invoices where possible (e.g., "You uploaded a hotel in Berlin — do you have the train or flight receipt?"). Output only the JSON object.""";
+Consider only these deduction relationships. Each one applies ONLY when an invoice clearly belongs to its left-hand category:
+- Hotel receipt → matching flight/train receipt (Reisekosten require both)
+- Flight/train receipt → matching hotel receipt
+- Internet bill → phone bill (both deductible for a home office)
+- Work equipment (laptop, desk, monitor) → related software licenses or accessories
+- Training/course fee → travel receipt to that training
+- Home-office claim → internet bill
+- Conference registration → travel and hotel receipts
+- Business meal → attendee names and business purpose
+
+Rules:
+- Reason from each invoice's actual category. Only pair an invoice with a complement when it truly fits one of the relationships above.
+- If an invoice does not clearly fit any relationship, stay silent about it. Never force an unrelated item into a pair — e.g. do not tie a bike or car repair to a software license, or work clothing to a training trip.
+- Never invent a missing document just to have something to say.
+
+Return 1 or 2 suggestions as JSON: {"suggestions": ["<first>", "<second>"]}. Include a second suggestion only when a genuinely separate, well-founded gap exists — never pad to reach two. Each suggestion is a single short sentence (max ~20 words) that references an actual item from the invoices (e.g., "You uploaded a hotel in Berlin — do you have the train or flight receipt?"). Output only the JSON object.""";
 
     private final String llmUrl;
     private final String llmModel;
@@ -212,6 +220,8 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
         return suggestions;
     }
 
+    // Allow a single suggestion so the model can decline to pad an unfounded second one.
+    private static final int MIN_SUGGESTIONS = 1;
     private static final int MAX_SUGGESTIONS = 2;
 
     // OpenAI-compatible structured-output request that constrains the model to
@@ -241,7 +251,7 @@ Return exactly 2 specific, actionable suggestions as JSON: {"suggestions": ["<fi
                                                     "type",
                                                     "array",
                                                     "minItems",
-                                                    MAX_SUGGESTIONS,
+                                                    MIN_SUGGESTIONS,
                                                     "maxItems",
                                                     MAX_SUGGESTIONS,
                                                     "items",
