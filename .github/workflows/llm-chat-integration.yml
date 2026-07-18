@@ -21,6 +21,7 @@ jobs:
       LLM_URL: ${{ vars.LLM_URL }}
       LLM_MODEL: ${{ vars.LLM_MODEL }}
       LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      GRAFANA_ADMIN_PASSWORD: unused
     steps:
       - uses: actions/checkout@v4
         with:
