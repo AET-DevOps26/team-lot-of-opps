@@ -1,9 +1,14 @@
 name: Deploy
 
 # One app deploy for both targets (both run k3s/Helm):
-#   push to main          -> auto-deploy to the AET cluster
-#   workflow_dispatch     -> choose target: aet (AET cluster) or vm
+#   push to main          -> auto-deploy to BOTH the AET cluster and the VM;
+#                            if the push touched infra/terraform or infra/ansible,
+#                            the VM is (re)provisioned first via vm-provision.yml
+#   workflow_dispatch     -> choose target: aet (AET cluster) or vm; a vm deploy
+#                            always provisions first (idempotent no-op if unchanged)
 # Monitoring is NOT deployed here — see deploy-observability.yml.
+# Provisioning does NOT start a deallocated VM — if it was stopped via
+# vm-stop.yml, run vm-start.yml first or the vm deploy will fail to connect.
 #
 # Rolling back: for the fast path use rollback.yml (helm rollback, no build). To
 # redeploy a known-good commit instead, dispatch this with ref + image_tag both
@@ -65,10 +70,34 @@ env:
   RELEASE: taxforward
 
 jobs:
-  # A VM deploy always provisions first (Terraform + Ansible) — it's idempotent,
-  # so it's a no-op when the VM already matches. Never runs for aet.
+  # Did this push touch the VM's infrastructure? Only then is provisioning
+  # needed on the auto-deploy path. HEAD^ on a merge commit is main's previous
+  # tip, so the diff covers the whole merged PR.
+  changes:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    outputs:
+      infra: ${{ steps.diff.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: diff
+        run: |
+          if git diff --name-only HEAD^ HEAD | grep -qE '^infra/(terraform|ansible)/'; then
+            echo "infra=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "infra=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Provision (Terraform + Ansible) runs before any deploy that could need it:
+  # always for a manual/called vm deploy (idempotent no-op when the VM already
+  # matches), and on push to main only when the push changed the infra.
   provision:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'vm' }}
+    needs: [changes]
+    if: ${{ always()
+         && ((github.event_name != 'push' && inputs.target == 'vm')
+          || (github.event_name == 'push' && needs.changes.outputs.infra == 'true')) }}
     uses: ./.github/workflows/vm-provision.yml
     secrets: inherit
 
@@ -79,11 +108,18 @@ jobs:
     secrets: inherit
 
   deploy:
-    needs: [build, provision]
+    needs: [changes, build, provision]
     if: ${{ always()
+         && (needs.changes.result == 'success' || needs.changes.result == 'skipped')
          && (needs.build.result == 'success' || needs.build.result == 'skipped')
          && (needs.provision.result == 'success' || needs.provision.result == 'skipped') }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Push to main fans out to both clusters; a manual dispatch/call still
+      # targets just the one target it asked for.
+      matrix:
+        target: ${{ github.event_name == 'push' && fromJSON('["aet","vm"]') || fromJSON(format('["{0}"]', inputs.target)) }}
     steps:
       # Empty ref = the triggering commit, i.e. the normal push-to-main path.
       - uses: actions/checkout@v4
@@ -108,7 +144,7 @@ jobs:
             exit 1
           fi
 
-          TARGET="${{ github.event_name == 'push' && 'aet' || inputs.target }}"
+          TARGET="${{ matrix.target }}"
           case "$TARGET" in
             vm)
               echo "storage_class=local-path"
