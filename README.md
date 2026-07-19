@@ -10,7 +10,7 @@ To deploy manually to the AET cluster: GitHub → **Actions** → **`deploy.yml`
 If the merge touched the VM's infrastructure (`infra/terraform/**` or `infra/ansible/**`), the same pipeline first (re)provisions the VM on Azure with Terraform and sets it up with Ansible before deploying.
 
 **!!! DISCLAIMER**: `deploy.yml` only deploys the app, not the observablility stack. We reccomend this, since the last time we checked (16.07.2026, 16:01) deploying the observablility stack on the AET cluster did not work, due to a known, unsolved problem.
-If you want to see the observabiliyt stack in action go to the [azure deployment](http://lot-of-opps-vm.swedencentral.cloudapp.azure.com/grafana) with username: `admin`, password: `pleaseGiveUseAGoodGrade1.0Thanks`.
+If you want to see the observabiliyt stack in action go to the [azure deployment](http://lot-of-opps-vm.polandcentral.cloudapp.azure.com/grafana) with username: `admin`, password: `pleaseGiveUseAGoodGrade1.0Thanks`.
 
 Full details (VM target, one-click deploy-all, rollout strategies) are in [Deploy](#deploy) below.
 
@@ -32,7 +32,7 @@ Full details (VM target, one-click deploy-all, rollout strategies) are in [Deplo
 | [`api/README.md`](api/README.md) | OpenAPI spec and codegen |
 ## Live deployments
 
-- **VM (Azure):** http://lot-of-opps-vm.swedencentral.cloudapp.azure.com/welcome
+- **VM (Azure):** http://lot-of-opps-vm.polandcentral.cloudapp.azure.com/welcome
 - **AET (TUM cluster):** https://taxforward-devops-ss26.stud.k8s.aet.cit.tum.de/welcome
 
 ## Architecture
